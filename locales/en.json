@@ -1,0 +1,50 @@
+{
+  "common": {
+    "appName": "Agriismart",
+    "language": "Language",
+    "english": "English",
+    "tamil": "Tamil"
+  },
+  "auth": {
+    "login": "Login",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "loginWithGoogle": "Login with Google",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "loginHere": "Login here",
+    "signupHere": "Sign up here"
+  },
+  "home": {
+    "title": "Plant Analysis",
+    "subtitle": "Upload a plant image for AI-powered analysis",
+    "uploadImage": "Upload Image",
+    "chooseSource": "Choose Image Source",
+    "camera": "Camera",
+    "gallery": "Gallery",
+    "cancel": "Cancel",
+    "analyzing": "Analyzing...",
+    "analyze": "Analyze Plant"
+  },
+  "results": {
+    "title": "Analysis Results",
+    "plantName": "Plant Name",
+    "healthStatus": "Health Status",
+    "diseases": "Diseases",
+    "recommendations": "Recommendations",
+    "noResults": "No results available"
+  },
+  "profile": {
+    "title": "Profile",
+    "logout": "Logout",
+    "analysisHistory": "Analysis History"
+  },
+  "errors": {
+    "selectImage": "Please select an image first",
+    "analysisError": "Failed to analyze image. Please try again.",
+    "cameraPermission": "Camera permission is required",
+    "networkError": "Network error. Please check your connection."
+  }
+}

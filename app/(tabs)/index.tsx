@@ -9,21 +9,23 @@ import {
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
 import { getAllPlants } from '../../lib/database';
+import { useTranslation } from 'react-i18next';
 
 export default function Home() {
   const { user } = useContext(UserContext);
   const [plants, setPlants] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const { t } = useTranslation();
 
-  const loadPlants = async () => {
+  const loadPlants = React.useCallback(async () => {
     if (!user) return;
     const allPlants = await getAllPlants(user.id);
     setPlants(allPlants);
-  };
+  }, [user]);
 
   useEffect(() => {
     loadPlants();
-  }, [user]);
+  }, [loadPlants]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -35,7 +37,9 @@ export default function Home() {
     let parsedResult = null;
     try {
       parsedResult = JSON.parse(item.result);
-    } catch (e) {}
+    } catch {
+      parsedResult = null;
+    }
 
     return (
       <View style={styles.card}>
@@ -75,7 +79,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Plants</Text>
+        <Text style={styles.headerTitle}>{t('profile.analysisHistory')}</Text>
         <Text style={styles.headerSubtitle}>
           Welcome, {user?.full_name || 'User'}!
         </Text>
@@ -84,7 +88,7 @@ export default function Home() {
       {plants.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🌱</Text>
-          <Text style={styles.emptyText}>No plants analyzed yet</Text>
+          <Text style={styles.emptyText}>{t('results.noResults')}</Text>
           <Text style={styles.emptySubtext}>
             Go to the Analyze tab to get started
           </Text>

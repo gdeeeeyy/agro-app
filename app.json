@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Plant Health Analyzer",
-    "slug": "plant-health-analyzer",
+    "name": "Agriismart",
+    "slug": "agriismart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "agroapp",
+    "scheme": "agriismart",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.krishna.agroapp"
+      "bundleIdentifier": "com.agriismart.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.krishn.agroapp"
+      "package": "com.agriismart.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "static",
@@ -39,7 +44,13 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Agriismart to access your camera to capture plant images for analysis."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

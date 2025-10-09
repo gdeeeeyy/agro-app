@@ -1,8 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from '../context/UserContext';
+import { useEffect } from 'react';
+import { loadLanguage } from '../lib/i18n';
 
 export default function RootLayout() {
+  useEffect(() => {
+    loadLanguage();
+  }, []);
+
   return (
     <UserProvider>
       <Stack screenOptions={{ headerShown: false }}>

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
 import { signIn } from '../../lib/auth';
+import { useTranslation } from 'react-i18next';
 
 export default function Login() {
   const [number, setNumber] = useState('');
@@ -19,6 +20,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { setUser } = useContext(UserContext);
+  const { t } = useTranslation();
 
   const handleLogin = async () => {
     if (!number || !password) {
@@ -49,7 +51,7 @@ export default function Login() {
     >
       <View style={styles.content}>
         <Text style={styles.logo}>🌿</Text>
-        <Text style={styles.title}>Plant Health Analyzer</Text>
+        <Text style={styles.title}>{t('common.appName')}</Text>
         <Text style={styles.subtitle}>Sign in to continue</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -66,7 +68,7 @@ export default function Login() {
 
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder={t('auth.password')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -81,7 +83,7 @@ export default function Login() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
+            <Text style={styles.buttonText}>{t('auth.login')}</Text>
           )}
         </TouchableOpacity>
 
@@ -90,7 +92,7 @@ export default function Login() {
           disabled={loading}
         >
           <Text style={styles.link}>
-            Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+            {t('auth.dontHaveAccount')} <Text style={styles.linkBold}>{t('auth.signupHere')}</Text>
           </Text>
         </TouchableOpacity>
       </View>

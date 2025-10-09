@@ -2,10 +2,14 @@ import axios from "axios";
 
 const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
-export async function analyzePlantImage(base64Image: string, plantName: string) {
+export async function analyzePlantImage(base64Image: string, plantName: string, language: string = 'en') {
   if (!apiKey) throw new Error("Missing Gemini API key");
 
   const base64Raw = base64Image.split(",")[1] ?? base64Image;
+
+  const languageInstruction = language === 'ta'
+    ? 'Respond in Tamil language (தமிழில் பதிலளிக்கவும்).'
+    : 'Respond in English language.';
 
   const prompt = `
 You are a plant disease and pest identification assistant.
@@ -14,6 +18,7 @@ Analyze the image and return:
 1. Disease or pest
 2. Short description
 3. 3–5 keywords
+${languageInstruction}
 Respond strictly in JSON:
 { "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
 `;

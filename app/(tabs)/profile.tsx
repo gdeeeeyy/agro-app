@@ -8,18 +8,21 @@ import {
   View,
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
+import { useTranslation } from 'react-i18next';
+import { saveLanguage } from '../../lib/i18n';
 
 export default function Profile() {
   const { user, setUser } = useContext(UserContext);
+  const { t, i18n } = useTranslation();
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
+      t('profile.logout'),
       'Are you sure you want to logout?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('home.cancel'), style: 'cancel' },
         {
-          text: 'Logout',
+          text: t('profile.logout'),
           style: 'destructive',
           onPress: () => {
             setUser(null);
@@ -30,11 +33,15 @@ export default function Profile() {
     );
   };
 
+  const changeLanguage = async (lang: string) => {
+    await saveLanguage(lang);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerIcon}>👤</Text>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t('profile.title')}</Text>
       </View>
 
       <View style={styles.content}>
@@ -44,7 +51,7 @@ export default function Profile() {
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('auth.email')}</Text>
           <Text style={styles.value}>{user?.email || 'N/A'}</Text>
         </View>
 
@@ -57,8 +64,46 @@ export default function Profile() {
           </Text>
         </View>
 
+        <View style={styles.languageCard}>
+          <Text style={styles.label}>{t('common.language')}</Text>
+          <View style={styles.languageButtons}>
+            <TouchableOpacity
+              style={[
+                styles.languageButton,
+                i18n.language === 'en' && styles.languageButtonActive,
+              ]}
+              onPress={() => changeLanguage('en')}
+            >
+              <Text
+                style={[
+                  styles.languageButtonText,
+                  i18n.language === 'en' && styles.languageButtonTextActive,
+                ]}
+              >
+                {t('common.english')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.languageButton,
+                i18n.language === 'ta' && styles.languageButtonActive,
+              ]}
+              onPress={() => changeLanguage('ta')}
+            >
+              <Text
+                style={[
+                  styles.languageButtonText,
+                  i18n.language === 'ta' && styles.languageButtonTextActive,
+                ]}
+              >
+                {t('common.tamil')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
+          <Text style={styles.logoutButtonText}>{t('profile.logout')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -120,5 +165,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  languageCard: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  languageButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  languageButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#4caf50',
+    alignItems: 'center',
+  },
+  languageButtonActive: {
+    backgroundColor: '#4caf50',
+  },
+  languageButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4caf50',
+  },
+  languageButtonTextActive: {
+    color: '#fff',
   },
 });
