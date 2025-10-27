@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Product {
   id: number;
@@ -30,12 +31,13 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onPress }: ProductCardProps) {
   const { addItem } = useCart();
+  const { t, currentLanguage } = useLanguage();
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
 
   const handleAddToCart = async () => {
     if (product.stock_available <= 0) {
-      Alert.alert('Out of Stock', 'This product is currently out of stock.');
+      Alert.alert(t('store.outOfStock'), t('store.outOfStock'));
       return;
     }
 
@@ -45,16 +47,16 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
 
   const handleConfirmAddToCart = async () => {
     if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) {
-      Alert.alert('Invalid Quantity', `Please enter a quantity between 1 and ${product.stock_available}`);
+      Alert.alert(t('common.error'), t('cart.invalidQuantity'));
       return;
     }
 
     const success = await addItem(product.id, selectedQuantity);
     if (success) {
-      Alert.alert('Success', `${selectedQuantity} item(s) added to cart!`);
+      Alert.alert(t('common.success'), t('store.addedToCart'));
       setQuantityModalVisible(false);
     } else {
-      Alert.alert('Error', 'Failed to add product to cart.');
+      Alert.alert(t('common.error'), t('store.addToCartError'));
     }
   };
 
@@ -66,15 +68,15 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
       
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>
-          {product.name}
+          {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
         </Text>
         
         <Text style={styles.plantUsed} numberOfLines={1}>
-          Plant: {product.plant_used}
+          {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
         </Text>
         
         <Text style={styles.details} numberOfLines={3}>
-          {product.details}
+          {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
         </Text>
         
         <View style={styles.footer}>
@@ -82,8 +84,8 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
             <Text style={styles.price}>₹{product.cost_per_unit}</Text>
             <Text style={styles.stock}>
               {product.stock_available > 0 
-                ? `${product.stock_available} in stock` 
-                : 'Out of stock'
+                ? `${product.stock_available} ${t('store.inStock')}` 
+                : t('store.outOfStock')
               }
             </Text>
           </View>
@@ -113,9 +115,9 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Quantity</Text>
-            <Text style={styles.modalProductName}>{product.name}</Text>
-            <Text style={styles.modalStock}>Available: {product.stock_available} units</Text>
+            <Text style={styles.modalTitle}>{t('product.selectQuantity')}</Text>
+            <Text style={styles.modalProductName}>{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}</Text>
+            <Text style={styles.modalStock}>{t('product.availableUnits').replace('{units}', String(product.stock_available))}</Text>
             
             <View style={styles.quantityContainer}>
               <TouchableOpacity
@@ -145,7 +147,7 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
             </View>
 
             <Text style={styles.modalTotal}>
-              Total: ₹{(selectedQuantity * product.cost_per_unit).toFixed(2)}
+              {t('product.total')}: ₹{(selectedQuantity * product.cost_per_unit).toFixed(2)}
             </Text>
 
             <View style={styles.modalButtons}>
@@ -153,14 +155,14 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
                 style={styles.cancelButton}
                 onPress={() => setQuantityModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={styles.confirmButton}
                 onPress={handleConfirmAddToCart}
               >
-                <Text style={styles.confirmButtonText}>Add to Cart</Text>
+                <Text style={styles.confirmButtonText}>{t('store.addToCart')}</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -7,20 +7,24 @@ import {
   TouchableOpacity,
   View,
   Image,
+  ScrollView,
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSelector from '../../components/LanguageSelector';
 
 export default function Profile() {
   const { user, setUser } = useContext(UserContext);
+  const { t } = useLanguage();
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
+      t('auth.logout'),
       'Are you sure you want to logout?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Logout',
+          text: t('auth.logout'),
           style: 'destructive',
           onPress: () => {
             setUser(null);
@@ -35,33 +39,37 @@ export default function Profile() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t('nav.profile')}</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
         <View style={styles.infoCard}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>{t('auth.fullname')}</Text>
           <Text style={styles.value}>{user?.full_name || 'N/A'}</Text>
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.label}>Number</Text>
+          <Text style={styles.label}>{t('auth.number')}</Text>
           <Text style={styles.value}>{user?.number || 'N/A'}</Text>
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.label}>Member Since</Text>
+          <Text style={styles.label}>{t('profile.memberSince')}</Text>
           <Text style={styles.value}>
             {user?.created_at
-              ? new Date(user.created_at).toLocaleDateString()
+              ? new Date(user.created_at).toLocaleDateString('ta-IN')
               : 'N/A'}
           </Text>
         </View>
 
+        <View style={styles.languageCard}>
+          <LanguageSelector />
+        </View>
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
+          <Text style={styles.logoutButtonText}>{t('auth.logout')}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -123,5 +131,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  languageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

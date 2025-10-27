@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useLanguage } from "../context/LanguageContext";
 
 interface PlantAnalysisProps {
   data: {
@@ -11,22 +12,23 @@ interface PlantAnalysisProps {
 }
 
 export default function PlantAnalysis({ data }: PlantAnalysisProps) {
+  const { t } = useLanguage();
   return (
     <View style={styles.card}>
       <Text style={styles.title}>🌿 {data.plant}</Text>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Disease / Pest:</Text>
+        <Text style={styles.label}>{t('analysis.diseaseOrPest')}</Text>
         <Text style={styles.value}>{data.disease_or_pest}</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Description:</Text>
+        <Text style={styles.label}>{t('analysis.description')}</Text>
         <Text style={styles.value}>{data.description}</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Keywords:</Text>
+        <Text style={styles.label}>{t('analysis.keywords')}</Text>
         <View style={styles.keywordContainer}>
           {data.keywords.map((kw, index) => (
             <View key={index} style={styles.keywordChip}>

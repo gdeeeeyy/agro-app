@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { getUserOrders, getOrderItems } from '../../lib/database';
 
 interface Order {
@@ -19,6 +20,7 @@ interface Order {
   user_id: number;
   total_amount: number;
   payment_method: string;
+  delivery_address?: string;
   status: string;
   status_note?: string;
   delivery_date?: string;
@@ -37,6 +39,7 @@ interface OrderItem {
 
 export default function Orders() {
   const { user } = useContext(UserContext);
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -111,9 +114,9 @@ export default function Orders() {
     >
       <View style={styles.orderHeader}>
         <View>
-          <Text style={styles.orderId}>Order #{item.id}</Text>
+          <Text style={styles.orderId}>{t('orders.orderDetails')} #{item.id}</Text>
           <Text style={styles.orderDate}>
-            {new Date(item.created_at).toLocaleDateString('en-IN', {
+            {new Date(item.created_at).toLocaleDateString('ta-IN', {
               day: 'numeric',
               month: 'short',
               year: 'numeric'
@@ -122,30 +125,38 @@ export default function Orders() {
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Ionicons name={getStatusIcon(item.status) as any} size={16} color="#fff" />
-          <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+          <Text style={styles.statusText}>{t(`status.${item.status.toLowerCase()}`)}</Text>
         </View>
       </View>
 
-      <View style={styles.orderDetails}>
-        <View style={styles.orderDetailRow}>
-          <Ionicons name="cash" size={20} color="#666" />
-          <Text style={styles.orderDetailText}>₹{item.total_amount.toFixed(2)}</Text>
-        </View>
-        <View style={styles.orderDetailRow}>
-          <Ionicons name="wallet" size={20} color="#666" />
-          <Text style={styles.orderDetailText}>
-            {item.payment_method === 'cod' ? 'Cash on Delivery' : item.payment_method.toUpperCase()}
-          </Text>
-        </View>
-        {item.delivery_date && (
+        <View style={styles.orderDetails}>
           <View style={styles.orderDetailRow}>
-            <Ionicons name="calendar" size={20} color="#666" />
+            <Ionicons name="cash" size={20} color="#666" />
+            <Text style={styles.orderDetailText}>₹{item.total_amount.toFixed(2)}</Text>
+          </View>
+          <View style={styles.orderDetailRow}>
+            <Ionicons name="wallet" size={20} color="#666" />
             <Text style={styles.orderDetailText}>
-              Est. Delivery: {new Date(item.delivery_date).toLocaleDateString('en-IN')}
+              {item.payment_method === 'cod' ? t('payment.cod') : item.payment_method.toUpperCase()}
             </Text>
           </View>
-        )}
-      </View>
+          {item.delivery_date && (
+            <View style={styles.orderDetailRow}>
+              <Ionicons name="calendar" size={20} color="#666" />
+              <Text style={styles.orderDetailText}>
+                {t('orders.delivery')}: {new Date(item.delivery_date).toLocaleDateString('ta-IN')}
+              </Text>
+            </View>
+          )}
+          {item.delivery_address && (
+            <View style={styles.orderDetailRow}>
+              <Ionicons name="location" size={20} color="#666" />
+              <Text style={styles.orderDetailText} numberOfLines={2}>
+                {item.delivery_address}
+              </Text>
+            </View>
+          )}
+        </View>
 
       {item.status_note && (
         <View style={styles.statusNote}>
@@ -155,7 +166,7 @@ export default function Orders() {
       )}
 
       <View style={styles.viewDetailsButton}>
-        <Text style={styles.viewDetailsText}>View Details</Text>
+        <Text style={styles.viewDetailsText}>{t('orders.viewDetails')}</Text>
         <Ionicons name="chevron-forward" size={20} color="#4caf50" />
       </View>
     </TouchableOpacity>
@@ -164,9 +175,9 @@ export default function Orders() {
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="receipt-outline" size={80} color="#ccc" />
-      <Text style={styles.emptyText}>No orders yet</Text>
+      <Text style={styles.emptyText}>{t('orders.empty')}</Text>
       <Text style={styles.emptySubtext}>
-        Your orders will appear here once you make a purchase
+        {t('orders.emptySubtext')}
       </Text>
     </View>
   );
@@ -176,10 +187,10 @@ export default function Orders() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>My Orders</Text>
+          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
         </View>
         <Text style={styles.headerSubtitle}>
-          Faith of the Farmers - Track your orders
+          {t('orders.subtitle')}
         </Text>
       </View>
 
@@ -202,7 +213,7 @@ export default function Orders() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Order Details</Text>
+            <Text style={styles.modalTitle}>{t('orders.orderDetails')}</Text>
             <TouchableOpacity onPress={() => setDetailsModalVisible(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -240,6 +251,14 @@ export default function Orders() {
                       <Text style={styles.detailLabel}>Est. Delivery:</Text>
                       <Text style={styles.detailValue}>
                         {new Date(selectedOrder.delivery_date).toLocaleDateString('en-IN')}
+                      </Text>
+                    </View>
+                  )}
+                  {selectedOrder.delivery_address && (
+                    <View style={styles.addressDetailSection}>
+                      <Text style={styles.detailLabel}>Delivery Address:</Text>
+                      <Text style={styles.addressDetailText}>
+                        {selectedOrder.delivery_address}
                       </Text>
                     </View>
                   )}
@@ -529,5 +548,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#4caf50',
+  },
+  addressDetailSection: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  addressDetailText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginTop: 4,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4caf50',
   },
 });

@@ -14,13 +14,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
-import { savePlant, findProductsByKeywords } from "../../lib/database";
+import { savePlant, findProductsByKeywords, getRelatedProductsByName } from "../../lib/database";
 import { analyzePlantImage } from "../../lib/gemini";
 import ProductCard from "../../components/ProductCard";
+import { useLanguage } from "../../context/LanguageContext";
 
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
+  const { currentLanguage, t } = useLanguage();
   const [plantName, setPlantName] = useState<string>("");
   const [result, setResult] = useState<any>(null);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
@@ -72,8 +74,8 @@ export default function App() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
-        'Permission Required',
-        'Camera permission is required to take photos. Please enable it in your device settings.'
+        t('permissions.cameraRequiredTitle'),
+        t('permissions.cameraRequiredMessage')
       );
       return false;
     }
@@ -129,19 +131,19 @@ export default function App() {
 
   const analyzeAndSave = async () => {
     if (!image || !plantName) {
-      Alert.alert("Error", "Please enter a plant name and select an image.");
+      Alert.alert(t('scanner.error'), t('scanner.inputRequired'));
       return;
     }
 
     if (!user) {
-      Alert.alert("Error", "You must be logged in to analyze plants.");
+      Alert.alert(t('scanner.error'), t('scanner.loginRequired'));
       return;
     }
 
     setLoading(true);
     try {
       const base64 = await uriToBase64(image);
-      const geminiResponse = await analyzePlantImage(base64, plantName);
+      const geminiResponse = await analyzePlantImage(base64, plantName, currentLanguage);
 
       setResult(geminiResponse);
 
@@ -149,15 +151,27 @@ export default function App() {
 
       // Extract keywords from the analysis for better product matching
       const analysisKeywords = extractKeywordsFromAnalysis(geminiResponse, plantName);
-      const products = await findProductsByKeywords(analysisKeywords);
-      setRecommendedProducts(products);
+      const products = await findProductsByKeywords(analysisKeywords, 5);
 
-      Alert.alert("Success", "Plant analysis saved successfully!");
+      // Also fetch related products based on the top matched product name
+      let related: any[] = [];
+      if (products.length > 0) {
+        const top = products[0] as any;
+        const topName = currentLanguage === 'ta' ? (top.name_ta || top.name) : top.name;
+        related = await getRelatedProductsByName(topName, products.map((p: any) => p.id), 3);
+      }
+      // Merge and dedupe by product id
+      const map: Record<string, any> = {};
+      [...products, ...related].forEach((p: any) => { map[p.id] = p; });
+      const combined = Object.values(map);
+      setRecommendedProducts(combined);
+
+      Alert.alert(t('scanner.success'), t('scanner.successSaved'));
       setImage(null);
       setPlantName("");
     } catch (error) {
       console.error("Analysis error:", error);
-      Alert.alert("Error", "Failed to analyze image. Please try again.");
+      Alert.alert(t('scanner.error'), t('scanner.failed'));
     }
     setLoading(false);
   };
@@ -167,33 +181,34 @@ export default function App() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>Agriismart Scanner</Text>
+          <Text style={styles.headerTitle}>{t('scanner.headerTitle')}</Text>
         </View>
-        <Text style={styles.headerSubtitle}>Faith of the Farmers - AI Plant Analysis</Text>
+        <Text style={styles.headerSubtitle}>{t('scanner.headerSubtitle')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.inputSection}>
-          <Text style={styles.label}>Plant Name</Text>
+          <Text style={styles.label}>{t('scanner.plantName')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., Tomato, Rose, Wheat"
+            placeholder={t('scanner.placeholder')}
             value={plantName}
             onChangeText={setPlantName}
+            placeholderTextColor="#999"
           />
         </View>
 
         <View style={styles.imagePickerSection}>
-          <Text style={styles.label}>Choose Image Source</Text>
+          <Text style={styles.label}>{t('scanner.chooseSource')}</Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cameraButton} onPress={takePhoto}>
               <Ionicons name="camera" size={32} color="#4caf50" />
-              <Text style={styles.cameraButtonText}>Take Photo</Text>
+              <Text style={styles.cameraButtonText}>{t('scanner.takePhoto')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.galleryButton} onPress={pickImageFromGallery}>
               <Ionicons name="images" size={32} color="#4caf50" />
-              <Text style={styles.galleryButtonText}>Gallery</Text>
+              <Text style={styles.galleryButtonText}>{t('scanner.gallery')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -208,7 +223,7 @@ export default function App() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.analyzeButtonText}>Analyze & Save</Text>
+            <Text style={styles.analyzeButtonText}>{t('scanner.analyzeSave')}</Text>
           )}
         </TouchableOpacity>
 
@@ -216,9 +231,9 @@ export default function App() {
 
         {recommendedProducts.length > 0 && (
           <View style={styles.recommendationsSection}>
-            <Text style={styles.recommendationsTitle}>Recommended Products</Text>
+            <Text style={styles.recommendationsTitle}>{t('scan.recommendations')}</Text>
             <Text style={styles.recommendationsSubtitle}>
-              Based on your plant analysis
+              {currentLanguage === 'ta' ? 'உங்கள் தாவர ஆய்வின் அடிப்படையில்' : 'Based on your plant analysis'}
             </Text>
             {recommendedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />

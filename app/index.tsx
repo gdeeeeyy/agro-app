@@ -4,10 +4,5 @@ import { UserContext } from '../context/UserContext';
 
 export default function Index() {
   const { user } = useContext(UserContext);
-
-  if (user) {
-    return <Redirect href="/(tabs)" />;
-  }
-
-  return <Redirect href="/auth/login" />;
+  return <Redirect href={user ? '/(tabs)' : '/auth/login'} />;
 }

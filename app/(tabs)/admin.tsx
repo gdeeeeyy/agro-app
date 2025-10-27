@@ -39,9 +39,12 @@ interface Product {
 
 interface ProductForm {
   name: string;
+  name_ta: string;
   plant_used: string;
+  plant_used_ta: string;
   keywords: string;
   details: string;
+  details_ta: string;
   image?: string;
   stock_available: string;
   cost_per_unit: string;
@@ -65,9 +68,12 @@ export default function AdminDashboard() {
   const [newKeywordName, setNewKeywordName] = useState('');
   const [formData, setFormData] = useState<ProductForm>({
     name: '',
+    name_ta: '',
     plant_used: '',
+    plant_used_ta: '',
     keywords: '',
     details: '',
+    details_ta: '',
     image: '',
     stock_available: '',
     cost_per_unit: '',
@@ -123,15 +129,18 @@ export default function AdminDashboard() {
     setModalVisible(true);
   };
 
-  const openEditModal = (product: Product) => {
+  const openEditModal = (product: any) => {
     setFormData({
-      name: product.name,
-      plant_used: product.plant_used,
-      keywords: product.keywords,
-      details: product.details,
+      name: product.name || '',
+      name_ta: product.name_ta || '',
+      plant_used: product.plant_used || '',
+      plant_used_ta: product.plant_used_ta || '',
+      keywords: product.keywords || '',
+      details: product.details || '',
+      details_ta: product.details_ta || '',
       image: product.image || '',
-      stock_available: product.stock_available.toString(),
-      cost_per_unit: product.cost_per_unit.toString(),
+      stock_available: String(product.stock_available ?? ''),
+      cost_per_unit: String(product.cost_per_unit ?? ''),
     });
     // Parse existing keywords
     const existingKeywords = product.keywords.split(',').map(k => k.trim()).filter(k => k);
@@ -227,11 +236,14 @@ export default function AdminDashboard() {
       return;
     }
 
-    const productData = {
+    const productData: any = {
       name: formData.name.trim(),
       plant_used: formData.plant_used.trim(),
       keywords: selectedKeywords.join(', '),
       details: formData.details.trim(),
+      name_ta: formData.name_ta.trim() || undefined,
+      plant_used_ta: formData.plant_used_ta.trim() || undefined,
+      details_ta: formData.details_ta.trim() || undefined,
       image: formData.image || undefined,
       stock_available: parseInt(formData.stock_available),
       cost_per_unit: parseFloat(formData.cost_per_unit),
@@ -460,16 +472,28 @@ export default function AdminDashboard() {
           <ScrollView style={styles.modalContent}>
             <TextInput
               style={styles.input}
-              placeholder="Product Name"
+              placeholder="Product Name (English)"
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="பொருளின் பெயர் (தமிழ்)"
+              value={formData.name_ta}
+              onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
             />
 
             <TextInput
               style={styles.input}
-              placeholder="Plant Used"
+              placeholder="Plant Used (English)"
               value={formData.plant_used}
               onChangeText={(text) => setFormData({ ...formData, plant_used: text })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="பயன்படுத்தும் தாவரம் (தமிழ்)"
+              value={formData.plant_used_ta}
+              onChangeText={(text) => setFormData({ ...formData, plant_used_ta: text })}
             />
 
             <View style={styles.keywordSection}>
@@ -505,16 +529,24 @@ export default function AdminDashboard() {
               
               {keywords.length === 0 && (
                 <Text style={styles.noKeywordsText}>
-                  No keywords available. Use "Manage Keywords" to add some.
+                  No keywords available. Use &quot;Manage Keywords&quot; to add some.
                 </Text>
               )}
             </View>
 
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Product Details"
+              placeholder="Product Details (English)"
               value={formData.details}
               onChangeText={(text) => setFormData({ ...formData, details: text })}
+              multiline
+              numberOfLines={4}
+            />
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="பொருள் விவரங்கள் (தமிழ்)"
+              value={formData.details_ta}
+              onChangeText={(text) => setFormData({ ...formData, details_ta: text })}
               multiline
               numberOfLines={4}
             />

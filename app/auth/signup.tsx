@@ -12,6 +12,8 @@ import {
   Image,
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSelector from '../../components/LanguageSelector';
 import { signUp } from '../../lib/auth';
 
 export default function SignUp() {
@@ -21,15 +23,16 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { setUser } = useContext(UserContext);
+  const { t } = useLanguage();
 
   const handleSignUp = async () => {
     if (!number || !password || !fullName) {
-      setError('Please fill in all fields');
+      setError(t('auth.fillFields'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordMismatch'));
       return;
     }
 
@@ -56,14 +59,16 @@ export default function SignUp() {
     >
       <View style={styles.content}>
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.title}>Agriismart</Text>
-        <Text style={styles.subtitle}>Faith of the Farmers - Join us today</Text>
+        <Text style={styles.title}>{t('home.title')}</Text>
+        <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
+
+        <LanguageSelector />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TextInput
           style={styles.input}
-          placeholder="Full Name"
+          placeholder={t('auth.fullname')}
           value={fullName}
           onChangeText={setFullName}
           editable={!loading}
@@ -71,7 +76,7 @@ export default function SignUp() {
 
         <TextInput
           style={styles.input}
-          placeholder="number"
+          placeholder={t('auth.number')}
           value={number}
           onChangeText={setnumber}
           autoCapitalize="none"
@@ -81,7 +86,7 @@ export default function SignUp() {
 
         <TextInput
           style={styles.input}
-          placeholder="Password (min 6 characters)"
+          placeholder={t('auth.password')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -96,7 +101,7 @@ export default function SignUp() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Create Account</Text>
+            <Text style={styles.buttonText}>{t('auth.signup')}</Text>
           )}
         </TouchableOpacity>
 
@@ -105,7 +110,7 @@ export default function SignUp() {
           disabled={loading}
         >
           <Text style={styles.link}>
-            Already have an account? <Text style={styles.linkBold}>Sign In</Text>
+            {t('auth.hasAccount')} <Text style={styles.linkBold}>{t('auth.signin')}</Text>
           </Text>
         </TouchableOpacity>
       </View>

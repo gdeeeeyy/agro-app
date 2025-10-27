@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Agriismart - Faith of the Farmers",
+    "name": "அக்ரிஸ்மார்ட் - விவசாயிகளின் நம்பிக்கை",
     "slug": "agriismart",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "agriismart",
@@ -42,8 +42,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app needs access to your photos to analyze plant images.",
-          "cameraPermission": "The app needs access to your camera to take photos of plants for analysis."
+          "photosPermission": "பயிர் படங்களை ஆய்வு செய்ய உங்கள் புகைப்படங்களுக்கு அணுகல் தேவை.",
+          "cameraPermission": "தாவரங்களைப் புகைப்படம் எடுக்க கேமரா அனுமதி தேவை."
         }
       ],
       "expo-sqlite"

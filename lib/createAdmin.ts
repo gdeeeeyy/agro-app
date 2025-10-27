@@ -41,4 +41,4 @@ export async function createDefaultAdmin() {
 }
 
 // Run this function to create the default admin
-// createDefaultAdmin();
+createDefaultAdmin();

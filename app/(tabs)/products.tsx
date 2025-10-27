@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { getAllProducts, searchProducts, getAllKeywords, getProductsByKeyword } from '../../lib/database';
 import ProductCard from '../../components/ProductCard';
 
@@ -35,6 +36,7 @@ interface Product {
 
 export default function Products() {
   const { user } = useContext(UserContext);
+  const { t } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
@@ -50,7 +52,7 @@ export default function Products() {
       setFilteredProducts(allProducts);
     } catch (error) {
       console.error('Error loading products:', error);
-      Alert.alert('Error', 'Failed to load products');
+      Alert.alert(t('common.error'), t('products.empty'));
     } finally {
       setLoading(false);
     }
@@ -120,12 +122,12 @@ export default function Products() {
     <View style={styles.emptyContainer}>
       <Ionicons name="leaf-outline" size={80} color="#ccc" />
       <Text style={styles.emptyText}>
-        {searchQuery ? 'No products found' : 'No products available'}
+        {searchQuery ? t('products.emptySearch') : t('products.empty')}
       </Text>
       <Text style={styles.emptySubtext}>
         {searchQuery 
-          ? 'Try searching with different keywords' 
-          : 'Products will appear here when added by admin'
+          ? t('products.searchHint') 
+          : t('products.empty')
         }
       </Text>
     </View>
@@ -134,7 +136,7 @@ export default function Products() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading products...</Text>
+        <Text style={styles.loadingText}>{t('products.loading')}</Text>
       </View>
     );
   }
@@ -144,10 +146,10 @@ export default function Products() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>Agriismart Store</Text>
+          <Text style={styles.headerTitle}>{t('store.title')}</Text>
         </View>
         <Text style={styles.headerSubtitle}>
-          Faith of the Farmers - Welcome, {user?.full_name || 'User'}!
+          {t('store.subtitle')}
         </Text>
       </View>
 
@@ -156,7 +158,7 @@ export default function Products() {
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search products..."
+            placeholder={t('store.search')}
             value={searchQuery}
             onChangeText={handleSearch}
             placeholderTextColor="#999"
@@ -189,7 +191,7 @@ export default function Products() {
               styles.filterChipText,
               !selectedKeyword && styles.filterChipTextActive
             ]}>
-              All
+              {t('products.all')}
             </Text>
           </TouchableOpacity>
           

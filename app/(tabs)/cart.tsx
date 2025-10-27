@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
 import { createOrder } from '../../lib/database';
+import AddressModal from '../../components/AddressModal';
 
 interface CartItem {
   id: number;
@@ -29,9 +31,12 @@ interface CartItem {
 
 export default function Cart() {
   const { user } = useContext(UserContext);
+  const { t } = useLanguage();
   const { cartItems, cartTotal, updateQuantity, removeItem, clearAll } = useCart();
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<string>('');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
 
   const handleQuantityChange = async (productId: number, newQuantity: number) => {
     if (newQuantity < 0) return;
@@ -40,12 +45,12 @@ export default function Cart() {
 
   const handleRemoveItem = async (productId: number) => {
     Alert.alert(
-      'Remove Item',
-      'Are you sure you want to remove this item from your cart?',
+      t('cart.removeItem'),
+      t('cart.removeConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Remove', 
+          text: t('common.delete'), 
           style: 'destructive',
           onPress: () => removeItem(productId)
         },
@@ -55,12 +60,12 @@ export default function Cart() {
 
   const handleClearCart = () => {
     Alert.alert(
-      'Clear Cart',
-      'Are you sure you want to remove all items from your cart?',
+      t('cart.clearCart'),
+      t('cart.clearConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Clear', 
+          text: t('cart.clearCart'), 
           style: 'destructive',
           onPress: () => clearAll()
         },
@@ -70,45 +75,61 @@ export default function Cart() {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      Alert.alert('Cart Empty', 'Please add items to your cart before checkout.');
+      Alert.alert(t('cart.empty'), t('cart.emptySubtext'));
       return;
     }
-    setPaymentModalVisible(true);
+    // Start with address collection for delivery
+    setAddressModalVisible(true);
   };
 
   const handlePaymentSelect = (method: string) => {
     setSelectedPayment(method);
   };
 
+  const handleAddressConfirmed = (address: string) => {
+    setDeliveryAddress(address);
+    setAddressModalVisible(false);
+    setPaymentModalVisible(true);
+  };
+
   const handleConfirmOrder = async () => {
     if (!selectedPayment) {
-      Alert.alert('Payment Method Required', 'Please select a payment method.');
+      Alert.alert(t('common.error'), t('payment.required'));
       return;
     }
 
     if (selectedPayment === 'card' || selectedPayment === 'upi') {
-      Alert.alert('Coming Soon', `${selectedPayment.toUpperCase()} payment is not available yet. Please use Cash on Delivery.`);
+      Alert.alert(t('common.info') ?? t('common.success'), t('payment.comingSoon'));
+      return;
+    }
+
+    // For delivery orders, ensure address is provided
+    if (selectedPayment === 'cod' && !deliveryAddress.trim()) {
+      setPaymentModalVisible(false);
+      setAddressModalVisible(true);
       return;
     }
 
     try {
       if (!user) {
-        Alert.alert('Error', 'Please login to place an order.');
+        Alert.alert(t('common.error'), t('order.loginRequired'));
         return;
       }
 
-      const orderId = await createOrder(user.id, selectedPayment);
+      const orderId = await createOrder(user.id, selectedPayment, deliveryAddress);
       setPaymentModalVisible(false);
+      setAddressModalVisible(false);
       setSelectedPayment('');
+      setDeliveryAddress('');
       
       Alert.alert(
-        'Order Placed Successfully!',
-        `Your order #${orderId} has been placed and will be delivered soon. You can track your order in the Orders tab.`,
-        [{ text: 'OK' }]
+        t('order.placed'),
+        t('order.placedDesc').replace('{orderId}', String(orderId)),
+        [{ text: t('common.ok') }]
       );
     } catch (error) {
       console.error('Order creation error:', error);
-      Alert.alert('Error', 'Failed to place order. Please try again.');
+      Alert.alert(t('common.error'), t('order.error'));
     }
   };
 
@@ -161,9 +182,9 @@ export default function Cart() {
   const renderEmptyCart = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="cart-outline" size={80} color="#ccc" />
-      <Text style={styles.emptyText}>Your cart is empty</Text>
+      <Text style={styles.emptyText}>{t('cart.empty')}</Text>
       <Text style={styles.emptySubtext}>
-        Add some products to get started
+        {t('cart.emptySubtext')}
       </Text>
     </View>
   );
@@ -173,10 +194,10 @@ export default function Cart() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>Agriismart Cart</Text>
+          <Text style={styles.headerTitle}>{t('cart.title')}</Text>
         </View>
         <Text style={styles.headerSubtitle}>
-          Faith of the Farmers - Welcome, {user?.full_name || 'User'}!
+          {t('cart.subtitle')}
         </Text>
       </View>
 
@@ -194,7 +215,7 @@ export default function Cart() {
 
           <View style={styles.footer}>
             <View style={styles.totalContainer}>
-              <Text style={styles.totalLabel}>Total:</Text>
+              <Text style={styles.totalLabel}>{t('cart.total')}:</Text>
               <Text style={styles.totalAmount}>₹{cartTotal.toFixed(2)}</Text>
             </View>
 
@@ -203,14 +224,14 @@ export default function Cart() {
                 style={styles.clearButton}
                 onPress={handleClearCart}
               >
-                <Text style={styles.clearButtonText}>Clear Cart</Text>
+                <Text style={styles.clearButtonText}>{t('cart.clearCart')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.checkoutButton}
                 onPress={handleCheckout}
               >
-                <Text style={styles.checkoutButtonText}>Checkout</Text>
+                <Text style={styles.checkoutButtonText}>{t('cart.checkout')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -226,14 +247,30 @@ export default function Cart() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Payment Method</Text>
+              <Text style={styles.modalTitle}>{t('payment.title')}</Text>
               <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalContent}>
-              <Text style={styles.orderSummary}>Order Total: ₹{cartTotal.toFixed(2)}</Text>
+              <Text style={styles.orderSummary}>{t('payment.orderTotal')}: ₹{cartTotal.toFixed(2)}</Text>
+              
+              {deliveryAddress && (
+                <View style={styles.addressSection}>
+                  <Text style={styles.addressLabel}>{t('address.deliveryAddress')}</Text>
+                  <Text style={styles.addressText}>{deliveryAddress}</Text>
+                  <TouchableOpacity 
+                    style={styles.changeAddressButton}
+                    onPress={() => {
+                      setPaymentModalVisible(false);
+                      setAddressModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.changeAddressText}>{t('address.changeAddress')}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[
@@ -249,8 +286,8 @@ export default function Cart() {
                     color={selectedPayment === 'cod' ? '#4caf50' : '#666'} 
                   />
                   <View style={styles.paymentOptionText}>
-                    <Text style={styles.paymentOptionTitle}>Cash on Delivery</Text>
-                    <Text style={styles.paymentOptionSubtitle}>Pay when you receive</Text>
+                    <Text style={styles.paymentOptionTitle}>{t('payment.cod')}</Text>
+                    <Text style={styles.paymentOptionSubtitle}>{t('payment.codDesc')}</Text>
                   </View>
                 </View>
                 {selectedPayment === 'cod' && (
@@ -273,8 +310,8 @@ export default function Cart() {
                     color={selectedPayment === 'card' ? '#4caf50' : '#ccc'} 
                   />
                   <View style={styles.paymentOptionText}>
-                    <Text style={[styles.paymentOptionTitle, styles.disabledText]}>Credit/Debit Card</Text>
-                    <Text style={[styles.paymentOptionSubtitle, styles.disabledText]}>Coming Soon</Text>
+                    <Text style={[styles.paymentOptionTitle, styles.disabledText]}>{t('payment.card')}</Text>
+                    <Text style={[styles.paymentOptionSubtitle, styles.disabledText]}>{t('payment.cardDesc')}</Text>
                   </View>
                 </View>
                 {selectedPayment === 'card' && (
@@ -297,8 +334,8 @@ export default function Cart() {
                     color={selectedPayment === 'upi' ? '#4caf50' : '#ccc'} 
                   />
                   <View style={styles.paymentOptionText}>
-                    <Text style={[styles.paymentOptionTitle, styles.disabledText]}>UPI Payment</Text>
-                    <Text style={[styles.paymentOptionSubtitle, styles.disabledText]}>Coming Soon</Text>
+                    <Text style={[styles.paymentOptionTitle, styles.disabledText]}>{t('payment.upi')}</Text>
+                    <Text style={[styles.paymentOptionSubtitle, styles.disabledText]}>{t('payment.upiDesc')}</Text>
                   </View>
                 </View>
                 {selectedPayment === 'upi' && (
@@ -316,12 +353,18 @@ export default function Cart() {
                 onPress={handleConfirmOrder}
                 disabled={!selectedPayment}
               >
-                <Text style={styles.confirmButtonText}>Confirm Order</Text>
+                <Text style={styles.confirmButtonText}>{t('payment.confirmOrder')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      <AddressModal
+        visible={addressModalVisible}
+        onClose={() => setAddressModalVisible(false)}
+        onAddressConfirmed={handleAddressConfirmed}
+      />
     </View>
   );
 }
@@ -585,6 +628,36 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  addressSection: {
+    backgroundColor: '#f1f8f4',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  addressLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2d5016',
+    marginBottom: 8,
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  changeAddressButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#4caf50',
+    borderRadius: 6,
+  },
+  changeAddressText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
   },
 });

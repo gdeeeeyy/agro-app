@@ -12,6 +12,8 @@ import {
   Image,
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSelector from '../../components/LanguageSelector';
 import { signIn } from '../../lib/auth';
 
 export default function Login() {
@@ -20,10 +22,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { setUser } = useContext(UserContext);
+  const { t } = useLanguage();
 
   const handleLogin = async () => {
     if (!number || !password) {
-      setError('Please fill in all fields');
+      setError(t('auth.fillFields'));
       return;
     }
 
@@ -50,14 +53,16 @@ export default function Login() {
     >
       <View style={styles.content}>
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.title}>Agriismart</Text>
-        <Text style={styles.subtitle}>Faith of the Farmers - Sign in to continue</Text>
+        <Text style={styles.title}>{t('home.title')}</Text>
+        <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
+
+        <LanguageSelector />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TextInput
           style={styles.input}
-          placeholder="number"
+          placeholder={t('auth.number')}
           value={number}
           onChangeText={setnumber}
           autoCapitalize="none"
@@ -67,7 +72,7 @@ export default function Login() {
 
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder={t('auth.password')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -82,7 +87,7 @@ export default function Login() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
+            <Text style={styles.buttonText}>{t('auth.signin')}</Text>
           )}
         </TouchableOpacity>
 
@@ -91,7 +96,7 @@ export default function Login() {
           disabled={loading}
         >
           <Text style={styles.link}>
-            Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+            {t('auth.noAccount')} <Text style={styles.linkBold}>{t('auth.signup')}</Text>
           </Text>
         </TouchableOpacity>
       </View>

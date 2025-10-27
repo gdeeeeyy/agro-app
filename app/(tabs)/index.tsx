@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   FlatList,
   Image,
@@ -18,6 +19,7 @@ import { getAllPlants } from '../../lib/database';
 
 export default function Home() {
   const { user } = useContext(UserContext);
+  const { t } = useLanguage();
   const [plants, setPlants] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -56,19 +58,19 @@ export default function Home() {
         )}
         {parsedResult && (
           <View style={styles.resultContainer}>
-            <Text style={styles.resultLabel}>Status:</Text>
+            <Text style={styles.resultLabel}>{t('orders.status')}:</Text>
             <Text style={styles.resultValue}>{parsedResult.disease_status || 'N/A'}</Text>
 
             {parsedResult.disease_name && (
               <>
-                <Text style={styles.resultLabel}>Disease:</Text>
+                <Text style={styles.resultLabel}>{t('analysis.diseaseOrPest')}</Text>
                 <Text style={styles.resultValue}>{parsedResult.disease_name}</Text>
               </>
             )}
 
             {parsedResult.severity && (
               <>
-                <Text style={styles.resultLabel}>Severity:</Text>
+                <Text style={styles.resultLabel}>{t('analysis.severity')}</Text>
                 <Text style={styles.resultValue}>{parsedResult.severity}</Text>
               </>
             )}
@@ -83,19 +85,19 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>Agriismart</Text>
+          <Text style={styles.headerTitle}>{t('home.title')}</Text>
         </View>
         <Text style={styles.headerSubtitle}>
-          Faith of the Farmers - Welcome, {user?.full_name || 'User'}!
+          {t('home.subtitle')}
         </Text>
       </View>
 
       {plants.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🌱</Text>
-          <Text style={styles.emptyText}>No plants analyzed yet</Text>
+          <Text style={styles.emptyText}>{t('home.noRecentScans')}</Text>
           <Text style={styles.emptySubtext}>
-            Go to the Analyze tab to get started
+            {t('home.getStarted')}
           </Text>
         </View>
       ) : (

@@ -9,6 +9,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       number TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       full_name TEXT,
+      address TEXT,
       is_admin INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -29,6 +30,10 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       plant_used TEXT NOT NULL,
       keywords TEXT NOT NULL,
       details TEXT NOT NULL,
+      -- Optional Tamil fields (added via migration if missing)
+      name_ta TEXT,
+      plant_used_ta TEXT,
+      details_ta TEXT,
       image TEXT,
       stock_available INTEGER DEFAULT 0,
       cost_per_unit REAL NOT NULL,
@@ -52,6 +57,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       user_id INTEGER NOT NULL,
       total_amount REAL NOT NULL,
       payment_method TEXT NOT NULL,
+      delivery_address TEXT,
       status TEXT DEFAULT 'pending',
       status_note TEXT,
       delivery_date TEXT,
@@ -78,6 +84,22 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Lightweight migration: ensure bilingual columns exist on products
+  try {
+    const cols = await db.getAllAsync("PRAGMA table_info(products)");
+    const colNames = (cols as any[]).map(c => c.name);
+    const addCol = async (name: string) => {
+      if (!colNames.includes(name)) {
+        await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} TEXT`);
+      }
+    };
+    await addCol('name_ta');
+    await addCol('plant_used_ta');
+    await addCol('details_ta');
+  } catch (e) {
+    console.warn('Migration check failed:', e);
+  }
 })();
 
 export async function savePlant(userId: number, name: string, imageUri: string, result: string) {
@@ -129,17 +151,23 @@ export async function addProduct(product: {
   plant_used: string;
   keywords: string;
   details: string;
+  name_ta?: string;
+  plant_used_ta?: string;
+  details_ta?: string;
   image?: string;
   stock_available: number;
   cost_per_unit: number;
 }) {
   try {
     const result = await db.runAsync(
-      "INSERT INTO products (name, plant_used, keywords, details, image, stock_available, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, stock_available, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
       product.plant_used,
       product.keywords,
       product.details,
+      product.name_ta || null,
+      product.plant_used_ta || null,
+      product.details_ta || null,
       product.image || null,
       product.stock_available,
       product.cost_per_unit
@@ -156,6 +184,9 @@ export async function updateProduct(id: number, product: {
   plant_used?: string;
   keywords?: string;
   details?: string;
+  name_ta?: string;
+  plant_used_ta?: string;
+  details_ta?: string;
   image?: string;
   stock_available?: number;
   cost_per_unit?: number;
@@ -199,8 +230,8 @@ export async function searchProducts(keywords: string) {
   try {
     const searchTerm = `%${keywords.toLowerCase()}%`;
     const rows = await db.getAllAsync(
-      "SELECT * FROM products WHERE LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(details) LIKE ? ORDER BY created_at DESC",
-      searchTerm, searchTerm, searchTerm, searchTerm
+      "SELECT * FROM products WHERE LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(details) LIKE ? OR LOWER(name_ta) LIKE ? OR LOWER(plant_used_ta) LIKE ? OR LOWER(details_ta) LIKE ? ORDER BY created_at DESC",
+      searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm
     );
     return rows;
   } catch (err) {
@@ -209,40 +240,43 @@ export async function searchProducts(keywords: string) {
   }
 }
 
-export async function findProductsByKeywords(analysisKeywords: string[]) {
+export async function findProductsByKeywords(analysisKeywords: string[], limit: number = 5) {
   try {
     if (analysisKeywords.length === 0) return [];
     
-    // Create a more sophisticated keyword matching
+    // Create a more sophisticated keyword matching across EN/TA fields
     const keywordConditions = analysisKeywords.map(() => 
-      "LOWER(keywords) LIKE ? OR LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(details) LIKE ?"
+      "LOWER(keywords) LIKE ? OR LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(details) LIKE ? OR LOWER(name_ta) LIKE ? OR LOWER(plant_used_ta) LIKE ? OR LOWER(details_ta) LIKE ?"
     ).join(' OR ');
     
     const searchTerms = analysisKeywords.flatMap(keyword => {
       const term = `%${keyword.toLowerCase()}%`;
-      return [term, term, term, term]; // For each keyword, search in 4 fields
+      return [term, term, term, term, term, term, term]; // include Tamil fields
     });
     
     const query = `
       SELECT *, 
       (
         CASE 
-          WHEN LOWER(keywords) LIKE ? THEN 4
-          WHEN LOWER(name) LIKE ? THEN 3
-          WHEN LOWER(plant_used) LIKE ? THEN 2
-          WHEN LOWER(details) LIKE ? THEN 1
+          WHEN LOWER(keywords) LIKE ? THEN 7
+          WHEN LOWER(name) LIKE ? THEN 6
+          WHEN LOWER(plant_used) LIKE ? THEN 5
+          WHEN LOWER(details) LIKE ? THEN 4
+          WHEN LOWER(name_ta) LIKE ? THEN 3
+          WHEN LOWER(plant_used_ta) LIKE ? THEN 2
+          WHEN LOWER(details_ta) LIKE ? THEN 1
           ELSE 0
         END
       ) as relevance_score
       FROM products 
       WHERE ${keywordConditions}
       ORDER BY relevance_score DESC, created_at DESC
-      LIMIT 10
+      LIMIT ${Math.max(1, Math.min(50, Number(limit) || 5))}
     `;
     
     // Add primary keyword for relevance scoring
     const primaryKeyword = `%${analysisKeywords[0].toLowerCase()}%`;
-    const finalSearchTerms = [primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, ...searchTerms];
+    const finalSearchTerms = [primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, ...searchTerms];
     
     const rows = await db.getAllAsync(query, ...finalSearchTerms);
     return rows;
@@ -252,11 +286,45 @@ export async function findProductsByKeywords(analysisKeywords: string[]) {
   }
 }
 
+export async function getRelatedProductsByName(query: string, excludeIds: number[] = [], limit: number = 3) {
+  try {
+    const tokens = query
+      .split(/[^\p{L}\p{N}]+/u)
+      .map(t => t.trim().toLowerCase())
+      .filter(t => t.length > 2);
+    if (tokens.length === 0) return [];
+
+    const nameConds = tokens.map(() => "LOWER(name) LIKE ? OR LOWER(name_ta) LIKE ?").join(" OR ");
+    const params = tokens.flatMap(t => {
+      const term = `%${t}%`;
+      return [term, term];
+    });
+
+    const excludeClause = excludeIds.length > 0
+      ? `AND id NOT IN (${excludeIds.map(() => '?').join(',')})`
+      : '';
+    const excludeParams = excludeIds;
+
+    const sql = `
+      SELECT * FROM products
+      WHERE (${nameConds}) ${excludeClause}
+      ORDER BY created_at DESC
+      LIMIT ${Math.max(1, Math.min(20, Number(limit) || 3))}
+    `;
+
+    const rows = await db.getAllAsync(sql, ...params, ...excludeParams);
+    return rows;
+  } catch (err) {
+    console.error('SQLite related products error:', err);
+    return [];
+  }
+}
+
 // Cart functions
 export async function getCartItems(userId: number) {
   try {
     const rows = await db.getAllAsync(
-      `SELECT ci.*, p.name, p.image, p.cost_per_unit, p.stock_available 
+      `SELECT ci.*, p.name, p.name_ta, p.image, p.cost_per_unit, p.stock_available 
        FROM cart_items ci 
        JOIN products p ON ci.product_id = p.id 
        WHERE ci.user_id = ? 
@@ -358,7 +426,7 @@ export async function getCartTotal(userId: number) {
 }
 
 // Order functions
-export async function createOrder(userId: number, paymentMethod: string) {
+export async function createOrder(userId: number, paymentMethod: string, deliveryAddress?: string) {
   try {
     // Get cart items
     const cartItems = await getCartItems(userId);
@@ -371,8 +439,8 @@ export async function createOrder(userId: number, paymentMethod: string) {
 
     // Create order
     const orderResult = await db.runAsync(
-      "INSERT INTO orders (user_id, total_amount, payment_method, status) VALUES (?, ?, ?, ?)",
-      userId, total, paymentMethod, 'pending'
+      "INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status) VALUES (?, ?, ?, ?, ?)",
+      userId, total, paymentMethod, deliveryAddress || null, 'pending'
     );
 
     const orderId = orderResult.lastInsertRowId;
@@ -530,6 +598,30 @@ export async function getProductsByKeyword(keyword: string) {
   } catch (err) {
     console.error("SQLite fetch error:", err);
     return [];
+  }
+}
+
+// User functions
+export async function updateUserAddress(userId: number, address: string) {
+  try {
+    await db.runAsync(
+      "UPDATE users SET address = ? WHERE id = ?",
+      address, userId
+    );
+    return true;
+  } catch (err) {
+    console.error("SQLite update error:", err);
+    return false;
+  }
+}
+
+export async function getUserById(userId: number) {
+  try {
+    const rows = await db.getAllAsync("SELECT * FROM users WHERE id = ?", userId);
+    return rows[0] || null;
+  } catch (err) {
+    console.error("SQLite fetch error:", err);
+    return null;
   }
 }
 

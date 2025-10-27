@@ -25,6 +25,7 @@ interface Order {
   number: string;
   total_amount: number;
   payment_method: string;
+  delivery_address?: string;
   status: string;
   status_note?: string;
   delivery_date?: string;
@@ -192,6 +193,14 @@ export default function AdminOrders() {
             </Text>
           </View>
         )}
+        {item.delivery_address && (
+          <View style={styles.orderDetailRow}>
+            <Ionicons name="location" size={18} color="#666" />
+            <Text style={styles.orderDetailText} numberOfLines={2}>
+              {item.delivery_address}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.actionButtons}>
@@ -284,7 +293,14 @@ export default function AdminOrders() {
                 <View style={styles.orderInfo}>
                   <Text style={styles.orderInfoTitle}>Order #{selectedOrder.id}</Text>
                   <Text style={styles.orderInfoText}>Customer: {selectedOrder.full_name}</Text>
+                  <Text style={styles.orderInfoText}>Phone: {selectedOrder.number}</Text>
                   <Text style={styles.orderInfoText}>Total: ₹{selectedOrder.total_amount.toFixed(2)}</Text>
+                  {selectedOrder.delivery_address && (
+                    <View style={styles.addressInfo}>
+                      <Text style={styles.addressLabel}>Delivery Address:</Text>
+                      <Text style={styles.addressText}>{selectedOrder.delivery_address}</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.section}>
@@ -739,5 +755,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  addressInfo: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4caf50',
+  },
+  addressLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2d5016',
+    marginBottom: 6,
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
   },
 });

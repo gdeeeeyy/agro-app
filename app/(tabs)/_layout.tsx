@@ -3,9 +3,11 @@ import { Tabs } from 'expo-router';
 import { useContext } from 'react';
 import CartIcon from '../../components/CartIcon';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function TabLayout() {
   const { user } = useContext(UserContext);
+  const { t } = useLanguage();
   const isAdmin = user?.is_admin === 1;
 
   return (
@@ -24,7 +26,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('nav.home'),
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -33,7 +35,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="App"
         options={{
-          title: 'Scan',
+          title: t('nav.scan'),
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="leaf" size={size} color={color} />
           ),
@@ -42,7 +44,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="products"
         options={{
-          title: 'Store',
+          title: t('nav.store'),
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="storefront" size={size} color={color} />
           ),
@@ -51,8 +53,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="cart"
         options={{
-          title: 'Cart',
-          href: isAdmin ? undefined : null,
+          title: t('nav.cart'),
+          href: isAdmin ? null : undefined,
           tabBarIcon: ({ size, color }) => (
             <CartIcon size={size} color={color} />
           ),
@@ -61,8 +63,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: 'Orders',
-          href: isAdmin ? undefined : null,
+          title: t('nav.orders'),
+          href: isAdmin ? null : undefined,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="receipt" size={size} color={color} />
           ),
@@ -71,7 +73,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="admin"
         options={{
-          title: 'Admin',
+          title: t('nav.admin'),
           href: isAdmin ? undefined : null,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="settings" size={size} color={color} />
@@ -81,7 +83,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="adminOrders"
         options={{
-          title: 'Manage',
+          title: t('nav.manage'),
           href: isAdmin ? undefined : null,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="clipboard" size={size} color={color} />
@@ -91,7 +93,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('nav.profile'),
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
