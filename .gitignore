@@ -4,9 +4,11 @@
 
 expo-env.d.ts
 node_modules/
+android/
 android/.gradle/
 android/app/build/
 android/build/
+ios/
 ios/build/
 ios/Pods/
 .expo/
