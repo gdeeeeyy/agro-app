@@ -13,7 +13,7 @@ ios/Pods/
 .expo-shared/
 *.iml
 *.log
-
+.gitignore
 
 # @end expo-cli
 node_modules
