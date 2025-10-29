@@ -258,15 +258,22 @@ export async function searchProducts(keywords: string) {
 export async function findProductsByKeywords(analysisKeywords: string[], limit: number = 5) {
   try {
     if (analysisKeywords.length === 0) return [];
-    
-    // Create a more sophisticated keyword matching across EN/TA fields
-    const keywordConditions = analysisKeywords.map(() => 
+
+    // Remote mode: approximate by search across joined keywords
+    if (API_URL) {
+      const q = analysisKeywords.join(' ');
+      const rows = await api.get(`/products/search?q=${encodeURIComponent(q)}`) as any[];
+      return rows.slice(0, Math.max(1, Math.min(50, Number(limit) || 5)));
+    }
+
+    // Local mode (SQLite)
+    const keywordConditions = analysisKeywords.map(() =>
       "LOWER(keywords) LIKE ? OR LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(details) LIKE ? OR LOWER(name_ta) LIKE ? OR LOWER(plant_used_ta) LIKE ? OR LOWER(details_ta) LIKE ?"
     ).join(' OR ');
     
     const searchTerms = analysisKeywords.flatMap(keyword => {
       const term = `%${keyword.toLowerCase()}%`;
-      return [term, term, term, term, term, term, term]; // include Tamil fields
+      return [term, term, term, term, term, term, term];
     });
     
     const query = `
@@ -289,13 +296,14 @@ export async function findProductsByKeywords(analysisKeywords: string[], limit: 
       LIMIT ${Math.max(1, Math.min(50, Number(limit) || 5))}
     `;
     
-    // Add primary keyword for relevance scoring
     const primaryKeyword = `%${analysisKeywords[0].toLowerCase()}%`;
     const finalSearchTerms = [primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, primaryKeyword, ...searchTerms];
     
     const rows = await db.getAllAsync(query, ...finalSearchTerms);
     return rows;
-  } catch (err) {
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (msg.includes('no such table')) return [];
     console.error("SQLite keyword matching error:", err);
     return [];
   }
@@ -308,6 +316,12 @@ export async function getRelatedProductsByName(query: string, excludeIds: number
       .map(t => t.trim().toLowerCase())
       .filter(t => t.length > 2);
     if (tokens.length === 0) return [];
+
+    if (API_URL) {
+      const res = await api.get(`/products/search?q=${encodeURIComponent(tokens.join(' '))}`) as any[];
+      const filtered = res.filter(p => !excludeIds.includes(Number(p.id)));
+      return filtered.slice(0, Math.max(1, Math.min(20, Number(limit) || 3)));
+    }
 
     const nameConds = tokens.map(() => "LOWER(name) LIKE ? OR LOWER(name_ta) LIKE ?").join(" OR ");
     const params = tokens.flatMap(t => {
@@ -329,7 +343,9 @@ export async function getRelatedProductsByName(query: string, excludeIds: number
 
     const rows = await db.getAllAsync(sql, ...params, ...excludeParams);
     return rows;
-  } catch (err) {
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (msg.includes('no such table')) return [];
     console.error('SQLite related products error:', err);
     return [];
   }
