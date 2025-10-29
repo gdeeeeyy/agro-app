@@ -31,7 +31,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
 }
 expoAutolinking.useExpoModules()
 
-rootProject.name = 'Agriismart - Faith of the Farmers'
+rootProject.name = 'அக்ரிஸ்மார்ட் - விவசாயிகளின் நம்பிக்கை'
 
 expoAutolinking.useExpoVersionCatalog()
 
