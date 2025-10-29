@@ -1,8 +1,10 @@
 import * as SQLite from "expo-sqlite";
+import { api, API_URL } from './api';
 
 const db = SQLite.openDatabaseSync("agroappDatabase.db");
 
 (async () => {
+  if (API_URL) return; // remote mode: API owns schema
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,7 +32,6 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       plant_used TEXT NOT NULL,
       keywords TEXT NOT NULL,
       details TEXT NOT NULL,
-      -- Optional Tamil fields (added via migration if missing)
       name_ta TEXT,
       plant_used_ta TEXT,
       details_ta TEXT,
@@ -85,7 +86,6 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
     );
   `);
 
-  // Lightweight migration: ensure bilingual columns exist on products
   try {
     const cols = await db.getAllAsync("PRAGMA table_info(products)");
     const colNames = (cols as any[]).map(c => c.name);
@@ -128,6 +128,7 @@ export async function getAllPlants(userId: number) {
 // Product functions
 export async function getAllProducts() {
   try {
+    if (API_URL) return await api.get('/products');
     const rows = await db.getAllAsync("SELECT * FROM products ORDER BY created_at DESC");
     return rows;
   } catch (err) {
@@ -138,6 +139,7 @@ export async function getAllProducts() {
 
 export async function getProductById(id: number) {
   try {
+    if (API_URL) return await api.get(`/products/${id}`);
     const rows = await db.getAllAsync("SELECT * FROM products WHERE id = ?", id);
     return rows[0] || null;
   } catch (err) {
@@ -159,6 +161,10 @@ export async function addProduct(product: {
   cost_per_unit: number;
 }) {
   try {
+    if (API_URL) {
+      const res = await api.post('/products', product);
+      return (res as any).id || null;
+    }
     const result = await db.runAsync(
       "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, stock_available, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
@@ -192,6 +198,10 @@ export async function updateProduct(id: number, product: {
   cost_per_unit?: number;
 }) {
   try {
+    if (API_URL) {
+      await api.patch(`/products/${id}`, product);
+      return true;
+    }
     const fields: string[] = [];
     const values: any[] = [];
     
@@ -218,6 +228,10 @@ export async function updateProduct(id: number, product: {
 
 export async function deleteProduct(id: number) {
   try {
+    if (API_URL) {
+      await api.del(`/products/${id}`);
+      return true;
+    }
     await db.runAsync("DELETE FROM products WHERE id = ?", id);
     return true;
   } catch (err) {
@@ -228,6 +242,7 @@ export async function deleteProduct(id: number) {
 
 export async function searchProducts(keywords: string) {
   try {
+    if (API_URL) return await api.get(`/products/search?q=${encodeURIComponent(keywords)}`);
     const searchTerm = `%${keywords.toLowerCase()}%`;
     const rows = await db.getAllAsync(
       "SELECT * FROM products WHERE LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(details) LIKE ? OR LOWER(name_ta) LIKE ? OR LOWER(plant_used_ta) LIKE ? OR LOWER(details_ta) LIKE ? ORDER BY created_at DESC",
@@ -323,6 +338,7 @@ export async function getRelatedProductsByName(query: string, excludeIds: number
 // Cart functions
 export async function getCartItems(userId: number) {
   try {
+    if (API_URL) return await api.get(`/cart?userId=${userId}`);
     const rows = await db.getAllAsync(
       `SELECT ci.*, p.name, p.name_ta, p.image, p.cost_per_unit, p.stock_available 
        FROM cart_items ci 
@@ -340,6 +356,10 @@ export async function getCartItems(userId: number) {
 
 export async function addToCart(userId: number, productId: number, quantity: number = 1) {
   try {
+    if (API_URL) {
+      await api.post('/cart/add', { userId, productId, quantity });
+      return true;
+    }
     // Check if item already exists in cart
     const existing = await db.getAllAsync(
       "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?",
@@ -368,6 +388,10 @@ export async function addToCart(userId: number, productId: number, quantity: num
 
 export async function updateCartItemQuantity(userId: number, productId: number, quantity: number) {
   try {
+    if (API_URL) {
+      await api.patch('/cart/item', { userId, productId, quantity });
+      return true;
+    }
     if (quantity <= 0) {
       await db.runAsync(
         "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
@@ -388,6 +412,10 @@ export async function updateCartItemQuantity(userId: number, productId: number, 
 
 export async function removeFromCart(userId: number, productId: number) {
   try {
+    if (API_URL) {
+      await api.del('/cart/item', { userId, productId });
+      return true;
+    }
     await db.runAsync(
       "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
       userId, productId
@@ -401,6 +429,10 @@ export async function removeFromCart(userId: number, productId: number) {
 
 export async function clearCart(userId: number) {
   try {
+    if (API_URL) {
+      await api.del(`/cart/clear?userId=${userId}`);
+      return true;
+    }
     await db.runAsync("DELETE FROM cart_items WHERE user_id = ?", userId);
     return true;
   } catch (err) {
@@ -411,6 +443,10 @@ export async function clearCart(userId: number) {
 
 export async function getCartTotal(userId: number) {
   try {
+    if (API_URL) {
+      const res = await api.get(`/cart/total?userId=${userId}`);
+      return (res as any)?.total || 0;
+    }
     const rows = await db.getAllAsync(
       `SELECT SUM(ci.quantity * p.cost_per_unit) as total 
        FROM cart_items ci 
@@ -428,6 +464,10 @@ export async function getCartTotal(userId: number) {
 // Order functions
 export async function createOrder(userId: number, paymentMethod: string, deliveryAddress?: string) {
   try {
+    if (API_URL) {
+      const res = await api.post('/orders', { userId, paymentMethod, deliveryAddress: deliveryAddress || null });
+      return (res as any).id;
+    }
     // Get cart items
     const cartItems = await getCartItems(userId);
     if (cartItems.length === 0) {
@@ -471,6 +511,7 @@ export async function createOrder(userId: number, paymentMethod: string, deliver
 
 export async function getUserOrders(userId: number) {
   try {
+    if (API_URL) return await api.get(`/orders?userId=${userId}`);
     const rows = await db.getAllAsync(
       `SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
       userId
@@ -484,6 +525,7 @@ export async function getUserOrders(userId: number) {
 
 export async function getOrderItems(orderId: number) {
   try {
+    if (API_URL) return await api.get(`/orders/${orderId}/items`);
     const rows = await db.getAllAsync(
       `SELECT * FROM order_items WHERE order_id = ? ORDER BY id`,
       orderId
@@ -497,6 +539,7 @@ export async function getOrderItems(orderId: number) {
 
 export async function getAllOrders() {
   try {
+    if (API_URL) return await api.get('/orders/all');
     const rows = await db.getAllAsync(
       `SELECT o.*, u.full_name, u.number 
        FROM orders o 
@@ -517,6 +560,10 @@ export async function updateOrderStatus(
   deliveryDate?: string
 ) {
   try {
+    if (API_URL) {
+      await api.patch(`/orders/${orderId}`, { status, statusNote, deliveryDate });
+      return true;
+    }
     const fields: string[] = ['status = ?', 'updated_at = CURRENT_TIMESTAMP'];
     const values: any[] = [status];
 
@@ -545,6 +592,10 @@ export async function updateOrderStatus(
 
 export async function deleteOrder(orderId: number) {
   try {
+    if (API_URL) {
+      await api.del(`/orders/${orderId}`);
+      return true;
+    }
     await db.runAsync("DELETE FROM orders WHERE id = ?", orderId);
     return true;
   } catch (err) {
@@ -556,6 +607,7 @@ export async function deleteOrder(orderId: number) {
 // Keyword functions
 export async function getAllKeywords() {
   try {
+    if (API_URL) return await api.get('/keywords');
     const rows = await db.getAllAsync("SELECT * FROM keywords ORDER BY name ASC");
     return rows;
   } catch (err) {
@@ -566,6 +618,10 @@ export async function getAllKeywords() {
 
 export async function addKeyword(name: string) {
   try {
+    if (API_URL) {
+      const res = await api.post('/keywords', { name: name.toLowerCase().trim() });
+      return (res as any).id || null;
+    }
     const result = await db.runAsync(
       "INSERT INTO keywords (name) VALUES (?)",
       name.toLowerCase().trim()
@@ -579,6 +635,10 @@ export async function addKeyword(name: string) {
 
 export async function deleteKeyword(id: number) {
   try {
+    if (API_URL) {
+      await api.del(`/keywords/${id}`);
+      return true;
+    }
     await db.runAsync("DELETE FROM keywords WHERE id = ?", id);
     return true;
   } catch (err) {
@@ -589,6 +649,7 @@ export async function deleteKeyword(id: number) {
 
 export async function getProductsByKeyword(keyword: string) {
   try {
+    if (API_URL) return await api.get(`/products/by-keyword?name=${encodeURIComponent(keyword)}`);
     const searchTerm = `%${keyword.toLowerCase()}%`;
     const rows = await db.getAllAsync(
       "SELECT * FROM products WHERE LOWER(keywords) LIKE ? ORDER BY created_at DESC",

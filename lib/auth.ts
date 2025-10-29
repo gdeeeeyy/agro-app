@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import db from './database';
+import { api, API_URL } from './api';
 
 export interface User {
   id: number;
@@ -20,6 +21,11 @@ export async function signUp(number: string, password: string, fullName?: string
   try {
     const hashedPassword = await hashPassword(password);
 
+    if (API_URL) {
+      const res = await api.post('/auth/signup', { number, password: hashedPassword, full_name: fullName || null });
+      return { user: res as User };
+    }
+
     const result = await db.runAsync(
       "INSERT INTO users (number, password, full_name, is_admin) VALUES (?, ?, ?, ?)",
       number, hashedPassword, fullName || null, 0
@@ -32,7 +38,7 @@ export async function signUp(number: string, password: string, fullName?: string
 
     return { user: user || undefined };
   } catch (err: any) {
-    if (err.message?.includes('UNIQUE constraint failed')) {
+    if (String(err?.message || '').includes('UNIQUE')) {
       return { error: 'number already exists' };
     }
     console.error("Sign up error:", err);
@@ -43,6 +49,11 @@ export async function signUp(number: string, password: string, fullName?: string
 export async function signIn(number: string, password: string): Promise<{ user?: User; error?: string }> {
   try {
     const hashedPassword = await hashPassword(password);
+
+    if (API_URL) {
+      const res = await api.post('/auth/signin', { number, password: hashedPassword });
+      return { user: res as User };
+    }
 
     const user = await db.getFirstAsync<User>(
       "SELECT id, number, full_name, is_admin, created_at FROM users WHERE number = ? AND password = ?",
