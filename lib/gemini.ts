@@ -47,29 +47,48 @@ Respond strictly in JSON:
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
-  try {
-    const res = await axios.post(url, payload, {
-      headers: { "Content-Type": "application/json" },
-    });
+  // Simple retry with exponential backoff for 429/503/network errors
+  const maxRetries = 3;
+  let attempt = 0;
+  let lastErr: any = null;
 
-    const textOutput = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!textOutput) throw new Error("No response from Gemini API");
-
-    // ✅ Extract JSON object from text
-    const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.warn("No JSON found in Gemini response:", textOutput);
-      return { plant: plantName, disease_or_pest: "Unknown", description: textOutput, keywords: [] };
-    }
-
+  while (attempt < maxRetries) {
     try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.warn("Failed to parse extracted JSON:", jsonMatch[0]);
-      return { plant: plantName, disease_or_pest: "Unknown", description: textOutput, keywords: [] };
+      const res = await axios.post(url, payload, {
+        headers: { "Content-Type": "application/json" },
+        timeout: 15000,
+      });
+
+      const textOutput = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textOutput) throw new Error("No response from Gemini API");
+
+      const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.warn("No JSON found in Gemini response:", textOutput);
+        return { plant: plantName, disease_or_pest: "Unknown", description: textOutput, keywords: [] };
+      }
+
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (parseErr) {
+        console.warn("Failed to parse extracted JSON:", jsonMatch[0]);
+        return { plant: plantName, disease_or_pest: "Unknown", description: textOutput, keywords: [] };
+      }
+    } catch (err: any) {
+      lastErr = err;
+      const status = err?.response?.status;
+      const retriable = status === 429 || status === 503 || err?.code === 'ECONNABORTED' || err?.message?.includes('Network request failed');
+      if (!retriable || attempt === maxRetries - 1) {
+        console.error("Gemini API error:", err.response?.data || err.message);
+        // graceful fallback so the app keeps working
+        return { plant: plantName, disease_or_pest: "Service unavailable", description: "AI service temporarily unavailable (try again later)", keywords: [] };
+      }
+      const backoff = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+      await new Promise(r => setTimeout(r, backoff));
+      attempt++;
     }
-  } catch (err: any) {
-    console.error("Gemini API error:", err.response?.data || err.message);
-    throw err;
   }
+
+  // Should not reach here, but return a safe fallback
+  return { plant: plantName, disease_or_pest: "Service unavailable", description: String(lastErr?.message || 'Unknown error'), keywords: [] };
 }
