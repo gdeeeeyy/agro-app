@@ -4,7 +4,23 @@ import { api, API_URL } from './api';
 const db = SQLite.openDatabaseSync("agroappDatabase.db");
 
 (async () => {
-  if (API_URL) return; // remote mode: API owns schema
+  // In remote mode, keep a small on-device table for scan history (plants),
+  // but don’t create the full commerce schema locally.
+  if (API_URL) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS plants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        imageUri TEXT,
+        result TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    return;
+  }
+
+  // Local mode: full schema
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,6 +120,16 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
 
 export async function savePlant(userId: number, name: string, imageUri: string, result: string) {
   try {
+    // Ensure local plants table exists even in remote mode
+    await db.execAsync(`CREATE TABLE IF NOT EXISTS plants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      imageUri TEXT,
+      result TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`);
+
     await db.runAsync("INSERT INTO plants (user_id, name, imageUri, result) VALUES (?, ?, ?, ?)",
       userId,
       name,
