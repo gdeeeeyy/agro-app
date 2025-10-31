@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { UserContext } from '../../context/UserContext';
 import { getAllOrders, getOrderItems, updateOrderStatus, deleteOrder } from '../../lib/database';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 interface Order {
   id: number;
@@ -253,14 +255,17 @@ export default function AdminOrders() {
 
   return (
     <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
+        <View style={{ position: 'absolute', top: 8, right: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
+            <Ionicons name="person-circle" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={styles.headerTitle}>Manage Orders</Text>
         </View>
-        <Text style={styles.headerSubtitle}>
-          Faith of the Farmers - Admin Panel
-        </Text>
       </View>
 
       <FlatList
@@ -300,6 +305,12 @@ export default function AdminOrders() {
                     <View style={styles.addressInfo}>
                       <Text style={styles.addressLabel}>Delivery Address:</Text>
                       <Text style={styles.addressText}>{selectedOrder.delivery_address}</Text>
+                    </View>
+                  )}
+                  {selectedOrder.status_note && (
+                    <View style={[styles.addressInfo, { marginTop: 8 }] }>
+                      <Text style={styles.addressLabel}>Customer Note:</Text>
+                      <Text style={styles.addressText}>{selectedOrder.status_note}</Text>
                     </View>
                   )}
                 </View>
@@ -419,9 +430,10 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    position: 'relative',
+    paddingTop: 0,
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
   headerTop: {
     flexDirection: 'row',

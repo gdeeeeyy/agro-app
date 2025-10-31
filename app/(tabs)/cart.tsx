@@ -203,7 +203,7 @@ export default function Cart() {
           </TouchableOpacity>
         </View>
         <View style={styles.brandRow}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={[styles.headerTitle, { fontSize: 20 }]}>{t('cart.title')}</Text>
         </View>
       </View>
@@ -393,15 +393,17 @@ export default function Cart() {
 
 const styles = StyleSheet.create({
   topRight: {
+    position: 'absolute',
+    top: 8,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 6,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 0,
   },
   container: {
     flex: 1,
@@ -409,7 +411,8 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 8,
+    position: 'relative',
+    paddingTop: 0,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

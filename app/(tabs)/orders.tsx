@@ -166,7 +166,7 @@ export default function Orders() {
         {item.logistics_name && (
           <View style={styles.orderDetailRow}>
             <Ionicons name="cube" size={20} color="#666" />
-            <TouchableOpacity onPress={() => { if (item.tracking_url) Linking.openURL(item.tracking_url).catch(()=>{}); }}>
+            <TouchableOpacity onPress={() => { const raw = item.tracking_url; const url = raw && !/^https?:\/\//i.test(raw) ? `https://${raw}` : raw; if (url) Linking.canOpenURL(url).then(can => { if (can) Linking.openURL(url); }).catch(()=>{}); }}>
               <Text style={[styles.orderDetailText, { color: '#1e88e5', textDecorationLine: item.tracking_url ? 'underline' : 'none' }]} numberOfLines={1}>
                 {item.logistics_name}
               </Text>
@@ -310,8 +310,9 @@ export default function Orders() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Logistics:</Text>
                     <TouchableOpacity onPress={() => {
-                      const url = (selectedOrder as any).tracking_url as string | undefined;
-                      if (url) Linking.openURL(url).catch(()=>{});
+                      const raw = (selectedOrder as any).tracking_url as string | undefined;
+                      const url = raw && !/^https?:\/\//i.test(raw) ? `https://${raw}` : raw;
+                      if (url) Linking.canOpenURL(url).then(can => { if (can) Linking.openURL(url); }).catch(()=>{});
                     }}>
                       <Text style={[styles.detailValue, { color: '#1e88e5', textDecorationLine: 'underline' }]}>
                         {(selectedOrder as any).logistics_name}
@@ -346,15 +347,17 @@ export default function Orders() {
 
 const styles = StyleSheet.create({
   topRight: {
+    position: 'absolute',
+    top: 8,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 6,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 0,
   },
   container: {
     flex: 1,
@@ -362,7 +365,8 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 8,
+    position: 'relative',
+    paddingTop: 0,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

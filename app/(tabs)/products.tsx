@@ -153,7 +153,7 @@ export default function Products() {
           </TouchableOpacity>
         </View>
         <View style={styles.brandRow}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={styles.headerTitle}>{t('store.title')}</Text>
         </View>
       </View>
@@ -253,20 +253,23 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 8,
+    position: 'relative',
+    paddingTop: 0,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },
   topRight: {
+    position: 'absolute',
+    top: 8,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 6,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 0,
   },
   logo: {
     width: 36,

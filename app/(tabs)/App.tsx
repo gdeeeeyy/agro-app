@@ -10,6 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -84,12 +85,12 @@ export default function App() {
     return true;
   };
 
-  const takePhoto = async () => {
+const takePhoto = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) return;
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+mediaTypes: ['images'] as any,
       quality: 1,
       allowsEditing: true,
       aspect: [4, 3],
@@ -101,9 +102,9 @@ export default function App() {
     }
   };
 
-  const pickImageFromGallery = async () => {
+const pickImageFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+mediaTypes: ['images'] as any,
       quality: 1,
       allowsEditing: true,
       aspect: [4, 3],
@@ -188,7 +189,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
         <View style={styles.brandRow}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={[styles.headerTitle, { fontSize: 20 }]}>{t('scanner.headerTitle')}</Text>
         </View>
       </View>
@@ -206,16 +207,14 @@ export default function App() {
         </View>
 
         <View style={styles.imagePickerSection}>
-          <Text style={styles.label}>{t('scanner.chooseSource')}</Text>
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cameraButton} onPress={takePhoto}>
-              <Ionicons name="camera" size={32} color="#4caf50" />
-              <Text style={styles.cameraButtonText}>{t('scanner.takePhoto')}</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={takePhoto}>
+              <Ionicons name="camera" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>{t('scanner.takePhoto')}</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.galleryButton} onPress={pickImageFromGallery}>
-              <Ionicons name="images" size={32} color="#4caf50" />
-              <Text style={styles.galleryButtonText}>{t('scanner.gallery')}</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={pickImageFromGallery}>
+              <Ionicons name="images" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>{t('scanner.gallery')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -248,6 +247,7 @@ export default function App() {
           </View>
         )}
       </ScrollView>
+
     </View>
   );
 }
@@ -255,15 +255,17 @@ export default function App() {
 
 const styles = StyleSheet.create({
   topRight: {
+    position: 'absolute',
+    top: 8,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 6,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 0,
   },
   wrapper: {
     flex: 1,
@@ -271,7 +273,8 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: "#4caf50",
-    paddingTop: 8,
+    position: 'relative',
+    paddingTop: 0,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },
@@ -322,41 +325,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
     gap: 12,
   },
-  cameraButton: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 20,
+  actionButton: {
+    backgroundColor: '#4caf50',
+    paddingVertical: 16,
     borderRadius: 12,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#4caf50",
-    borderStyle: "solid",
-  },
-  cameraButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4caf50",
-    marginTop: 8,
-  },
-  galleryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     flex: 1,
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#4caf50",
-    borderStyle: "solid",
   },
-  galleryButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4caf50",
-    marginTop: 8,
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   image: {
     width: "100%",
@@ -370,6 +355,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginBottom: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  sheetText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
   },
   analyzeButtonDisabled: {
     backgroundColor: "#a5d6a7",

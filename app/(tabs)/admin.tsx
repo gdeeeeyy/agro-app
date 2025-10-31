@@ -163,9 +163,9 @@ export default function AdminDashboard() {
     resetForm();
   };
 
-  const pickImage = async () => {
+const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+mediaTypes: ['images'] as any,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
@@ -403,7 +403,7 @@ export default function AdminDashboard() {
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 6 }}>
+        <View style={{ position: 'absolute', top: 8, right: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
             <Ionicons name="person-circle" size={28} color="#fff" />
           </TouchableOpacity>
@@ -729,7 +729,8 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 8,
+    position: 'relative',
+    paddingTop: 0,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },
