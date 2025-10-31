@@ -25,6 +25,8 @@ import {
 } from '../../lib/database';
 import { addSampleProducts } from '../../lib/sampleProducts';
 import { createDefaultAdmin, createAdminCustom } from '../../lib/createAdmin';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 interface Product {
   id: number;
@@ -399,14 +401,17 @@ export default function AdminDashboard() {
 
   return (
     <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 6 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
+            <Ionicons name="person-circle" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={styles.headerTitle}>Agriismart Admin</Text>
         </View>
-        <Text style={styles.headerSubtitle}>
-          Faith of the Farmers - Manage Products
-        </Text>
       </View>
 
       <View style={styles.buttonContainer}>
@@ -466,12 +471,14 @@ export default function AdminDashboard() {
             <TextInput
               style={styles.input}
               placeholder="Product Name (English)"
+              placeholderTextColor="#999"
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
             />
             <TextInput
               style={styles.input}
               placeholder="பொருளின் பெயர் (தமிழ்)"
+              placeholderTextColor="#999"
               value={formData.name_ta}
               onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
             />
@@ -479,12 +486,14 @@ export default function AdminDashboard() {
             <TextInput
               style={styles.input}
               placeholder="Plant Used (English)"
+              placeholderTextColor="#999"
               value={formData.plant_used}
               onChangeText={(text) => setFormData({ ...formData, plant_used: text })}
             />
             <TextInput
               style={styles.input}
               placeholder="பயன்படுத்தும் தாவரம் (தமிழ்)"
+              placeholderTextColor="#999"
               value={formData.plant_used_ta}
               onChangeText={(text) => setFormData({ ...formData, plant_used_ta: text })}
             />
@@ -530,6 +539,7 @@ export default function AdminDashboard() {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Product Details (English)"
+              placeholderTextColor="#999"
               value={formData.details}
               onChangeText={(text) => setFormData({ ...formData, details: text })}
               multiline
@@ -538,6 +548,7 @@ export default function AdminDashboard() {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="பொருள் விவரங்கள் (தமிழ்)"
+              placeholderTextColor="#999"
               value={formData.details_ta}
               onChangeText={(text) => setFormData({ ...formData, details_ta: text })}
               multiline
@@ -558,6 +569,7 @@ export default function AdminDashboard() {
             <TextInput
               style={styles.input}
               placeholder="Stock Available"
+              placeholderTextColor="#999"
               value={formData.stock_available}
               onChangeText={(text) => setFormData({ ...formData, stock_available: text })}
               keyboardType="numeric"
@@ -566,6 +578,7 @@ export default function AdminDashboard() {
             <TextInput
               style={styles.input}
               placeholder="Cost per Unit"
+              placeholderTextColor="#999"
               value={formData.cost_per_unit}
               onChangeText={(text) => setFormData({ ...formData, cost_per_unit: text })}
               keyboardType="numeric"
@@ -574,6 +587,7 @@ export default function AdminDashboard() {
             <TextInput
               style={styles.input}
               placeholder="Unit (e.g., kg, litre, pcs)"
+              placeholderTextColor="#999"
               value={formData.unit}
               onChangeText={(text) => setFormData({ ...formData, unit: text })}
               autoCapitalize="none"
@@ -715,9 +729,9 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
   headerTop: {
     flexDirection: 'row',
@@ -725,19 +739,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logo: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     marginRight: 12,
     borderRadius: 8,
+    transform: [{ scale: 1.2 }],
+    overflow: 'hidden',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#e8f5e9',
   },
   buttonContainer: {
     flexDirection: 'row',

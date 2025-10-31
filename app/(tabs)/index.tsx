@@ -13,8 +13,9 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserContext } from '../../context/UserContext';
-import { getAllPlants, getAllKeywords } from '../../lib/database';
+import { getAllPlants, getAllCrops } from '../../lib/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { resetDatabase } from '../../lib/resetDatabase';
 
@@ -31,8 +32,8 @@ export default function Home() {
   const [locationName, setLocationName] = useState<string>('');
   const [weather, setWeather] = useState<{ temp?: number; condition?: string }>({});
   const [cropModalVisible, setCropModalVisible] = useState(false);
-  const [allCrops, setAllCrops] = useState<string[]>([]);
-  const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
+  const [allCrops, setAllCrops] = useState<any[]>([]);
+  const [selectedCrops, setSelectedCrops] = useState<number[]>([]);
 
   const loadPlants = async () => {
     if (!user) return;
@@ -49,8 +50,8 @@ export default function Home() {
       try {
         const saved = await AsyncStorage.getItem('@agro_crops');
         if (saved) setSelectedCrops(JSON.parse(saved));
-        const keywords = await getAllKeywords() as any[];
-        setAllCrops(keywords.map(k => k.name));
+        const crops = await getAllCrops() as any[];
+        setAllCrops(crops);
       } catch {}
     })();
   }, []);
@@ -125,26 +126,28 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-            <View>
-              <Text style={styles.headerTitle}>{locationName ? `${locationName}${weather.temp !== undefined ? ` • ${Math.round(weather.temp)}°C` : ''}` : t('home.title')}</Text>
-              <Text style={styles.headerSubtitle}>{t('home.subtitle')}</Text>
-            </View>
+            <Text style={styles.headerTitle} numberOfLines={1}>{t('home.title')}</Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
-              <Ionicons name="receipt" size={26} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
-              <Ionicons name="person-circle" size={28} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
+            <Ionicons name="person-circle" size={28} color="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
 
+      {/* Weather card */}
+      <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016' }}>{locationName || 'Your location'}</Text>
+        {weather?.temp !== undefined && (
+          <Text style={{ marginTop: 4, fontSize: 16, color: '#333' }}>{Math.round(weather.temp)}°C today</Text>
+        )}
+      </View>
+
+      {/* Crop Doctor */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Crop Doctor</Text>
@@ -152,16 +155,24 @@ export default function Home() {
             <Text style={{ color: '#fff', fontWeight: '600' }}>Add Crops</Text>
           </TouchableOpacity>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-          {selectedCrops.slice(0,5).map(crop => (
-            <TouchableOpacity key={crop} onPress={() => router.push(`/crop/${encodeURIComponent(crop)}`)} style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#f1f8f4', borderRadius: 20, borderWidth: 1, borderColor: '#4caf50' }}>
-              <Text style={{ color: '#2d5016', fontWeight: '600' }}>{crop}</Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12 }}>
+          {selectedCrops.slice(0,5).map(id => {
+            const crop = allCrops.find((c:any) => Number(c.id) === Number(id));
+            if (!crop) return null;
+            return (
+              <TouchableOpacity key={id} onPress={() => router.push(`/crop/${id}`)} style={{ width: 140, backgroundColor: '#f9f9f9', borderRadius: 12, borderWidth: 1, borderColor: '#e0e0e0', overflow: 'hidden' }}>
+                <Image source={crop.image ? { uri: crop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 80 }} />
+                <View style={{ padding: 10 }}>
+                  <Text style={{ color: '#2d5016', fontWeight: '700' }} numberOfLines={1}>{crop.name}</Text>
+                  <Text style={{ color: '#666', fontSize: 12 }} numberOfLines={2}>Cultivation • Pest • Disease</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
           {selectedCrops.length === 0 && (
-            <Text style={{ color: '#666' }}>Select up to 5 crops from admin-added list</Text>
+            <Text style={{ color: '#666' }}>Add up to 5 crops from admin list</Text>
           )}
-        </View>
+        </ScrollView>
       </View>
 
       {plants.length === 0 ? (
@@ -194,16 +205,16 @@ export default function Home() {
           </View>
           <ScrollView style={{ flex: 1, padding: 16 }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {allCrops.map(name => {
-                const active = selectedCrops.includes(name);
+              {allCrops.map((crop:any) => {
+                const active = selectedCrops.includes(Number(crop.id));
                 return (
-                  <TouchableOpacity key={name} onPress={() => {
-                    let next = active ? selectedCrops.filter(c => c !== name) : [...selectedCrops, name];
+                  <TouchableOpacity key={crop.id} onPress={() => {
+                    let next = active ? selectedCrops.filter(c => c !== Number(crop.id)) : [...selectedCrops, Number(crop.id)];
                     if (next.length > 5) next = next.slice(0,5);
                     setSelectedCrops(next);
                     AsyncStorage.setItem('@agro_crops', JSON.stringify(next)).catch(()=>{});
                   }} style={{ paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, borderWidth: 2, borderColor: active ? '#4caf50' : '#e0e0e0', backgroundColor: active ? '#f1f8f4' : '#f9f9f9' }}>
-                    <Text style={{ color: active ? '#4caf50' : '#333', fontWeight: '600' }}>{name}</Text>
+                    <Text style={{ color: active ? '#4caf50' : '#333', fontWeight: '600' }}>{crop.name}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -227,9 +238,9 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
   headerTop: {
     flexDirection: 'row',
@@ -238,19 +249,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logo: {
-    width: 40,
-    height: 40,
-    marginRight: 12,
+    width: 36,
+    height: 36,
+    marginRight: 10,
     borderRadius: 8,
+    transform: [{ scale: 1.2 }],
+    overflow: 'hidden',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#e8f5e9',
+    display: 'none',
   },
   listContent: {
     padding: 16,

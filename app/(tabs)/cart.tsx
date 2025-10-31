@@ -18,6 +18,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
 import { createOrder } from '../../lib/database';
 import AddressModal from '../../components/AddressModal';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface CartItem {
   id: number;
@@ -194,24 +195,17 @@ export default function Cart() {
 
   return (
     <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-            <Text style={styles.headerTitle}>{t('cart.title')}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
-              <Ionicons name="receipt" size={26} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
-              <Ionicons name="person-circle" size={28} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.topRight}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
+            <Ionicons name="person-circle" size={28} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <Text style={styles.headerSubtitle}>
-          {t('cart.subtitle')}
-        </Text>
+        <View style={styles.brandRow}>
+          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+          <Text style={[styles.headerTitle, { fontSize: 20 }]}>{t('cart.title')}</Text>
+        </View>
       </View>
 
       {cartItems.length === 0 ? (
@@ -362,6 +356,7 @@ export default function Cart() {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="Add your suggestion or note..."
+                  placeholderTextColor="#999"
                   value={orderNote}
                   onChangeText={setOrderNote}
                   multiline
@@ -397,15 +392,26 @@ export default function Cart() {
 
 
 const styles = StyleSheet.create({
+  topRight: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 6,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
   headerTop: {
     flexDirection: 'row',
@@ -413,10 +419,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logo: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     marginRight: 12,
     borderRadius: 8,
+    transform: [{ scale: 1.2 }],
+    overflow: 'hidden',
   },
   headerTitle: {
     fontSize: 32,

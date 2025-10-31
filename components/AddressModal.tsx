@@ -88,6 +88,7 @@ export default function AddressModal({
             <TextInput
               style={styles.addressInput}
               placeholder="Enter your complete delivery address..."
+              placeholderTextColor="#999"
               value={address}
               onChangeText={setAddress}
               multiline

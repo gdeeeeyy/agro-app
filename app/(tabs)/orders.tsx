@@ -9,12 +9,15 @@ import {
   Image,
   ScrollView,
   Modal,
+  Linking,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getUserOrders, getOrderItems } from '../../lib/database';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Order {
   id: number;
@@ -25,6 +28,9 @@ interface Order {
   status: string;
   status_note?: string;
   delivery_date?: string;
+  logistics_name?: string;
+  tracking_number?: string;
+  tracking_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +95,18 @@ export default function Orders() {
     }
   };
 
+  const copyTracking = async (text: string) => {
+    let copied = false;
+    try {
+      if ((navigator as any)?.clipboard?.writeText) {
+        await (navigator as any).clipboard.writeText(text);
+        copied = true;
+      }
+    } catch {}
+    if (copied) Alert.alert('Copied', 'Tracking number copied to clipboard');
+    else Alert.alert('Tracking number', String(text));
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -117,7 +135,7 @@ export default function Orders() {
         <View>
           <Text style={styles.orderId}>{t('orders.orderDetails')} #{item.id}</Text>
           <Text style={styles.orderDate}>
-            {new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} / {new Date(item.created_at).toLocaleDateString('ta-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            {new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -137,15 +155,36 @@ export default function Orders() {
               {item.payment_method === 'cod' ? t('payment.cod') : item.payment_method.toUpperCase()}
             </Text>
           </View>
-          {item.delivery_address && (
-            <View style={styles.orderDetailRow}>
-              <Ionicons name="location" size={20} color="#666" />
-              <Text style={styles.orderDetailText} numberOfLines={2}>
-                {item.delivery_address}
+        {item.delivery_address && (
+          <View style={styles.orderDetailRow}>
+            <Ionicons name="location" size={20} color="#666" />
+            <Text style={styles.orderDetailText} numberOfLines={2}>
+              {item.delivery_address}
+            </Text>
+          </View>
+        )}
+        {item.logistics_name && (
+          <View style={styles.orderDetailRow}>
+            <Ionicons name="cube" size={20} color="#666" />
+            <TouchableOpacity onPress={() => { if (item.tracking_url) Linking.openURL(item.tracking_url).catch(()=>{}); }}>
+              <Text style={[styles.orderDetailText, { color: '#1e88e5', textDecorationLine: item.tracking_url ? 'underline' : 'none' }]} numberOfLines={1}>
+                {item.logistics_name}
               </Text>
-            </View>
-          )}
-        </View>
+            </TouchableOpacity>
+          </View>
+        )}
+        {item.tracking_number && (
+          <View style={[styles.orderDetailRow, { alignItems: 'center' }] }>
+            <Ionicons name="barcode" size={20} color="#666" />
+            <Text style={[styles.orderDetailText, { flex: 1 }]} numberOfLines={1}>
+              {item.tracking_number}
+            </Text>
+            <TouchableOpacity style={styles.copyButton} onPress={() => copyTracking(String(item.tracking_number))}>
+              <Ionicons name="copy" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       {item.status_note && (
         <View style={styles.statusNote}>
@@ -173,21 +212,17 @@ export default function Orders() {
 
   return (
     <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-            <Text style={styles.headerTitle}>{t('orders.title')}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
-              <Ionicons name="person-circle" size={28} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.topRight}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
+            <Ionicons name="person-circle" size={28} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <Text style={styles.headerSubtitle}>
-          {t('orders.subtitle')}
-        </Text>
+        <View style={styles.brandRow}>
+          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+          <Text style={[styles.headerTitle, { fontSize: 20 }]}>{t('orders.title')}</Text>
+        </View>
       </View>
 
       <FlatList
@@ -227,7 +262,7 @@ export default function Orders() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date:</Text>
                     <Text style={styles.detailValue}>
-                      {new Date(selectedOrder.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} / {new Date(selectedOrder.created_at).toLocaleDateString('ta-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(selectedOrder.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -271,6 +306,31 @@ export default function Orders() {
                   ))}
                 </View>
 
+                {Boolean((selectedOrder as any).logistics_name) && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Logistics:</Text>
+                    <TouchableOpacity onPress={() => {
+                      const url = (selectedOrder as any).tracking_url as string | undefined;
+                      if (url) Linking.openURL(url).catch(()=>{});
+                    }}>
+                      <Text style={[styles.detailValue, { color: '#1e88e5', textDecorationLine: 'underline' }]}>
+                        {(selectedOrder as any).logistics_name}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {Boolean((selectedOrder as any).tracking_number) && (
+                  <View style={[styles.detailRow, { alignItems: 'center' }] }>
+                    <Text style={styles.detailLabel}>Tracking #:</Text>
+                    <Text style={[styles.detailValue, { flex: 1 }]} numberOfLines={1}>
+                      {(selectedOrder as any).tracking_number}
+                    </Text>
+                    <TouchableOpacity style={styles.copyButton} onPress={() => copyTracking(String((selectedOrder as any).tracking_number))}>
+                      <Ionicons name="copy" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 <View style={styles.totalSection}>
                   <Text style={styles.totalLabel}>Total Amount</Text>
                   <Text style={styles.totalAmount}>₹{selectedOrder.total_amount.toFixed(2)}</Text>
@@ -285,15 +345,26 @@ export default function Orders() {
 }
 
 const styles = StyleSheet.create({
+  topRight: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 6,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
   headerTop: {
     flexDirection: 'row',
@@ -301,10 +372,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logo: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     marginRight: 12,
     borderRadius: 8,
+    transform: [{ scale: 1.2 }],
+    overflow: 'hidden',
   },
   headerTitle: {
     fontSize: 32,
@@ -456,6 +529,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    gap: 8,
   },
   detailLabel: {
     fontSize: 14,
@@ -465,6 +539,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+  },
+  copyButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#4caf50',
   },
   statusBadgeSmall: {
     paddingHorizontal: 12,

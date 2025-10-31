@@ -69,6 +69,7 @@ export default function SignUp() {
         <TextInput
           style={styles.input}
           placeholder={t('auth.fullname')}
+          placeholderTextColor="#999"
           value={fullName}
           onChangeText={setFullName}
           editable={!loading}
@@ -77,6 +78,7 @@ export default function SignUp() {
         <TextInput
           style={styles.input}
           placeholder={t('auth.number')}
+          placeholderTextColor="#999"
           value={number}
           onChangeText={setnumber}
           autoCapitalize="none"
@@ -87,6 +89,7 @@ export default function SignUp() {
         <TextInput
           style={styles.input}
           placeholder={t('auth.password')}
+          placeholderTextColor="#999"
           value={password}
           onChangeText={setPassword}
           secureTextEntry

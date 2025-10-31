@@ -36,6 +36,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       plant_used_ta TEXT,
       details_ta TEXT,
       image TEXT,
+      unit TEXT,
       stock_available INTEGER DEFAULT 0,
       cost_per_unit REAL NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -84,25 +85,56 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       name TEXT UNIQUE NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS crops (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      name_ta TEXT,
+      image TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS crop_guides (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      crop_id INTEGER NOT NULL,
+      language TEXT NOT NULL DEFAULT 'en',
+      cultivation_guide TEXT,
+      pest_management TEXT,
+      disease_management TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(crop_id, language),
+      FOREIGN KEY (crop_id) REFERENCES crops(id) ON DELETE CASCADE
+    );
   `);
 
   try {
-    const cols = await db.getAllAsync("PRAGMA table_info(products)");
-    const colNames = (cols as any[]).map(c => c.name);
-    const addTextCol = async (name: string) => {
-      if (!colNames.includes(name)) {
+    // products migration
+    const prodCols = await db.getAllAsync("PRAGMA table_info(products)");
+    const prodColNames = (prodCols as any[]).map(c => c.name);
+    const addProdTextCol = async (name: string) => {
+      if (!prodColNames.includes(name)) {
         await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} TEXT`);
       }
     };
-    const addRealCol = async (name: string) => {
-      if (!colNames.includes(name)) {
-        await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} REAL`);
+    await addProdTextCol('name_ta');
+    await addProdTextCol('plant_used_ta');
+    await addProdTextCol('details_ta');
+    await addProdTextCol('unit');
+
+    // orders migration (align with server: add logistics fields if missing)
+    const orderCols = await db.getAllAsync("PRAGMA table_info(orders)");
+    const orderColNames = (orderCols as any[]).map(c => c.name);
+    const addOrderTextCol = async (name: string) => {
+      if (!orderColNames.includes(name)) {
+        await db.runAsync(`ALTER TABLE orders ADD COLUMN ${name} TEXT`);
       }
     };
-    await addTextCol('name_ta');
-    await addTextCol('plant_used_ta');
-    await addTextCol('details_ta');
-    await addTextCol('unit');
+    await addOrderTextCol('status_note'); // already exists in schema, but safe
+    await addOrderTextCol('delivery_date'); // already exists in schema, but safe
+    await addOrderTextCol('logistics_name');
+    await addOrderTextCol('tracking_number');
+    await addOrderTextCol('tracking_url');
   } catch (e) {
     console.warn('Migration check failed:', e);
   }
@@ -173,7 +205,7 @@ export async function addProduct(product: {
       return (res as any).id || null;
     }
     const result = await db.runAsync(
-      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, stock_available, cost_per_unit, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
       product.plant_used,
       product.keywords,
@@ -182,9 +214,9 @@ export async function addProduct(product: {
       product.plant_used_ta || null,
       product.details_ta || null,
       product.image || null,
+      product.unit || null,
       product.stock_available,
-      product.cost_per_unit,
-      product.unit || null
+      product.cost_per_unit
     );
     return result.lastInsertRowId;
   } catch (err) {
@@ -579,28 +611,27 @@ export async function getAllOrders() {
 }
 
 export async function updateOrderStatus(
-  orderId: number, 
-  status: string, 
-  statusNote?: string, 
-  deliveryDate?: string
+  orderId: number,
+  status: string,
+  statusNote?: string,
+  deliveryDate?: string,
+  logisticsName?: string,
+  trackingNumber?: string,
+  trackingUrl?: string
 ) {
   try {
     if (API_URL) {
-      await api.patch(`/orders/${orderId}`, { status, statusNote, deliveryDate });
+      await api.patch(`/orders/${orderId}`, { status, statusNote, deliveryDate, logisticsName, trackingNumber, trackingUrl });
       return true;
     }
     const fields: string[] = ['status = ?', 'updated_at = CURRENT_TIMESTAMP'];
     const values: any[] = [status];
 
-    if (statusNote !== undefined) {
-      fields.push('status_note = ?');
-      values.push(statusNote);
-    }
-
-    if (deliveryDate !== undefined) {
-      fields.push('delivery_date = ?');
-      values.push(deliveryDate);
-    }
+    if (statusNote !== undefined) { fields.push('status_note = ?'); values.push(statusNote); }
+    if (deliveryDate !== undefined) { fields.push('delivery_date = ?'); values.push(deliveryDate); }
+    if (logisticsName !== undefined) { fields.push('logistics_name = ?'); values.push(logisticsName); }
+    if (trackingNumber !== undefined) { fields.push('tracking_number = ?'); values.push(trackingNumber); }
+    if (trackingUrl !== undefined) { fields.push('tracking_url = ?'); values.push(trackingUrl); }
 
     values.push(orderId);
 
@@ -627,6 +658,80 @@ export async function deleteOrder(orderId: number) {
     console.error("SQLite delete error:", err);
     return false;
   }
+}
+
+// Crops functions
+export async function getAllCrops() {
+  try {
+    if (API_URL) return await api.get('/crops');
+    const rows = await db.getAllAsync("SELECT * FROM crops ORDER BY name ASC");
+    return rows;
+  } catch (err) {
+    console.error("SQLite fetch error:", err);
+    return [];
+  }
+}
+
+export async function addCrop(input: { name: string; name_ta?: string; image?: string; }) {
+  try {
+    if (API_URL) {
+      const res = await api.post('/crops', input);
+      return (res as any).id || null;
+    }
+    const result = await db.runAsync(
+      "INSERT INTO crops (name, name_ta, image) VALUES (?, ?, ?)",
+      input.name, input.name_ta || null, input.image || null
+    );
+    return result.lastInsertRowId;
+  } catch (err) {
+    console.error("SQLite insert error:", err);
+    return null;
+  }
+}
+
+export async function updateCrop(id: number, input: { name?: string; name_ta?: string; image?: string; }) {
+  try {
+    if (API_URL) { await api.patch(`/crops/${id}`, input); return true; }
+    const fields: string[] = []; const vals: any[] = [];
+    Object.entries(input).forEach(([k,v]) => { if (v !== undefined) { fields.push(`${k} = ?`); vals.push(v); } });
+    if (!fields.length) return true;
+    vals.push(id);
+    await db.runAsync(`UPDATE crops SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) { console.error('SQLite update error:', err); return false; }
+}
+
+export async function deleteCrop(id: number) {
+  try {
+    if (API_URL) { await api.del(`/crops/${id}`); return true; }
+    await db.runAsync("DELETE FROM crops WHERE id = ?", id);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
+export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
+  try {
+    if (API_URL) return await api.get(`/crops/${cropId}/guide?lang=${language}`);
+    const rows = await db.getAllAsync(
+      "SELECT * FROM crop_guides WHERE crop_id = ? AND language = ?",
+      cropId, language
+    );
+    return rows[0] || { crop_id: cropId, language, cultivation_guide: null, pest_management: null, disease_management: null };
+  } catch (err) { console.error('SQLite fetch error:', err); return null; }
+}
+
+export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data: { cultivation_guide?: string; pest_management?: string; disease_management?: string; }) {
+  try {
+    if (API_URL) { await api.put(`/crops/${cropId}/guide`, { language, ...data }); return true; }
+    await db.runAsync(
+      `INSERT INTO crop_guides (crop_id, language, cultivation_guide, pest_management, disease_management)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(crop_id, language)
+       DO UPDATE SET cultivation_guide=excluded.cultivation_guide, pest_management=excluded.pest_management, disease_management=excluded.disease_management, updated_at=CURRENT_TIMESTAMP`,
+      cropId, language, data.cultivation_guide || null, data.pest_management || null, data.disease_management || null
+    );
+    return true;
+  } catch (err) { console.error('SQLite upsert error:', err); return false; }
 }
 
 // Keyword functions
@@ -690,6 +795,10 @@ export async function getProductsByKeyword(keyword: string) {
 // User functions
 export async function updateUserAddress(userId: number, address: string) {
   try {
+    if (API_URL) {
+      await api.patch(`/users/${userId}`, { address });
+      return true;
+    }
     await db.runAsync(
       "UPDATE users SET address = ? WHERE id = ?",
       address, userId

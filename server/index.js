@@ -13,6 +13,34 @@ if (!DATABASE_URL) {
 const isNeon = /neon\.tech|sslmode=require|render|railway/.test(DATABASE_URL);
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUnauthorized: false } : undefined });
 
+// Ensure runtime migrations (idempotent)
+(async () => {
+  try {
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT");
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS logistics_name TEXT");
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number TEXT");
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT");
+    await pool.query(`CREATE TABLE IF NOT EXISTS crops (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      name_ta TEXT,
+      image TEXT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS crop_guides (
+      id BIGSERIAL PRIMARY KEY,
+      crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
+      language TEXT NOT NULL DEFAULT 'en',
+      cultivation_guide TEXT,
+      pest_management TEXT,
+      disease_management TEXT,
+      updated_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(crop_id, language)
+    )`);
+  } catch (e) { console.warn('Startup migration warning:', e.message); }
+})();
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -62,17 +90,25 @@ app.post('/auth/create-admin', async (req, res) => {
   }
 });
 
+// Users (address update)
+app.patch('/users/:id', async (req, res) => {
+  const { address, full_name } = req.body || {};
+  const set = []; const vals=[]; let i=1;
+  if (address !== undefined) { set.push(`address=$${i++}`); vals.push(address); }
+  if (full_name !== undefined) { set.push(`full_name=$${i++}`); vals.push(full_name); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE users SET ${set.join(', ')}, created_at=created_at WHERE id=$${i}`, vals);
+  const u = await one('SELECT id, number, full_name, is_admin, created_at, address FROM users WHERE id=$1', [req.params.id]);
+  res.json(u);
+});
+
 // Products
 app.get('/products', async (req, res) => {
   res.json(await all('SELECT * FROM products ORDER BY created_at DESC'));
 });
 
-app.get('/products/:id', async (req, res) => {
-  const r = await one('SELECT * FROM products WHERE id=$1', [req.params.id]);
-  if (!r) return res.status(404).json({ error: 'not found' });
-  res.json(r);
-});
-
+// Place search routes BEFORE ":id" to avoid route shadowing
 app.get('/products/search', async (req, res) => {
   const q = String(req.query.q || '').toLowerCase();
   const like = `%${q}%`;
@@ -89,18 +125,24 @@ app.get('/products/by-keyword', async (req, res) => {
   res.json(await all('SELECT * FROM products WHERE lower(keywords) LIKE $1 ORDER BY created_at DESC', [like]));
 });
 
+app.get('/products/:id', async (req, res) => {
+  const r = await one('SELECT * FROM products WHERE id=$1', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'not found' });
+  res.json(r);
+});
+
 app.post('/products', async (req, res) => {
   const p = req.body || {};
   const r = await one(
-    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, stock_available, cost_per_unit)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.stock_available, p.cost_per_unit]
+    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.stock_available, p.cost_per_unit]
   );
   res.json(r);
 });
 
 app.patch('/products/:id', async (req, res) => {
-  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','stock_available','cost_per_unit'];
+  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','stock_available','cost_per_unit'];
   const set = []; const vals = []; let i = 1;
   for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
   if (!set.length) return res.json({ ok: true });
@@ -117,6 +159,56 @@ app.delete('/products/:id', async (req, res) => {
 // Keywords
 app.get('/keywords', async (req, res) => {
   res.json(await all('SELECT * FROM keywords ORDER BY name ASC'));
+});
+
+// Crops
+app.get('/crops', async (req, res) => {
+  res.json(await all('SELECT * FROM crops ORDER BY name ASC'));
+});
+
+app.post('/crops', async (req, res) => {
+  const { name, name_ta, image } = req.body || {};
+  try {
+    const r = await one('INSERT INTO crops (name, name_ta, image) VALUES ($1,$2,$3) RETURNING id', [name, name_ta || null, image || null]);
+    res.json(r);
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
+    console.error(e); res.status(500).json({ error: 'create crop failed' });
+  }
+});
+
+app.patch('/crops/:id', async (req, res) => {
+  const allowed = ['name','name_ta','image']; const set=[]; const vals=[]; let i=1;
+  for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE crops SET ${set.join(', ')}, updated_at=now() WHERE id=$${i}`, vals);
+  res.json({ ok: true });
+});
+
+app.delete('/crops/:id', async (req, res) => {
+  await pool.query('DELETE FROM crops WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Crop guides
+app.get('/crops/:id/guide', async (req, res) => {
+  const lang = String(req.query.lang || 'en');
+  const g = await one('SELECT * FROM crop_guides WHERE crop_id=$1 AND language=$2', [req.params.id, lang]);
+  res.json(g || { crop_id: Number(req.params.id), language: lang, cultivation_guide: null, pest_management: null, disease_management: null });
+});
+
+app.put('/crops/:id/guide', async (req, res) => {
+  const { language, cultivation_guide, pest_management, disease_management } = req.body || {};
+  const lang = language || 'en';
+  await pool.query(
+    `INSERT INTO crop_guides (crop_id, language, cultivation_guide, pest_management, disease_management)
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (crop_id, language)
+     DO UPDATE SET cultivation_guide=EXCLUDED.cultivation_guide, pest_management=EXCLUDED.pest_management, disease_management=EXCLUDED.disease_management, updated_at=now()`,
+    [req.params.id, lang, cultivation_guide || null, pest_management || null, disease_management || null]
+  );
+  res.json({ ok: true });
 });
 
 app.post('/keywords', async (req, res) => {
@@ -221,10 +313,15 @@ app.get('/orders/all', async (req, res) => {
 });
 
 app.patch('/orders/:id', async (req, res) => {
-  const { status, statusNote, deliveryDate } = req.body || {};
-  const set = ['status=$1','updated_at=now()']; const vals=[status]; let i=2;
+  const { status, statusNote, deliveryDate, logisticsName, trackingNumber, trackingUrl } = req.body || {};
+  const set = []; const vals=[]; let i=1;
+  if (status !== undefined) { set.push(`status=$${i++}`); vals.push(status); }
+  set.push(`updated_at=now()`);
   if (statusNote !== undefined) { set.push(`status_note=$${i++}`); vals.push(statusNote); }
   if (deliveryDate !== undefined) { set.push(`delivery_date=$${i++}`); vals.push(deliveryDate); }
+  if (logisticsName !== undefined) { set.push(`logistics_name=$${i++}`); vals.push(logisticsName); }
+  if (trackingNumber !== undefined) { set.push(`tracking_number=$${i++}`); vals.push(trackingNumber); }
+  if (trackingUrl !== undefined) { set.push(`tracking_url=$${i++}`); vals.push(trackingUrl); }
   vals.push(req.params.id);
   await pool.query(`UPDATE orders SET ${set.join(', ')} WHERE id=$${i}`, vals);
   res.json({ ok: true });

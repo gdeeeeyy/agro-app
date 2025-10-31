@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
@@ -27,12 +28,12 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   onPress?: () => void;
+  listOnlyDescription?: boolean;
 }
 
-export default function ProductCard({ product, onPress }: ProductCardProps) {
+export default function ProductCard({ product, onPress, listOnlyDescription }: ProductCardProps) {
   const { addItem } = useCart();
   const { t, currentLanguage } = useLanguage();
-  const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
 
   const handleAddToCart = async () => {
@@ -40,21 +41,13 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
       Alert.alert(t('store.outOfStock'), t('store.outOfStock'));
       return;
     }
-
-    setSelectedQuantity(1);
-    setQuantityModalVisible(true);
-  };
-
-  const handleConfirmAddToCart = async () => {
     if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) {
       Alert.alert(t('common.error'), t('cart.invalidQuantity'));
       return;
     }
-
     const success = await addItem(product.id, selectedQuantity);
     if (success) {
       Alert.alert(t('common.success'), t('store.addedToCart'));
-      setQuantityModalVisible(false);
     } else {
       Alert.alert(t('common.error'), t('store.addToCartError'));
     }
@@ -69,49 +62,78 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress || openDetails}>
-      {product.image && (
+      {!listOnlyDescription && product.image && (
         <Image source={{ uri: product.image }} style={styles.image} />
       )}
       
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={2}>
-          {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
-        </Text>
+        {!listOnlyDescription && (
+          <Text style={styles.name} numberOfLines={2}>
+            {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+          </Text>
+        )}
         
-        <Text style={styles.plantUsed} numberOfLines={1}>
-          {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
-        </Text>
+        {listOnlyDescription ? null : (
+          <Text style={styles.plantUsed} numberOfLines={1}>
+            {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
+          </Text>
+        )}
         
-        <Text style={styles.details} numberOfLines={3}>
+        <Text style={styles.details} numberOfLines={listOnlyDescription ? 6 : 3}>
           {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
         </Text>
         
-        <View style={styles.footer}>
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{product.cost_per_unit} / {Unit}</Text>
-            <Text style={styles.stock}>
-              {product.stock_available > 0 
-                ? `${product.stock_available} ${Unit} ${t('store.inStock')}` 
-                : t('store.outOfStock')
-              }
-            </Text>
+        {listOnlyDescription ? null : (
+          <View style={styles.footer}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.price}>₹{product.cost_per_unit} / {Unit}</Text>
+              <Text style={styles.stock}>
+                {product.stock_available > 0 
+                  ? `${product.stock_available} ${Unit} ${t('store.inStock')}` 
+                  : t('store.outOfStock')
+                }
+              </Text>
+            </View>
+
+            <View style={styles.inlineQuantity}>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
+                disabled={product.stock_available <= 0}
+              >
+                <Ionicons name="remove" size={16} color="#4caf50" />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.qtyInput}
+                value={String(selectedQuantity)}
+                onChangeText={(txt) => {
+                  const n = parseInt(txt) || 1;
+                  setSelectedQuantity(Math.max(1, Math.min(product.stock_available, n)));
+                }}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}
+                disabled={product.stock_available <= 0}
+              >
+                <Ionicons name="add" size={16} color="#4caf50" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.addButton, product.stock_available <= 0 && styles.addButtonDisabled]}
+              onPress={handleAddToCart}
+              disabled={product.stock_available <= 0}
+            >
+              <Ionicons 
+                name="add" 
+                size={20} 
+                color={product.stock_available <= 0 ? '#999' : '#fff'}
+              />
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity
-            style={[
-              styles.addButton,
-              product.stock_available <= 0 && styles.addButtonDisabled
-            ]}
-            onPress={handleAddToCart}
-            disabled={product.stock_available <= 0}
-          >
-            <Ionicons 
-              name="add" 
-              size={20} 
-              color={product.stock_available <= 0 ? '#999' : '#fff'} 
-            />
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
 
       <Modal
@@ -124,80 +146,18 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
           <View style={[styles.modalContent, { maxWidth: 500 }] }>
             <Text style={styles.modalTitle}>{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}</Text>
             <Text style={[styles.modalStock, { marginBottom: 8 }]}>₹{product.cost_per_unit} / {Unit}</Text>
-            <Text style={styles.details}>{(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}</Text>
+            <ScrollView style={{ maxHeight: 220 }}>
+              <Text style={styles.details}>{(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}</Text>
+            </ScrollView>
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
               <TouchableOpacity style={styles.cancelButton} onPress={closeDetails}>
                 <Text style={styles.cancelButtonText}>{t('common.close')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={() => { closeDetails(); handleAddToCart(); }}>
-                <Text style={styles.confirmButtonText}>{t('store.addToCart')}</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        visible={quantityModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setQuantityModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('product.selectQuantity')}</Text>
-            <Text style={styles.modalProductName}>{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}</Text>
-            <Text style={styles.modalStock}>{t('product.availableUnits').replace('{units}', String(product.stock_available))}</Text>
-            
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
-              >
-                <Ionicons name="remove" size={20} color="#4caf50" />
-              </TouchableOpacity>
-              
-              <TextInput
-                style={styles.quantityInput}
-                value={selectedQuantity.toString()}
-                onChangeText={(text) => {
-                  const num = parseInt(text) || 1;
-                  setSelectedQuantity(Math.max(1, Math.min(product.stock_available, num)));
-                }}
-                keyboardType="numeric"
-                selectTextOnFocus
-              />
-              
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => setSelectedQuantity(Math.min(product.stock_available, selectedQuantity + 1))}
-              >
-                <Ionicons name="add" size={20} color="#4caf50" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalTotal}>
-              {t('product.total')}: ₹{(selectedQuantity * product.cost_per_unit).toFixed(2)}
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setQuantityModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleConfirmAddToCart}
-              >
-                <Text style={styles.confirmButtonText}>{t('store.addToCart')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </TouchableOpacity>
   );
 }
@@ -307,6 +267,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
+  },
+  inlineQuantity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 12,
+  },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qtyInput: {
+    width: 48,
+    height: 32,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 6,
+    textAlign: 'center',
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
   },
   quantityButton: {
     width: 40,

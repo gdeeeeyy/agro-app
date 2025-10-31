@@ -17,6 +17,7 @@ import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAllProducts, searchProducts, getAllKeywords, getProductsByKeyword } from '../../lib/database';
 import ProductCard from '../../components/ProductCard';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Keyword {
   id: number;
@@ -144,24 +145,17 @@ export default function Products() {
 
   return (
     <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-            <Text style={styles.headerTitle}>{t('store.title')}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
-              <Ionicons name="receipt" size={26} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
-              <Ionicons name="person-circle" size={28} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.topRight}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
+            <Ionicons name="person-circle" size={28} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <Text style={styles.headerSubtitle}>
-          {t('store.subtitle')}
-        </Text>
+        <View style={styles.brandRow}>
+          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+          <Text style={styles.headerTitle}>{t('store.title')}</Text>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -259,23 +253,31 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
-  headerTop: {
+  topRight: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 6,
+  },
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 4,
   },
   logo: {
-    width: 40,
-    height: 40,
-    marginRight: 12,
+    width: 36,
+    height: 36,
+    marginRight: 8,
     borderRadius: 8,
+    transform: [{ scale: 1.2 }],
+    overflow: 'hidden',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
   },

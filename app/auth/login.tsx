@@ -63,6 +63,7 @@ export default function Login() {
         <TextInput
           style={styles.input}
           placeholder={t('auth.number')}
+          placeholderTextColor="#999"
           value={number}
           onChangeText={setnumber}
           autoCapitalize="none"
@@ -73,6 +74,7 @@ export default function Login() {
         <TextInput
           style={styles.input}
           placeholder={t('auth.password')}
+          placeholderTextColor="#999"
           value={password}
           onChangeText={setPassword}
           secureTextEntry

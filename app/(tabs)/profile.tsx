@@ -58,7 +58,7 @@ export default function Profile() {
           <Text style={styles.label}>{t('profile.memberSince')}</Text>
           <Text style={styles.value}>
             {user?.created_at
-              ? `${new Date(user.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} / ${new Date(user.created_at).toLocaleDateString('ta-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              ? new Date(user.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
               : 'N/A'}
           </Text>
         </View>
@@ -67,7 +67,11 @@ export default function Profile() {
           <LanguageSelector />
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#FFD54F' }]} onPress={() => router.push('/(tabs)/orders')}>
+          <Text style={[styles.logoutButtonText, { color: '#333' }]}>{t('nav.orders')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#d32f2f' }]} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>{t('auth.logout')}</Text>
         </TouchableOpacity>
       </ScrollView>

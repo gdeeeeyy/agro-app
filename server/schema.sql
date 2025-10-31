@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS products (
   plant_used_ta TEXT,
   details_ta TEXT,
   image TEXT,
+  unit TEXT,
   stock_available INTEGER DEFAULT 0,
   cost_per_unit DOUBLE PRECISION NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -44,6 +45,9 @@ CREATE TABLE IF NOT EXISTS orders (
   status TEXT DEFAULT 'pending',
   status_note TEXT,
   delivery_date TEXT,
+  logistics_name TEXT,
+  tracking_number TEXT,
+  tracking_url TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -62,4 +66,26 @@ CREATE TABLE IF NOT EXISTS keywords (
   id BIGSERIAL PRIMARY KEY,
   name TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Crops master (admin-managed)
+CREATE TABLE IF NOT EXISTS crops (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  name_ta TEXT,
+  image TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Crop guides (language-specific)
+CREATE TABLE IF NOT EXISTS crop_guides (
+  id BIGSERIAL PRIMARY KEY,
+  crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
+  language TEXT NOT NULL DEFAULT 'en',
+  cultivation_guide TEXT,
+  pest_management TEXT,
+  disease_management TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(crop_id, language)
 );

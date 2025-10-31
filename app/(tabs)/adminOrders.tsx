@@ -62,6 +62,9 @@ export default function AdminOrders() {
   const [statusNote, setStatusNote] = useState('');
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [logisticsName, setLogisticsName] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
 
   const isAdmin = user?.is_admin === 1;
 
@@ -87,6 +90,9 @@ export default function AdminOrders() {
     setNewStatus(order.status);
     setStatusNote(order.status_note || '');
     setDeliveryDate(order.delivery_date ? new Date(order.delivery_date) : null);
+    setLogisticsName((order as any).logistics_name || '');
+    setTrackingNumber((order as any).tracking_number || '');
+    setTrackingUrl((order as any).tracking_url || '');
     setModalVisible(true);
   };
 
@@ -102,7 +108,10 @@ export default function AdminOrders() {
         selectedOrder.id,
         newStatus,
         statusNote || undefined,
-        deliveryDateStr
+        deliveryDateStr,
+        logisticsName || undefined,
+        trackingNumber || undefined,
+        trackingUrl || undefined
       );
 
       if (success) {
@@ -346,6 +355,30 @@ export default function AdminOrders() {
                     multiline
                     numberOfLines={3}
                   />
+                </View>
+
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Logistics (Optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Logistics name (e.g., Delhivery, BlueDart)"
+                    value={logisticsName}
+                    onChangeText={setLogisticsName}
+                  />
+                  <TextInput
+                    style={[styles.input, { marginTop: 8 }]}
+                    placeholder="Tracking number"
+                    value={trackingNumber}
+                    onChangeText={setTrackingNumber}
+                  />
+                  <TextInput
+                    style={[styles.input, { marginTop: 8 }]}
+                    placeholder="Tracking URL (https://...)"
+                    autoCapitalize="none"
+                    value={trackingUrl}
+                    onChangeText={setTrackingUrl}
+                  />
+                  <Text style={styles.hint}>If URL is provided, users can tap the logistics name in their order details to open it.</Text>
                 </View>
 
               </>
