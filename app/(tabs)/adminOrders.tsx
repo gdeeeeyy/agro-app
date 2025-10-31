@@ -185,14 +185,6 @@ export default function AdminOrders() {
             {new Date(item.created_at).toLocaleDateString('en-IN')}
           </Text>
         </View>
-        {item.delivery_date && (
-          <View style={styles.orderDetailRow}>
-            <Ionicons name="checkmark-done" size={18} color="#4caf50" />
-            <Text style={styles.orderDetailText}>
-              Delivery: {new Date(item.delivery_date).toLocaleDateString('en-IN')}
-            </Text>
-          </View>
-        )}
         {item.delivery_address && (
           <View style={styles.orderDetailRow}>
             <Ionicons name="location" size={18} color="#666" />
@@ -356,41 +348,6 @@ export default function AdminOrders() {
                   />
                 </View>
 
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Estimated Delivery Date (Optional)</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <Ionicons name="calendar" size={20} color="#4caf50" />
-                    <Text style={styles.dateButtonText}>
-                      {deliveryDate 
-                        ? deliveryDate.toLocaleDateString('en-IN', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })
-                        : 'Select Delivery Date'}
-                    </Text>
-                  </TouchableOpacity>
-                  {deliveryDate && (
-                    <TouchableOpacity
-                      style={styles.clearDateButton}
-                      onPress={() => setDeliveryDate(null)}
-                    >
-                      <Text style={styles.clearDateText}>Clear Date</Text>
-                    </TouchableOpacity>
-                  )}
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={deliveryDate || new Date()}
-                      mode="date"
-                      display="default"
-                      minimumDate={new Date()}
-                      onChange={onDateChange}
-                    />
-                  )}
-                </View>
               </>
             )}
           </ScrollView>

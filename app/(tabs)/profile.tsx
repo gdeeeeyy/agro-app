@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+// router imported once below
 import React, { useContext } from 'react';
 import {
   Alert,
@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { UserContext } from '../../context/UserContext';
+import { router } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSelector from '../../components/LanguageSelector';
 
@@ -57,7 +58,7 @@ export default function Profile() {
           <Text style={styles.label}>{t('profile.memberSince')}</Text>
           <Text style={styles.value}>
             {user?.created_at
-              ? new Date(user.created_at).toLocaleDateString('ta-IN')
+              ? `${new Date(user.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} / ${new Date(user.created_at).toLocaleDateString('ta-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
               : 'N/A'}
           </Text>
         </View>

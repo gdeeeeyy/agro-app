@@ -47,6 +47,21 @@ app.post('/auth/signin', async (req, res) => {
   res.json(u);
 });
 
+// Create admin (server-side)
+app.post('/auth/create-admin', async (req, res) => {
+  const { number, password, full_name } = req.body || {};
+  try {
+    const u = await one(
+      'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1, $2, $3, 1) RETURNING id, number, full_name, is_admin, created_at',
+      [number, password, full_name || null]
+    );
+    res.json(u);
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'number already exists' });
+    console.error(e); res.status(500).json({ error: 'create-admin failed' });
+  }
+});
+
 // Products
 app.get('/products', async (req, res) => {
   res.json(await all('SELECT * FROM products ORDER BY created_at DESC'));
@@ -167,7 +182,7 @@ app.get('/cart/total', async (req, res) => {
 
 // Orders
 app.post('/orders', async (req, res) => {
-  const { userId, paymentMethod, deliveryAddress } = req.body || {};
+  const { userId, paymentMethod, deliveryAddress, note } = req.body || {};
   const cartItems = await all(
     `SELECT ci.product_id, ci.quantity, p.name, p.cost_per_unit
      FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.user_id = $1`, [userId]
@@ -178,8 +193,8 @@ app.post('/orders', async (req, res) => {
      FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.user_id = $1`, [userId]
   )).total || 0;
   const o = await one(
-    'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-    [userId, total, paymentMethod, deliveryAddress || null, 'pending']
+    'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+    [userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null]
   );
   for (const it of cartItems) {
     await pool.query(

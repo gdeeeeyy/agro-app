@@ -124,12 +124,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#2d5016',
+    color: '#111',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#111',
     marginBottom: 40,
   },
   error: {
@@ -148,6 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     fontSize: 16,
+    color: '#000',
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },

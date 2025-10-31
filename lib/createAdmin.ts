@@ -57,5 +57,25 @@ export async function createDefaultAdmin() {
   }
 }
 
-// Run this function to create the default admin (best-effort, safe in both modes)
-createDefaultAdmin();
+export async function createAdminCustom(number: string, password: string, fullName: string) {
+  try {
+    const hashed = await hashPassword(password);
+    if (API_URL) {
+      try {
+        await api.post('/auth/create-admin', { number, password: hashed, full_name: fullName });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    const existing = await db.getFirstAsync("SELECT id FROM users WHERE number = ?", number);
+    if (existing) return false;
+    await db.runAsync(
+      "INSERT INTO users (number, password, full_name, is_admin) VALUES (?, ?, ?, 1)",
+      number, hashed, fullName
+    );
+    return true;
+  } catch (e) {
+    return false;
+  }
+}

@@ -9,7 +9,9 @@ import {
   Image,
   Modal,
   ScrollView,
+  TextInput,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -37,6 +39,7 @@ export default function Cart() {
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [orderNote, setOrderNote] = useState<string>('');
 
   const handleQuantityChange = async (productId: number, newQuantity: number) => {
     if (newQuantity < 0) return;
@@ -116,7 +119,7 @@ export default function Cart() {
         return;
       }
 
-      const orderId = await createOrder(user.id, selectedPayment, deliveryAddress);
+      const orderId = await createOrder(user.id, selectedPayment, deliveryAddress, orderNote.trim() || undefined);
       setPaymentModalVisible(false);
       setAddressModalVisible(false);
       setSelectedPayment('');
@@ -193,8 +196,18 @@ export default function Cart() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>{t('cart.title')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+            <Text style={styles.headerTitle}>{t('cart.title')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
+              <Ionicons name="receipt" size={26} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+              <Ionicons name="person-circle" size={28} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.headerSubtitle}>
           {t('cart.subtitle')}
@@ -342,6 +355,19 @@ export default function Cart() {
                   <Ionicons name="checkmark-circle" size={24} color="#4caf50" />
                 )}
               </TouchableOpacity>
+
+              <View style={styles.noteSection}>
+                <Text style={styles.addressLabel}>Suggestion/Note (optional)</Text>
+                <Text style={styles.helperText}>You can add a note for the admin regarding this order</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Add your suggestion or note..."
+                  value={orderNote}
+                  onChangeText={setOrderNote}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
             </ScrollView>
 
             <View style={styles.modalFooter}>

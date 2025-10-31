@@ -60,8 +60,15 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
     }
   };
 
+  const [detailsVisible, setDetailsVisible] = useState(false);
+
+  const openDetails = () => setDetailsVisible(true);
+  const closeDetails = () => setDetailsVisible(false);
+
+  const Unit = (product as any).unit || 'units';
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={styles.card} onPress={onPress || openDetails}>
       {product.image && (
         <Image source={{ uri: product.image }} style={styles.image} />
       )}
@@ -81,10 +88,10 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
         
         <View style={styles.footer}>
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{product.cost_per_unit}</Text>
+            <Text style={styles.price}>₹{product.cost_per_unit} / {Unit}</Text>
             <Text style={styles.stock}>
               {product.stock_available > 0 
-                ? `${product.stock_available} ${t('store.inStock')}` 
+                ? `${product.stock_available} ${Unit} ${t('store.inStock')}` 
                 : t('store.outOfStock')
               }
             </Text>
@@ -106,6 +113,29 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal
+        visible={detailsVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeDetails}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 500 }] }>
+            <Text style={styles.modalTitle}>{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}</Text>
+            <Text style={[styles.modalStock, { marginBottom: 8 }]}>₹{product.cost_per_unit} / {Unit}</Text>
+            <Text style={styles.details}>{(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+              <TouchableOpacity style={styles.cancelButton} onPress={closeDetails}>
+                <Text style={styles.cancelButtonText}>{t('common.close')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmButton} onPress={() => { closeDetails(); handleAddToCart(); }}>
+                <Text style={styles.confirmButtonText}>{t('store.addToCart')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={quantityModalVisible}

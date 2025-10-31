@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
 import { savePlant, findProductsByKeywords, getRelatedProductsByName } from "../../lib/database";
@@ -180,8 +181,18 @@ export default function App() {
     <View style={styles.wrapper}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>{t('scanner.headerTitle')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+            <Text style={styles.headerTitle}>{t('scanner.headerTitle')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
+              <Ionicons name="receipt" size={26} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+              <Ionicons name="person-circle" size={28} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.headerSubtitle}>{t('scanner.headerSubtitle')}</Text>
       </View>

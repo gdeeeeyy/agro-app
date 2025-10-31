@@ -37,7 +37,7 @@ export default function LanguageSelector() {
             styles.languageText,
             currentLanguage === 'en' && styles.selectedText
           ]}>
-            🇺🇸 {t('language.english')}
+            {t('language.english')}
           </Text>
           {currentLanguage === 'en' && (
             <Ionicons name="checkmark-circle" size={20} color="#4caf50" />
@@ -55,7 +55,7 @@ export default function LanguageSelector() {
             styles.languageText,
             currentLanguage === 'ta' && styles.selectedText
           ]}>
-            🇮🇳 {t('language.tamil')}
+            {t('language.tamil')}
           </Text>
           {currentLanguage === 'ta' && (
             <Ionicons name="checkmark-circle" size={20} color="#4caf50" />

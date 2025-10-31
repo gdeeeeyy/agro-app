@@ -89,14 +89,20 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
   try {
     const cols = await db.getAllAsync("PRAGMA table_info(products)");
     const colNames = (cols as any[]).map(c => c.name);
-    const addCol = async (name: string) => {
+    const addTextCol = async (name: string) => {
       if (!colNames.includes(name)) {
         await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} TEXT`);
       }
     };
-    await addCol('name_ta');
-    await addCol('plant_used_ta');
-    await addCol('details_ta');
+    const addRealCol = async (name: string) => {
+      if (!colNames.includes(name)) {
+        await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} REAL`);
+      }
+    };
+    await addTextCol('name_ta');
+    await addTextCol('plant_used_ta');
+    await addTextCol('details_ta');
+    await addTextCol('unit');
   } catch (e) {
     console.warn('Migration check failed:', e);
   }
@@ -159,6 +165,7 @@ export async function addProduct(product: {
   image?: string;
   stock_available: number;
   cost_per_unit: number;
+  unit?: string;
 }) {
   try {
     if (API_URL) {
@@ -166,7 +173,7 @@ export async function addProduct(product: {
       return (res as any).id || null;
     }
     const result = await db.runAsync(
-      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, stock_available, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, stock_available, cost_per_unit, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
       product.plant_used,
       product.keywords,
@@ -176,7 +183,8 @@ export async function addProduct(product: {
       product.details_ta || null,
       product.image || null,
       product.stock_available,
-      product.cost_per_unit
+      product.cost_per_unit,
+      product.unit || null
     );
     return result.lastInsertRowId;
   } catch (err) {
@@ -196,6 +204,7 @@ export async function updateProduct(id: number, product: {
   image?: string;
   stock_available?: number;
   cost_per_unit?: number;
+  unit?: string;
 }) {
   try {
     if (API_URL) {
@@ -478,10 +487,10 @@ export async function getCartTotal(userId: number) {
 }
 
 // Order functions
-export async function createOrder(userId: number, paymentMethod: string, deliveryAddress?: string) {
+export async function createOrder(userId: number, paymentMethod: string, deliveryAddress?: string, note?: string) {
   try {
     if (API_URL) {
-      const res = await api.post('/orders', { userId, paymentMethod, deliveryAddress: deliveryAddress || null });
+      const res = await api.post('/orders', { userId, paymentMethod, deliveryAddress: deliveryAddress || null, note: note || null });
       return (res as any).id;
     }
     // Get cart items
@@ -495,8 +504,8 @@ export async function createOrder(userId: number, paymentMethod: string, deliver
 
     // Create order
     const orderResult = await db.runAsync(
-      "INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status) VALUES (?, ?, ?, ?, ?)",
-      userId, total, paymentMethod, deliveryAddress || null, 'pending'
+      "INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES (?, ?, ?, ?, ?, ?)",
+      userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null
     );
 
     const orderId = orderResult.lastInsertRowId;

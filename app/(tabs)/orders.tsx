@@ -10,6 +10,7 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -116,11 +117,7 @@ export default function Orders() {
         <View>
           <Text style={styles.orderId}>{t('orders.orderDetails')} #{item.id}</Text>
           <Text style={styles.orderDate}>
-            {new Date(item.created_at).toLocaleDateString('ta-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric'
-            })}
+            {new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} / {new Date(item.created_at).toLocaleDateString('ta-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -140,14 +137,6 @@ export default function Orders() {
               {item.payment_method === 'cod' ? t('payment.cod') : item.payment_method.toUpperCase()}
             </Text>
           </View>
-          {item.delivery_date && (
-            <View style={styles.orderDetailRow}>
-              <Ionicons name="calendar" size={20} color="#666" />
-              <Text style={styles.orderDetailText}>
-                {t('orders.delivery')}: {new Date(item.delivery_date).toLocaleDateString('ta-IN')}
-              </Text>
-            </View>
-          )}
           {item.delivery_address && (
             <View style={styles.orderDetailRow}>
               <Ionicons name="location" size={20} color="#666" />
@@ -186,8 +175,15 @@ export default function Orders() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
+            <Text style={styles.headerTitle}>{t('orders.title')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+              <Ionicons name="person-circle" size={28} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.headerSubtitle}>
           {t('orders.subtitle')}
@@ -231,7 +227,7 @@ export default function Orders() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date:</Text>
                     <Text style={styles.detailValue}>
-                      {new Date(selectedOrder.created_at).toLocaleString('en-IN')}
+                      {new Date(selectedOrder.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} / {new Date(selectedOrder.created_at).toLocaleDateString('ta-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -246,14 +242,6 @@ export default function Orders() {
                       {selectedOrder.payment_method === 'cod' ? 'Cash on Delivery' : selectedOrder.payment_method.toUpperCase()}
                     </Text>
                   </View>
-                  {selectedOrder.delivery_date && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Est. Delivery:</Text>
-                      <Text style={styles.detailValue}>
-                        {new Date(selectedOrder.delivery_date).toLocaleDateString('en-IN')}
-                      </Text>
-                    </View>
-                  )}
                   {selectedOrder.delivery_address && (
                     <View style={styles.addressDetailSection}>
                       <Text style={styles.detailLabel}>Delivery Address:</Text>

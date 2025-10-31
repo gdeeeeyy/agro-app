@@ -24,7 +24,7 @@ import {
   deleteKeyword
 } from '../../lib/database';
 import { addSampleProducts } from '../../lib/sampleProducts';
-import { createDefaultAdmin } from '../../lib/createAdmin';
+import { createDefaultAdmin, createAdminCustom } from '../../lib/createAdmin';
 
 interface Product {
   id: number;
@@ -48,6 +48,7 @@ interface ProductForm {
   image?: string;
   stock_available: string;
   cost_per_unit: string;
+  unit?: string;
 }
 
 interface Keyword {
@@ -66,6 +67,10 @@ export default function AdminDashboard() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [newKeywordName, setNewKeywordName] = useState('');
+  const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [adminNumber, setAdminNumber] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminFullName, setAdminFullName] = useState('');
   const [formData, setFormData] = useState<ProductForm>({
     name: '',
     name_ta: '',
@@ -77,6 +82,7 @@ export default function AdminDashboard() {
     image: '',
     stock_available: '',
     cost_per_unit: '',
+    unit: 'units',
   });
 
   // Check if user is admin
@@ -132,15 +138,16 @@ export default function AdminDashboard() {
   const openEditModal = (product: any) => {
     setFormData({
       name: product.name || '',
-      name_ta: product.name_ta || '',
+      name_ta: (product as any).name_ta || '',
       plant_used: product.plant_used || '',
-      plant_used_ta: product.plant_used_ta || '',
+      plant_used_ta: (product as any).plant_used_ta || '',
       keywords: product.keywords || '',
       details: product.details || '',
-      details_ta: product.details_ta || '',
+      details_ta: (product as any).details_ta || '',
       image: product.image || '',
       stock_available: String(product.stock_available ?? ''),
       cost_per_unit: String(product.cost_per_unit ?? ''),
+      unit: (product as any).unit || 'units',
     });
     // Parse existing keywords
     const existingKeywords = product.keywords.split(',').map(k => k.trim()).filter(k => k);
@@ -241,12 +248,13 @@ export default function AdminDashboard() {
       plant_used: formData.plant_used.trim(),
       keywords: selectedKeywords.join(', '),
       details: formData.details.trim(),
-      name_ta: formData.name_ta.trim() || undefined,
-      plant_used_ta: formData.plant_used_ta.trim() || undefined,
-      details_ta: formData.details_ta.trim() || undefined,
+      name_ta: formData.name_ta?.trim() || undefined,
+      plant_used_ta: formData.plant_used_ta?.trim() || undefined,
+      details_ta: formData.details_ta?.trim() || undefined,
       image: formData.image || undefined,
       stock_available: parseInt(formData.stock_available),
       cost_per_unit: parseFloat(formData.cost_per_unit),
+      unit: formData.unit?.trim() || undefined,
     };
 
     try {
@@ -327,25 +335,10 @@ export default function AdminDashboard() {
   };
 
   const handleCreateAdmin = () => {
-    Alert.alert(
-      'Create Admin Account',
-      'This will create a default admin account:\n\nNumber: 1234567890\nPassword: admin123',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Create', 
-          onPress: async () => {
-            try {
-              await createDefaultAdmin();
-              Alert.alert('Success', 'Admin account created successfully!\n\nNumber: 1234567890\nPassword: admin123');
-            } catch (error) {
-              console.error('Error creating admin account:', error);
-              Alert.alert('Error', 'Failed to create admin account');
-            }
-          }
-        },
-      ]
-    );
+    setAdminNumber('');
+    setAdminPassword('');
+    setAdminFullName('');
+    setAdminModalVisible(true);
   };
 
   const renderProduct = ({ item }: { item: Product }) => (
@@ -577,6 +570,14 @@ export default function AdminDashboard() {
               onChangeText={(text) => setFormData({ ...formData, cost_per_unit: text })}
               keyboardType="numeric"
             />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Unit (e.g., kg, litre, pcs)"
+              value={formData.unit}
+              onChangeText={(text) => setFormData({ ...formData, unit: text })}
+              autoCapitalize="none"
+            />
           </ScrollView>
 
           <View style={styles.modalFooter}>
@@ -643,6 +644,63 @@ export default function AdminDashboard() {
                 </Text>
               }
             />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={adminModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Create Admin</Text>
+            <TouchableOpacity onPress={() => setAdminModalVisible(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalContent}>
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              value={adminFullName}
+              onChangeText={setAdminFullName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Phone Number"
+              value={adminNumber}
+              onChangeText={setAdminNumber}
+              keyboardType="number-pad"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              value={adminPassword}
+              onChangeText={setAdminPassword}
+              secureTextEntry
+            />
+          </View>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setAdminModalVisible(false)}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={async () => {
+                if (!adminNumber || !adminPassword || !adminFullName) {
+                  Alert.alert('Error', 'Fill all fields');
+                  return;
+                }
+                const ok = await createAdminCustom(adminNumber, adminPassword, adminFullName);
+                if (ok) Alert.alert('Success', 'Admin created');
+                else Alert.alert('Error', 'Failed to create admin');
+                setAdminModalVisible(false);
+              }}
+            >
+              <Text style={styles.saveButtonText}>Create</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
