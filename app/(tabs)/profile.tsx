@@ -9,6 +9,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserContext } from '../../context/UserContext';
 import { router } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
@@ -75,6 +76,7 @@ export default function Profile() {
           <Text style={styles.logoutButtonText}>{t('auth.logout')}</Text>
         </TouchableOpacity>
       </ScrollView>
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
 }

@@ -386,6 +386,7 @@ export default function Cart() {
         onClose={() => setAddressModalVisible(false)}
         onAddressConfirmed={handleAddressConfirmed}
       />
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
 }

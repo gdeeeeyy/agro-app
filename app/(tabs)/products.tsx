@@ -231,6 +231,7 @@ export default function Products() {
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
 }

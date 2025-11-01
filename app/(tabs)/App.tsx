@@ -247,7 +247,7 @@ mediaTypes: ['images'] as any,
           </View>
         )}
       </ScrollView>
-
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
 }

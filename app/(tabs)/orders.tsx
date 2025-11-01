@@ -236,6 +236,7 @@ export default function Orders() {
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
 
       <Modal
         visible={detailsModalVisible}
