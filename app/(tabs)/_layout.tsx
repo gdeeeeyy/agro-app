@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useContext } from 'react';
-import CartIcon from '../../components/CartIcon';
+import React, { useContext } from 'react';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -51,16 +50,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
-        options={{
-          title: t('nav.profile'),
-          href: null,
-          tabBarIcon: ({ size, color }) => (
-            <Ionicons name="person" size={size + 6} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="orders"
         options={{
           title: t('nav.orders'),
@@ -90,13 +79,17 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Remove Cart from tab bar entirely */}
       <Tabs.Screen
         name="cart"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="profile"
         options={{
-          title: t('nav.cart'),
-          href: isAdmin ? null : undefined,
+          title: t('nav.profile'),
           tabBarIcon: ({ size, color }) => (
-            <CartIcon size={size + 6} color={color} />
+            <Ionicons name="person" size={size + 6} color={color} />
           ),
         }}
       />

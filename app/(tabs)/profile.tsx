@@ -14,6 +14,7 @@ import { UserContext } from '../../context/UserContext';
 import { router } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSelector from '../../components/LanguageSelector';
+import AppHeader from '../../components/AppHeader';
 
 export default function Profile() {
   const { user, setUser } = useContext(UserContext);
@@ -38,11 +39,9 @@ export default function Profile() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top','bottom']}>
-      <View style={styles.header}>
-        <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.headerTitle}>{t('nav.profile')}</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <AppHeader />
+
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }}>
         <View style={styles.infoCard}>

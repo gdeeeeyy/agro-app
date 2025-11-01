@@ -17,6 +17,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
 import { UserContext } from '../../context/UserContext';
 import { getAllPlants, getAllCrops, addCrop, upsertCropGuide, getCropGuide } from '../../lib/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -140,18 +141,7 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-            <Text style={styles.headerTitle} numberOfLines={1}>{t('home.title')}</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
-            <Ionicons name="person-circle" size={28} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <AppHeader />
 
       {/* Weather card */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>

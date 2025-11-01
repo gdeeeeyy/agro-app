@@ -18,6 +18,7 @@ import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getUserOrders, getOrderItems } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
 
 interface Order {
   id: number;
@@ -212,18 +213,7 @@ export default function Orders() {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
-      <View style={styles.header}>
-        <View style={styles.topRight}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
-            <Ionicons name="person-circle" size={28} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.brandRow}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={[styles.headerTitle, { fontSize: 20 }]}>{t('orders.title')}</Text>
-        </View>
-      </View>
+      <AppHeader />
 
       <FlatList
         data={orders}

@@ -21,6 +21,7 @@ import { analyzePlantImage } from "../../lib/gemini";
 import ProductCard from "../../components/ProductCard";
 import { useLanguage } from "../../context/LanguageContext";
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
 
 
 export default function App() {
@@ -194,18 +195,7 @@ mediaTypes: ['images'] as any,
 
   return (
     <View style={styles.wrapper}>
-      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
-      <View style={styles.header}>
-        <View style={styles.topRight}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
-            <Ionicons name="person-circle" size={28} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.brandRow}>
-            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={[styles.headerTitle, { fontSize: 20 }]}>Agriismart</Text>
-        </View>
-      </View>
+      <AppHeader />
 
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.inputSection}>

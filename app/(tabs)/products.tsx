@@ -18,6 +18,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { getAllProducts, searchProducts, getAllKeywords, getProductsByKeyword } from '../../lib/database';
 import ProductCard from '../../components/ProductCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
 
 interface Keyword {
   id: number;
@@ -140,18 +141,7 @@ export default function Products() {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
-      <View style={styles.header}>
-        <View style={styles.topRight}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
-            <Ionicons name="person-circle" size={28} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.brandRow}>
-            <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>{t('store.title')}</Text>
-        </View>
-      </View>
+      <AppHeader />
 
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>

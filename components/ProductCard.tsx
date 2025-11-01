@@ -9,6 +9,10 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  Pressable,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
@@ -36,6 +40,8 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   const { addItem } = useCart();
   const { t, currentLanguage } = useLanguage();
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const placeholderImage = 'https://via.placeholder.com/800x600?text=Agri+Product';
+  const productImage = product.image || placeholderImage;
 
   const handleAddToCart = async () => {
     if (product.stock_available <= 0) {
@@ -56,15 +62,53 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
   const [detailsVisible, setDetailsVisible] = useState(false);
 
-  const openDetails = () => setDetailsVisible(true);
+  const SCREEN_H = Dimensions.get('window').height;
+  const INITIAL_Y = Math.round(SCREEN_H * 0.35);
+  const sheetTranslateY = React.useRef(new Animated.Value(INITIAL_Y)).current;
+  const currentOffsetRef = React.useRef(INITIAL_Y);
+
+  const animateTo = (to: number) => {
+    currentOffsetRef.current = to;
+    Animated.timing(sheetTranslateY, { toValue: to, duration: 180, useNativeDriver: true }).start();
+  };
+
+  const openDetails = () => {
+    sheetTranslateY.setValue(INITIAL_Y);
+    currentOffsetRef.current = INITIAL_Y;
+    setDetailsVisible(true);
+  };
   const closeDetails = () => setDetailsVisible(false);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gesture) => {
+        const next = Math.max(0, currentOffsetRef.current + gesture.dy);
+        sheetTranslateY.setValue(next);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const releasePos = Math.max(0, currentOffsetRef.current + gesture.dy);
+        // Snap logic: close, half, or expanded
+        if (releasePos > INITIAL_Y + 120) {
+          closeDetails();
+          return;
+        }
+        if (releasePos < INITIAL_Y / 2) {
+          animateTo(0); // expand
+        } else {
+          animateTo(INITIAL_Y); // half
+        }
+      },
+    })
+  ).current;
 
   const Unit = (product as any).unit || 'units';
 
   return (
     <TouchableOpacity style={[styles.card, compact && styles.cardCompact]} onPress={onPress || openDetails}>
-      {!listOnlyDescription && product.image && (
-        <Image source={{ uri: product.image }} style={[styles.image, compact && styles.imageCompact]} />
+      {!listOnlyDescription && (
+        <Image source={{ uri: productImage }} style={[styles.image, compact && styles.imageCompact]} />
       )}
       
       <View style={[styles.content, compact && styles.contentCompact]}>
@@ -82,23 +126,16 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
         )}
         
         {listOnlyDescription ? null : (
-          <>
-            {/* Divider */}
-            <View style={styles.divider} />
-            {/* Name and Price row */}
-            <View style={styles.topRow}>
-              <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={1}>
-                {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
-              </Text>
-              <Text style={[styles.price, compact && styles.priceCompact]}>₹{product.cost_per_unit} / {Unit}</Text>
-            </View>
-            {/* Stock */}
+          <View style={{ flexGrow: 1 }}>
+            <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
+              {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+            </Text>
+            <Text style={[styles.price, compact && styles.priceCompact]}>₹{product.cost_per_unit}</Text>
             <Text style={styles.stock} numberOfLines={1}>
               {product.stock_available > 0 
                 ? `Stock: ${product.stock_available} ${Unit}`
                 : t('store.outOfStock')}
             </Text>
-            {/* Bottom row with qty and big add button */}
             <View style={styles.bottomRow}>
               <View style={styles.inlineQuantity}>
                 <TouchableOpacity
@@ -134,29 +171,43 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 <Ionicons name="add" size={22} color={product.stock_available <= 0 ? '#999' : '#fff'} />
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         )}
       </View>
 
       <Modal
         visible={detailsVisible}
-        transparent={false}
-        animationType="slide"
+        transparent={true}
+        animationType="fade"
         onRequestClose={closeDetails}
       >
-        <ScrollView contentContainerStyle={styles.fullModalContainer}>
-          {product.image && (
-            <Image source={{ uri: product.image }} style={styles.fullImage} resizeMode="contain" />
-          )}
-          <View style={styles.fullModalContent}>
-            <Text style={styles.modalTitle}>{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}</Text>
-            <Text style={[styles.modalStock, { marginBottom: 12 }]}>₹{product.cost_per_unit} / {Unit}</Text>
-            <Text style={styles.fullDetails}>{(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}</Text>
-            <TouchableOpacity style={[styles.cancelButton, { marginTop: 16 }]} onPress={closeDetails}>
-              <Text style={styles.cancelButtonText}>{t('common.close')}</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.backdrop} onPress={closeDetails} />
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              { transform: [{ translateY: sheetTranslateY }] },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.modalTitle} numberOfLines={2}>
+                {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+              </Text>
+              <TouchableOpacity onPress={closeDetails}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <Image source={{ uri: productImage }} style={styles.fullImage} resizeMode="contain" />
+            <ScrollView style={styles.descScroll} contentContainerStyle={styles.descScrollContent}>
+              <Text style={styles.fullDetails}>
+                {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
+              </Text>
+            </ScrollView>
+            <View style={{ height: 10 }} />
+          </Animated.View>
+        </View>
       </Modal>
 
     </TouchableOpacity>
@@ -177,31 +228,36 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 200,
+    height: 190,
     resizeMode: 'cover',
+    backgroundColor: '#eef2e6',
   },
   imageCompact: {
-    flex: 1,
+    height: 140,
   },
   content: {
-    padding: 16,
+    padding: 12,
+    gap: 6,
   },
   contentCompact: {
-    padding: 8,
+    padding: 12,
+    gap: 6,
+    flex: 1,
+    justifyContent: 'space-between',
   },
   name: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#2d5016',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   nameCompact: {
     fontSize: 14,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   cardCompact: {
     width: '48%',
-    aspectRatio: 1,
+    minHeight: 300,
   },
   plantUsed: {
     fontSize: 14,
@@ -215,12 +271,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 16,
   },
-  divider: { height: 1, backgroundColor: '#eee', marginTop: 8, marginBottom: 8 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  divider: { height: 0 },
+  topRow: {},
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  price: { fontSize: 16, fontWeight: '700', color: '#2d5016' },
-  priceCompact: { fontSize: 12 },
-  stock: { fontSize: 12, color: '#666', marginTop: 4 },
+  price: { fontSize: 16, fontWeight: '700', color: '#2d5016', marginBottom: 2 },
+  priceCompact: { fontSize: 14 },
+  stock: { fontSize: 12, color: '#666', marginTop: 2 },
   fabAdd: {
     width: 40,
     height: 40,
@@ -258,9 +314,16 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   fullModalContainer: { paddingBottom: 24 },
-  fullImage: { width: '100%', height: 320, backgroundColor: '#000' },
+  fullImage: { width: '100%', height: 360, borderRadius: 8, backgroundColor: '#000' },
   fullModalContent: { padding: 16 },
   fullDetails: { fontSize: 14, color: '#333', lineHeight: 20 },
+  descScroll: { maxHeight: 240 },
+  descScrollContent: { paddingBottom: 8 },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  backdrop: { ...StyleSheet.absoluteFillObject },
+  bottomSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '90%' },
+  sheetHandle: { width: 40, height: 4, backgroundColor: '#ccc', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
