@@ -125,6 +125,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       pest_id INTEGER NOT NULL,
       image TEXT NOT NULL,
       caption TEXT,
+      caption_ta TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (pest_id) REFERENCES crop_pests(id) ON DELETE CASCADE
     );
@@ -146,6 +147,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       disease_id INTEGER NOT NULL,
       image TEXT NOT NULL,
       caption TEXT,
+      caption_ta TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (disease_id) REFERENCES crop_diseases(id) ON DELETE CASCADE
     );
@@ -184,6 +186,18 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
     await addOrderTextCol('logistics_name');
     await addOrderTextCol('tracking_number');
     await addOrderTextCol('tracking_url');
+
+    // image caption bilingual columns
+    const pestImgCols = await db.getAllAsync("PRAGMA table_info(crop_pest_images)");
+    const pestImgColNames = (pestImgCols as any[]).map(c => c.name);
+    if (!pestImgColNames.includes('caption_ta')) {
+      await db.runAsync('ALTER TABLE crop_pest_images ADD COLUMN caption_ta TEXT');
+    }
+    const disImgCols = await db.getAllAsync("PRAGMA table_info(crop_disease_images)");
+    const disImgColNames = (disImgCols as any[]).map(c => c.name);
+    if (!disImgColNames.includes('caption_ta')) {
+      await db.runAsync('ALTER TABLE crop_disease_images ADD COLUMN caption_ta TEXT');
+    }
   } catch (e) {
     console.warn('Migration check failed:', e);
   }
@@ -800,10 +814,10 @@ export async function addCropPest(cropId: number, language: 'en'|'ta', name: str
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
-export async function addCropPestImage(pestId: number, image: string, caption?: string) {
+export async function addCropPestImage(pestId: number, image: string, caption?: string, caption_ta?: string) {
   try {
-    if (API_URL) { const res = await api.post(`/pests/${pestId}/images`, { image, caption }); return (res as any).id || null; }
-    const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption) VALUES (?, ?, ?)", pestId, image, caption || null);
+    if (API_URL) { const res = await api.post(`/pests/${pestId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+    const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption, caption_ta) VALUES (?, ?, ?, ?)", pestId, image, caption || null, caption_ta || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
@@ -824,10 +838,10 @@ export async function addCropDisease(cropId: number, language: 'en'|'ta', name: 
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
-export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string) {
+export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string, caption_ta?: string) {
   try {
-    if (API_URL) { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption }); return (res as any).id || null; }
-    const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption) VALUES (?, ?, ?)", diseaseId, image, caption || null);
+    if (API_URL) { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+    const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption, caption_ta) VALUES (?, ?, ?, ?)", diseaseId, image, caption || null, caption_ta || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }

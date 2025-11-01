@@ -74,7 +74,7 @@ export default function TabLayout() {
         name="admin"
         options={{
           title: t('nav.admin'),
-          href: isAdmin ? undefined : null,
+          href: null,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="settings" size={size + 6} color={color} />
           ),
@@ -84,7 +84,7 @@ export default function TabLayout() {
         name="adminOrders"
         options={{
           title: t('nav.manage'),
-          href: isAdmin ? undefined : null,
+          href: null,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="clipboard" size={size + 6} color={color} />
           ),

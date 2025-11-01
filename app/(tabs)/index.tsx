@@ -232,9 +232,7 @@ export default function Home() {
             </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
-            {isAdmin && (
-            <View style={{ backgroundColor: '#f9f9f9', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e0e0e0' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 8, color: '#2d5016' }}>Add New Crop</Text>
+            {/* Admin add-new-crop moved to Masters */}
               <TextInput
                 placeholder="Name (English)"
                 placeholderTextColor="#999"
@@ -328,8 +326,6 @@ export default function Home() {
                   <Text style={{ color: '#fff', fontWeight: '600' }}>Save Crop</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-            )}
 
             <View>
               <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 8, color: '#2d5016' }}>Select Crops</Text>

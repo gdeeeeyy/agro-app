@@ -68,11 +68,6 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
       )}
       
       <View style={[styles.content, compact && styles.contentCompact]}>
-        {!listOnlyDescription && (
-          <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
-            {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
-          </Text>
-        )}
         
         {!compact && !listOnlyDescription ? (
           <Text style={styles.plantUsed} numberOfLines={1}>
@@ -95,7 +90,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={1}>
                 {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
-              <Text style={styles.price}>₹{product.cost_per_unit} / {Unit}</Text>
+              <Text style={[styles.price, compact && styles.priceCompact]}>₹{product.cost_per_unit} / {Unit}</Text>
             </View>
             {/* Stock */}
             <Text style={styles.stock} numberOfLines={1}>
@@ -107,14 +102,14 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <View style={styles.bottomRow}>
               <View style={styles.inlineQuantity}>
                 <TouchableOpacity
-                  style={styles.qtyBtn}
+                  style={[styles.qtyBtn, compact && styles.qtyBtnCompact]}
                   onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
                   disabled={product.stock_available <= 0}
                 >
                   <Ionicons name="remove" size={16} color="#4caf50" />
                 </TouchableOpacity>
                 <TextInput
-                  style={styles.qtyInput}
+                  style={[styles.qtyInput, compact && styles.qtyInputCompact]}
                   value={String(selectedQuantity)}
                   onChangeText={(txt) => {
                     const n = parseInt(txt) || 1;
@@ -123,7 +118,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                   keyboardType="numeric"
                 />
                 <TouchableOpacity
-                  style={styles.qtyBtn}
+                  style={[styles.qtyBtn, compact && styles.qtyBtnCompact]}
                   onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}
                   disabled={product.stock_available <= 0}
                 >
@@ -132,7 +127,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </View>
 
               <TouchableOpacity
-                style={[styles.fabAdd, product.stock_available <= 0 && styles.addButtonDisabled]}
+                style={[styles.fabAdd, compact && styles.fabAddCompact, product.stock_available <= 0 && styles.addButtonDisabled]}
                 onPress={handleAddToCart}
                 disabled={product.stock_available <= 0}
               >
@@ -145,24 +140,23 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
       <Modal
         visible={detailsVisible}
-        transparent={true}
-        animationType="fade"
+        transparent={false}
+        animationType="slide"
         onRequestClose={closeDetails}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxWidth: 500 }] }>
+        <ScrollView contentContainerStyle={styles.fullModalContainer}>
+          {product.image && (
+            <Image source={{ uri: product.image }} style={styles.fullImage} resizeMode="contain" />
+          )}
+          <View style={styles.fullModalContent}>
             <Text style={styles.modalTitle}>{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}</Text>
-            <Text style={[styles.modalStock, { marginBottom: 8 }]}>₹{product.cost_per_unit} / {Unit}</Text>
-            <ScrollView style={{ maxHeight: 220 }}>
-              <Text style={styles.details}>{(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}</Text>
-            </ScrollView>
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-              <TouchableOpacity style={styles.cancelButton} onPress={closeDetails}>
-                <Text style={styles.cancelButtonText}>{t('common.close')}</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.modalStock, { marginBottom: 12 }]}>₹{product.cost_per_unit} / {Unit}</Text>
+            <Text style={styles.fullDetails}>{(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}</Text>
+            <TouchableOpacity style={[styles.cancelButton, { marginTop: 16 }]} onPress={closeDetails}>
+              <Text style={styles.cancelButtonText}>{t('common.close')}</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </Modal>
 
     </TouchableOpacity>
@@ -187,13 +181,13 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   imageCompact: {
-    height: 110,
+    flex: 1,
   },
   content: {
     padding: 16,
   },
   contentCompact: {
-    padding: 10,
+    padding: 8,
   },
   name: {
     fontSize: 18,
@@ -207,6 +201,7 @@ const styles = StyleSheet.create({
   },
   cardCompact: {
     width: '48%',
+    aspectRatio: 1,
   },
   plantUsed: {
     fontSize: 14,
@@ -224,6 +219,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   price: { fontSize: 16, fontWeight: '700', color: '#2d5016' },
+  priceCompact: { fontSize: 12 },
   stock: { fontSize: 12, color: '#666', marginTop: 4 },
   fabAdd: {
     width: 40,
@@ -244,6 +240,9 @@ const styles = StyleSheet.create({
   addButtonDisabled: {
     backgroundColor: '#e0e0e0',
   },
+  fabAddCompact: { width: 34, height: 34, borderRadius: 17 },
+  qtyBtnCompact: { width: 26, height: 26, borderRadius: 13 },
+  qtyInputCompact: { width: 40, height: 26, fontSize: 14 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -258,6 +257,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
+  fullModalContainer: { paddingBottom: 24 },
+  fullImage: { width: '100%', height: 320, backgroundColor: '#000' },
+  fullModalContent: { padding: 16 },
+  fullDetails: { fontSize: 14, color: '#333', lineHeight: 20 },
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',

@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS crop_pest_images (
   pest_id BIGINT NOT NULL REFERENCES crop_pests(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
   caption TEXT,
+  caption_ta TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -126,5 +127,6 @@ CREATE TABLE IF NOT EXISTS crop_disease_images (
   disease_id BIGINT NOT NULL REFERENCES crop_diseases(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
   caption TEXT,
+  caption_ta TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
