@@ -36,6 +36,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [locationName, setLocationName] = useState<string>('');
   const [weather, setWeather] = useState<{ temp?: number; condition?: string }>({});
+  const [hourly, setHourly] = useState<Array<{ time: string; temp: number; desc?: string; icon?: string }>>([]);
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [allCrops, setAllCrops] = useState<any[]>([]);
   const [selectedCrops, setSelectedCrops] = useState<number[]>([]);
@@ -84,10 +85,47 @@ export default function Home() {
         const place = rev?.[0];
         const city = [place?.city, place?.subregion, place?.region].filter(Boolean)[0];
         setLocationName(city || `${latitude.toFixed(2)},${longitude.toFixed(2)}`);
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`;
-        const res = await fetch(url).then(r => r.json()).catch(() => null);
-        const temp = res?.current?.temperature_2m;
-        setWeather({ temp, condition: '' });
+
+        // Current temp via OpenWeather (fallback to 3h forecast first entry)
+        const OW_KEY = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
+        if (OW_KEY) {
+          // Use One Call API for true hourly forecast
+          const ow = await fetch(`https://api.openweathermap.org/data/2.5/onecall?lat=${latitude}&lon=${longitude}&exclude=minutely,daily,alerts&units=metric&appid=${OW_KEY}`)
+            .then(r => r.json()).catch(()=>null);
+          const current = ow?.current;
+          if (current) setWeather({ temp: Math.round(current.temp), condition: current.weather?.[0]?.main || '' });
+
+          // Build hourly forecast for the rest of today (hourly granularity)
+          const tz = Number(ow?.timezone_offset || 0); // seconds
+          const nowLocal = new Date((Math.floor(Date.now()/1000) + tz) * 1000);
+          const y = nowLocal.getFullYear(), m = nowLocal.getMonth(), d = nowLocal.getDate();
+          let items: Array<{ time: string; temp: number; desc?: string; icon?: string }> = [];
+          (ow?.hourly || []).slice(0, 24).forEach((it: any) => {
+            const dtLocal = new Date((it.dt + tz) * 1000);
+            if (dtLocal.getFullYear()===y && dtLocal.getMonth()===m && dtLocal.getDate()===d) {
+              const hh = dtLocal.getHours().toString().padStart(2,'0');
+              const desc = String(it.weather?.[0]?.description || '').replace(/\b\w/g, c => c.toUpperCase());
+              items.push({ time: `${hh}:00`, temp: Math.round(it.temp), desc, icon: it.weather?.[0]?.icon });
+            }
+          });
+          // If timezone filtering yielded nothing, show next 24 hours from now
+          if (items.length === 0 && Array.isArray(ow?.hourly)) {
+            items = (ow.hourly as any[]).slice(0, 24).map((it: any) => {
+              const dtLocal = new Date((it.dt + tz) * 1000);
+              const hh = dtLocal.getHours().toString().padStart(2,'0');
+              const desc = String(it.weather?.[0]?.description || '').replace(/\b\w/g, c => c.toUpperCase());
+              return { time: `${hh}:00`, temp: Math.round(it.temp), desc, icon: it.weather?.[0]?.icon };
+            });
+          }
+          setHourly(items);
+        } else {
+          // fallback: Open-Meteo current temp
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m`;
+          const res = await fetch(url).then(r => r.json()).catch(() => null);
+          const temp = res?.current?.temperature_2m;
+          setWeather({ temp, condition: '' });
+          setHourly([]);
+        }
       } catch {}
     })();
   }, []);
@@ -147,7 +185,18 @@ export default function Home() {
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016' }}>{locationName || 'Your location'}</Text>
         {weather?.temp !== undefined && (
-          <Text style={{ marginTop: 4, fontSize: 16, color: '#333' }}>{Math.round(weather.temp)}°C today</Text>
+          <Text style={{ marginTop: 4, fontSize: 16, color: '#333' }}>{Math.round(weather.temp)}°C now</Text>
+        )}
+        {hourly.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }} contentContainerStyle={{ gap: 10 }}>
+            {hourly.map((h, idx) => (
+              <View key={`${h.time}-${idx}`} style={{ paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#f6faf6', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 10, minWidth: 80, alignItems: 'center' }}>
+                <Text style={{ color: '#2d5016', fontWeight: '700' }}>{h.time}</Text>
+                <Text style={{ color: '#333', marginTop: 2 }}>{h.temp}°C</Text>
+                {!!h.desc && <Text style={{ color: '#666', fontSize: 12 }} numberOfLines={1}>{h.desc}</Text>}
+              </View>
+            ))}
+          </ScrollView>
         )}
       </View>
 
