@@ -37,6 +37,8 @@ export default function Home() {
   const [locationName, setLocationName] = useState<string>('');
   const [weather, setWeather] = useState<{ temp?: number; condition?: string }>({});
   const [hourly, setHourly] = useState<Array<{ time: string; temp: number; desc?: string; icon?: string }>>([]);
+  const [dateLabel, setDateLabel] = useState<string>('');
+  const [timeLabel, setTimeLabel] = useState<string>('');
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [allCrops, setAllCrops] = useState<any[]>([]);
   const [selectedCrops, setSelectedCrops] = useState<number[]>([]);
@@ -72,6 +74,18 @@ export default function Home() {
     })();
   }, []);
 
+  // Keep header time real-time (updates every 30s)
+  useEffect(() => {
+    const tick = () => {
+      const nowFmt = new Date();
+      setDateLabel(nowFmt.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }));
+      setTimeLabel(nowFmt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -86,45 +100,63 @@ export default function Home() {
         const city = [place?.city, place?.subregion, place?.region].filter(Boolean)[0];
         setLocationName(city || `${latitude.toFixed(2)},${longitude.toFixed(2)}`);
 
-        // Current temp via OpenWeather (fallback to 3h forecast first entry)
-        const OW_KEY = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
-        if (OW_KEY) {
-          // Use One Call API for true hourly forecast
-          const ow = await fetch(`https://api.openweathermap.org/data/2.5/onecall?lat=${latitude}&lon=${longitude}&exclude=minutely,daily,alerts&units=metric&appid=${OW_KEY}`)
-            .then(r => r.json()).catch(()=>null);
-          const current = ow?.current;
-          if (current) setWeather({ temp: Math.round(current.temp), condition: current.weather?.[0]?.main || '' });
+        // Open-Meteo hourly forecast for today (no API key)
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weather_code&timezone=auto`;
+        const res = await fetch(url).then(r => r.json()).catch(() => null);
+        const times: string[] = res?.hourly?.time || [];
+        const temps: number[] = res?.hourly?.temperature_2m || [];
+        const precs: number[] = res?.hourly?.precipitation || [];
+        // API may return weather_code or weathercode depending on version
+        const codes: number[] = res?.hourly?.weather_code || res?.hourly?.weathercode || [];
 
-          // Build hourly forecast for the rest of today (hourly granularity)
-          const tz = Number(ow?.timezone_offset || 0); // seconds
-          const nowLocal = new Date((Math.floor(Date.now()/1000) + tz) * 1000);
-          const y = nowLocal.getFullYear(), m = nowLocal.getMonth(), d = nowLocal.getDate();
-          let items: Array<{ time: string; temp: number; desc?: string; icon?: string }> = [];
-          (ow?.hourly || []).slice(0, 24).forEach((it: any) => {
-            const dtLocal = new Date((it.dt + tz) * 1000);
-            if (dtLocal.getFullYear()===y && dtLocal.getMonth()===m && dtLocal.getDate()===d) {
-              const hh = dtLocal.getHours().toString().padStart(2,'0');
-              const desc = String(it.weather?.[0]?.description || '').replace(/\b\w/g, c => c.toUpperCase());
-              items.push({ time: `${hh}:00`, temp: Math.round(it.temp), desc, icon: it.weather?.[0]?.icon });
-            }
-          });
-          // If timezone filtering yielded nothing, show next 24 hours from now
-          if (items.length === 0 && Array.isArray(ow?.hourly)) {
-            items = (ow.hourly as any[]).slice(0, 24).map((it: any) => {
-              const dtLocal = new Date((it.dt + tz) * 1000);
-              const hh = dtLocal.getHours().toString().padStart(2,'0');
-              const desc = String(it.weather?.[0]?.description || '').replace(/\b\w/g, c => c.toUpperCase());
-              return { time: `${hh}:00`, temp: Math.round(it.temp), desc, icon: it.weather?.[0]?.icon };
-            });
+        const nowFmt = new Date();
+        setDateLabel(nowFmt.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }));
+        setTimeLabel(nowFmt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+
+        const codeToText = (c: number) => {
+          const map: Record<number, string> = {
+            0: 'Clear', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Cloudy',
+            45: 'Fog', 48: 'Fog', 51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle',
+            56: 'Freezing Drizzle', 57: 'Freezing Drizzle',
+            61: 'Light Rain', 63: 'Rain', 65: 'Heavy Rain',
+            66: 'Freezing Rain', 67: 'Freezing Rain',
+            71: 'Light Snow', 73: 'Snow', 75: 'Heavy Snow', 77: 'Snow Grains',
+            80: 'Rain Showers', 81: 'Rain Showers', 82: 'Heavy Showers',
+            85: 'Snow Showers', 86: 'Snow Showers',
+            95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm'
+          };
+          return map[c] || '—';
+        };
+
+        // Build list for today only
+        const now = new Date();
+        const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+        const items: Array<{ time: string; temp: number; desc?: string; icon?: string }> = [];
+        const nowDt = new Date();
+        for (let i = 0; i < times.length; i++) {
+          const dt = new Date(times[i]);
+          if (dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d && dt >= nowDt) {
+            const hh = dt.getHours().toString().padStart(2, '0');
+            const desc = codeToText(Number(codes[i] ?? -1));
+            items.push({ time: `${hh}:00`, temp: Math.round(Number(temps[i] ?? 0)), desc });
           }
-          setHourly(items);
+        }
+        setHourly(items);
+
+        // Set current temperature/condition from the closest hour
+        if (items.length > 0) {
+          const idx = (() => {
+            let best = 0; let bestDiff = Infinity;
+            for (let i = 0; i < times.length; i++) {
+              const dt = new Date(times[i]).getTime();
+              const diff = Math.abs(dt - Date.now());
+              if (diff < bestDiff) { best = i; bestDiff = diff; }
+            }
+            return best;
+          })();
+          setWeather({ temp: Math.round(Number(temps[idx] ?? items[0].temp)), condition: codeToText(Number(codes[idx] ?? -1)) });
         } else {
-          // fallback: Open-Meteo current temp
-          const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m`;
-          const res = await fetch(url).then(r => r.json()).catch(() => null);
-          const temp = res?.current?.temperature_2m;
-          setWeather({ temp, condition: '' });
-          setHourly([]);
+          setWeather({ temp: undefined, condition: '' });
         }
       } catch {}
     })();
@@ -183,10 +215,25 @@ export default function Home() {
 
       {/* Weather card */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016' }}>{locationName || 'Your location'}</Text>
-        {weather?.temp !== undefined && (
-          <Text style={{ marginTop: 4, fontSize: 16, color: '#333' }}>{Math.round(weather.temp)}°C now</Text>
-        )}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            {dateLabel ? (
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016' }}>{dateLabel}</Text>
+            ) : null}
+            {timeLabel ? (
+              <Text style={{ fontSize: 16, color: '#2d5016', marginTop: 2 }}>{timeLabel}</Text>
+            ) : null}
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016', marginTop: 6 }} numberOfLines={1}>{locationName || 'Your location'}</Text>
+          </View>
+          {weather?.temp !== undefined && (
+            <View style={{ alignItems: 'flex-end', minWidth: 80 }}>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: '#2d5016' }}>{Math.round(weather.temp)}°C</Text>
+              {!!weather?.condition && (
+                <Text style={{ color: '#666', marginTop: 2 }}>{weather.condition}</Text>
+              )}
+            </View>
+          )}
+        </View>
         {hourly.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }} contentContainerStyle={{ gap: 10 }}>
             {hourly.map((h, idx) => (
