@@ -106,6 +106,55 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
       UNIQUE(crop_id, language),
       FOREIGN KEY (crop_id) REFERENCES crops(id) ON DELETE CASCADE
     );
+
+    -- Pests and diseases nested under crop (by language)
+    CREATE TABLE IF NOT EXISTS crop_pests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      crop_id INTEGER NOT NULL,
+      language TEXT NOT NULL DEFAULT 'en',
+      name TEXT NOT NULL,
+      description TEXT,
+      management TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(crop_id, language, name),
+      FOREIGN KEY (crop_id) REFERENCES crops(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS crop_pest_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pest_id INTEGER NOT NULL,
+      image TEXT NOT NULL,
+      caption TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (pest_id) REFERENCES crop_pests(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS crop_diseases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      crop_id INTEGER NOT NULL,
+      language TEXT NOT NULL DEFAULT 'en',
+      name TEXT NOT NULL,
+      description TEXT,
+      management TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(crop_id, language, name),
+      FOREIGN KEY (crop_id) REFERENCES crops(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS crop_disease_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      disease_id INTEGER NOT NULL,
+      image TEXT NOT NULL,
+      caption TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (disease_id) REFERENCES crop_diseases(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS scan_plants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      name_ta TEXT
+    );
   `);
 
   try {
@@ -732,6 +781,82 @@ export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data:
     );
     return true;
   } catch (err) { console.error('SQLite upsert error:', err); return false; }
+}
+
+export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') {
+  try {
+    if (API_URL) return await api.get(`/crops/${cropId}/pests?lang=${language}`);
+    const rows = await db.getAllAsync("SELECT * FROM crop_pests WHERE crop_id = ? AND language = ? ORDER BY name ASC", cropId, language);
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+export async function addCropPest(cropId: number, language: 'en'|'ta', name: string, description?: string, management?: string) {
+  try {
+    if (API_URL) {
+      const res = await api.post(`/crops/${cropId}/pests`, { language, name, description, management });
+      return (res as any).id || null;
+    }
+    const r = await db.runAsync("INSERT INTO crop_pests (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function addCropPestImage(pestId: number, image: string, caption?: string) {
+  try {
+    if (API_URL) { const res = await api.post(`/pests/${pestId}/images`, { image, caption }); return (res as any).id || null; }
+    const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption) VALUES (?, ?, ?)", pestId, image, caption || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en') {
+  try {
+    if (API_URL) return await api.get(`/crops/${cropId}/diseases?lang=${language}`);
+    const rows = await db.getAllAsync("SELECT * FROM crop_diseases WHERE crop_id = ? AND language = ? ORDER BY name ASC", cropId, language);
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+export async function addCropDisease(cropId: number, language: 'en'|'ta', name: string, description?: string, management?: string) {
+  try {
+    if (API_URL) {
+      const res = await api.post(`/crops/${cropId}/diseases`, { language, name, description, management });
+      return (res as any).id || null;
+    }
+    const r = await db.runAsync("INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string) {
+  try {
+    if (API_URL) { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption }); return (res as any).id || null; }
+    const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption) VALUES (?, ?, ?)", diseaseId, image, caption || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+
+export async function getScanPlants() {
+  try {
+    if (API_URL) return await api.get('/scan-plants');
+    const rows = await db.getAllAsync("SELECT * FROM scan_plants ORDER BY name ASC");
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
+export async function addScanPlant(name: string, name_ta?: string) {
+  try {
+    if (API_URL) {
+      const res = await api.post('/scan-plants', { name, name_ta });
+      return (res as any).id || null;
+    }
+    const r = await db.runAsync("INSERT INTO scan_plants (name, name_ta) VALUES (?, ?)", name, name_ta || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+
+export async function deleteScanPlant(id: number) {
+  try {
+    if (API_URL) { await api.del(`/scan-plants/${id}`); return true; }
+    await db.runAsync("DELETE FROM scan_plants WHERE id = ?", id);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
 }
 
 // Keyword functions

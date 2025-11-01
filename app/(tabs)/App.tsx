@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
-import { savePlant, findProductsByKeywords, getRelatedProductsByName } from "../../lib/database";
+import { savePlant, findProductsByKeywords, getRelatedProductsByName, getScanPlants } from "../../lib/database";
 import { analyzePlantImage } from "../../lib/gemini";
 import ProductCard from "../../components/ProductCard";
 import { useLanguage } from "../../context/LanguageContext";
@@ -27,6 +27,9 @@ export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const { currentLanguage, t } = useLanguage();
   const [plantName, setPlantName] = useState<string>("");
+  const [plantNote, setPlantNote] = useState<string>("");
+  const [scanPlants, setScanPlants] = useState<any[]>([]);
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -146,7 +149,8 @@ mediaTypes: ['images'] as any,
     setLoading(true);
     try {
       const base64 = await uriToBase64(image);
-      const geminiResponse = await analyzePlantImage(base64, plantName, currentLanguage);
+      const augmentedName = plantNote ? `${plantName} (Note: ${plantNote})` : plantName;
+      const geminiResponse = await analyzePlantImage(base64, augmentedName, currentLanguage);
 
       setResult(geminiResponse);
 
@@ -179,6 +183,15 @@ mediaTypes: ['images'] as any,
     setLoading(false);
   };
 
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getScanPlants() as any[];
+        setScanPlants(rows);
+      } catch {}
+    })();
+  }, []);
+
   return (
     <View style={styles.wrapper}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
@@ -190,18 +203,25 @@ mediaTypes: ['images'] as any,
         </View>
         <View style={styles.brandRow}>
             <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={[styles.headerTitle, { fontSize: 20 }]}>{t('scanner.headerTitle')}</Text>
+          <Text style={[styles.headerTitle, { fontSize: 20 }]}>Agriismart</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.inputSection}>
           <Text style={styles.label}>{t('scanner.plantName')}</Text>
+          <TouchableOpacity
+            style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+            onPress={() => setPickerVisible(true)}
+          >
+            <Text style={{ color: plantName ? '#333' : '#999' }}>{plantName || 'Select plant (from Masters)'}</Text>
+            <Ionicons name="chevron-down" size={18} color="#666" />
+          </TouchableOpacity>
           <TextInput
-            style={styles.input}
-            placeholder={t('scanner.placeholder')}
-            value={plantName}
-            onChangeText={setPlantName}
+            style={[styles.input, { marginTop: 10 }]}
+            placeholder={'Optional note about the plant'}
+            value={plantNote}
+            onChangeText={setPlantNote}
             placeholderTextColor="#999"
           />
         </View>
@@ -247,7 +267,32 @@ mediaTypes: ['images'] as any,
           </View>
         )}
       </ScrollView>
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+      {/* Plant picker modal */}
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Select Plant</Text>
+            <ScrollView style={{ maxHeight: 280 }}>
+              {scanPlants.map((p:any) => (
+                <TouchableOpacity key={p.id} style={styles.sheetRow} onPress={() => { setPlantName(p.name); setPickerVisible(false); }}>
+                  <Ionicons name="leaf" size={20} color="#4caf50" />
+                  <Text style={styles.sheetText}>{p.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={[styles.sheetRow, { justifyContent: 'center' }]} onPress={() => setPickerVisible(false)}>
+              <Text style={[styles.sheetText, { color: '#f44336' }]}>{t('common.close')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -274,7 +319,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#4caf50",
     position: 'relative',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

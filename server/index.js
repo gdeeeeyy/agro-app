@@ -195,7 +195,9 @@ app.delete('/crops/:id', async (req, res) => {
 app.get('/crops/:id/guide', async (req, res) => {
   const lang = String(req.query.lang || 'en');
   const g = await one('SELECT * FROM crop_guides WHERE crop_id=$1 AND language=$2', [req.params.id, lang]);
-  res.json(g || { crop_id: Number(req.params.id), language: lang, cultivation_guide: null, pest_management: null, disease_management: null });
+  const pests = await all('SELECT * FROM crop_pests WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]);
+  const diseases = await all('SELECT * FROM crop_diseases WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]);
+  res.json({ guide: g || { crop_id: Number(req.params.id), language: lang }, pests, diseases });
 });
 
 app.put('/crops/:id/guide', async (req, res) => {
@@ -209,6 +211,38 @@ app.put('/crops/:id/guide', async (req, res) => {
     [req.params.id, lang, cultivation_guide || null, pest_management || null, disease_management || null]
   );
   res.json({ ok: true });
+});
+
+// Pests
+app.get('/crops/:id/pests', async (req, res) => {
+  const lang = String(req.query.lang || 'en');
+  res.json(await all('SELECT * FROM crop_pests WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]));
+});
+app.post('/crops/:id/pests', async (req, res) => {
+  const { language, name, description, management } = req.body || {};
+  const r = await one('INSERT INTO crop_pests (crop_id, language, name, description, management) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, language || 'en', name, description || null, management || null]);
+  res.json(r);
+});
+app.post('/pests/:id/images', async (req, res) => {
+  const { image, caption } = req.body || {};
+  const r = await one('INSERT INTO crop_pest_images (pest_id, image_url, caption) VALUES ($1,$2,$3) RETURNING id', [req.params.id, image, caption || null]);
+  res.json(r);
+});
+
+// Diseases
+app.get('/crops/:id/diseases', async (req, res) => {
+  const lang = String(req.query.lang || 'en');
+  res.json(await all('SELECT * FROM crop_diseases WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]));
+});
+app.post('/crops/:id/diseases', async (req, res) => {
+  const { language, name, description, management } = req.body || {};
+  const r = await one('INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, language || 'en', name, description || null, management || null]);
+  res.json(r);
+});
+app.post('/diseases/:id/images', async (req, res) => {
+  const { image, caption } = req.body || {};
+  const r = await one('INSERT INTO crop_disease_images (disease_id, image_url, caption) VALUES ($1,$2,$3) RETURNING id', [req.params.id, image, caption || null]);
+  res.json(r);
 });
 
 app.post('/keywords', async (req, res) => {

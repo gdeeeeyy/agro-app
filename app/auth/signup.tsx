@@ -59,8 +59,7 @@ export default function SignUp() {
     >
       <View style={styles.content}>
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.title}>{t('home.title')}</Text>
-        <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
+        <Text style={styles.title}>Agriismart - Faith of the Farmers</Text>
 
         <LanguageSelector />
 

@@ -44,6 +44,7 @@ export default function Products() {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [numColumns] = useState(2);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -61,12 +62,7 @@ export default function Products() {
   };
 
   const loadKeywords = async () => {
-    try {
-      const allKeywords = await getAllKeywords() as Keyword[];
-      setKeywords(allKeywords);
-    } catch (error) {
-      console.error('Error loading keywords:', error);
-    }
+    setKeywords([]);
   };
 
   const handleKeywordFilter = async (keywordName: string | null) => {
@@ -113,11 +109,10 @@ export default function Products() {
 
   useEffect(() => {
     loadProducts();
-    loadKeywords();
   }, []);
 
   const renderProduct = ({ item }: { item: Product }) => (
-    <ProductCard product={item} />
+    <ProductCard product={item} compact />
   );
 
   const renderEmptyState = () => (
@@ -179,58 +174,22 @@ export default function Products() {
         </View>
       </View>
 
-      <View style={styles.filterContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScrollContent}
-        >
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              !selectedKeyword && styles.filterChipActive
-            ]}
-            onPress={() => handleKeywordFilter(null)}
-          >
-            <Text style={[
-              styles.filterChipText,
-              !selectedKeyword && styles.filterChipTextActive
-            ]}>
-              {t('products.all')}
-            </Text>
-          </TouchableOpacity>
-          
-          {keywords.map((keyword) => (
-            <TouchableOpacity
-              key={keyword.id}
-              style={[
-                styles.filterChip,
-                selectedKeyword === keyword.name && styles.filterChipActive
-              ]}
-              onPress={() => handleKeywordFilter(keyword.name)}
-            >
-              <Text style={[
-                styles.filterChipText,
-                selectedKeyword === keyword.name && styles.filterChipTextActive
-              ]}>
-                {keyword.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Keyword filters removed as requested */}
 
       <FlatList
         data={filteredProducts}
         renderItem={renderProduct}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { justifyContent: 'space-between' }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
+        numColumns={numColumns}
+        columnWrapperStyle={{ justifyContent: 'space-between' }}
       />
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
@@ -255,7 +214,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#4caf50',
     position: 'relative',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

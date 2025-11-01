@@ -226,7 +226,7 @@ export default function Home() {
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
           <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
-            <Text style={{ fontSize: 18, fontWeight: '700' }}>Manage Crops</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700' }}>Manage Crops</Text>
             <TouchableOpacity onPress={() => setCropModalVisible(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
@@ -354,6 +354,7 @@ export default function Home() {
               <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Done</Text>
             </TouchableOpacity>
           </View>
+          <View style={{ height: 10 }} />
           <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
@@ -362,12 +363,12 @@ export default function Home() {
     <Modal visible={guideModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGuideModalVisible(false)}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
-        <Text style={{ fontSize: 18, fontWeight: '700' }}>{guideCrop ? (currentLanguage==='ta' && guideCrop.name_ta ? guideCrop.name_ta : guideCrop.name) : 'Crop Guide'}</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700' }}>{guideCrop ? (currentLanguage==='ta' && guideCrop.name_ta ? guideCrop.name_ta : guideCrop.name) : 'Crop Guide'}</Text>
         <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
           <Ionicons name="close" size={24} color="#333" />
         </TouchableOpacity>
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 20, gap: 12 }}>
         {guideLoading ? (
           <Text>Loading...</Text>
         ) : guideData ? (
@@ -407,9 +408,11 @@ export default function Home() {
           <Text>No guide available.</Text>
         )}
       </ScrollView>
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
     </Modal>
 
+    <View style={{ height: 10 }} />
     <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
@@ -422,7 +425,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4caf50',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

@@ -386,6 +386,7 @@ export default function Cart() {
         onClose={() => setAddressModalVisible(false)}
         onAddressConfirmed={handleAddressConfirmed}
       />
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#4caf50',
     position: 'relative',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

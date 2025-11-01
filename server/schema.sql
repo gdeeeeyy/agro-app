@@ -89,3 +89,42 @@ CREATE TABLE IF NOT EXISTS crop_guides (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(crop_id, language)
 );
+
+-- Pests and Diseases nested under crops (per language)
+CREATE TABLE IF NOT EXISTS crop_pests (
+  id BIGSERIAL PRIMARY KEY,
+  crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
+  language TEXT NOT NULL DEFAULT 'en',
+  name TEXT NOT NULL,
+  description TEXT,
+  management TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(crop_id, language, name)
+);
+CREATE TABLE IF NOT EXISTS crop_pest_images (
+  id BIGSERIAL PRIMARY KEY,
+  pest_id BIGINT NOT NULL REFERENCES crop_pests(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  caption TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS crop_diseases (
+  id BIGSERIAL PRIMARY KEY,
+  crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
+  language TEXT NOT NULL DEFAULT 'en',
+  name TEXT NOT NULL,
+  description TEXT,
+  management TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(crop_id, language, name)
+);
+CREATE TABLE IF NOT EXISTS crop_disease_images (
+  id BIGSERIAL PRIMARY KEY,
+  disease_id BIGINT NOT NULL REFERENCES crop_diseases(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  caption TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

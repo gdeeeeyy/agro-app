@@ -236,6 +236,7 @@ export default function Orders() {
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
 
       <Modal
@@ -243,6 +244,7 @@ export default function Orders() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('orders.orderDetails')}</Text>
@@ -252,7 +254,7 @@ export default function Orders() {
           </View>
 
           <ScrollView style={styles.modalContent}>
-            {selectedOrder && (
+      {selectedOrder && (
               <>
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Order Information</Text>
@@ -340,6 +342,8 @@ export default function Orders() {
               </>
             )}
           </ScrollView>
+          <View style={{ height: 10 }} />
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
     </View>
@@ -367,7 +371,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#4caf50',
     position: 'relative',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

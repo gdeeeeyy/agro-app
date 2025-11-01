@@ -51,12 +51,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="cart"
+        name="profile"
         options={{
-          title: t('nav.cart'),
-          href: isAdmin ? null : undefined,
+          title: t('nav.profile'),
+          href: null,
           tabBarIcon: ({ size, color }) => (
-            <CartIcon size={size + 6} color={color} />
+            <Ionicons name="person" size={size + 6} color={color} />
           ),
         }}
       />
@@ -91,12 +91,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="cart"
         options={{
-          title: t('nav.profile'),
-          href: null,
+          title: t('nav.cart'),
+          href: isAdmin ? null : undefined,
           tabBarIcon: ({ size, color }) => (
-            <Ionicons name="person" size={size + 6} color={color} />
+            <CartIcon size={size + 6} color={color} />
           ),
         }}
       />

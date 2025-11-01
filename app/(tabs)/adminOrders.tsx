@@ -285,6 +285,7 @@ export default function AdminOrders() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Update Order Status</Text>
@@ -307,7 +308,7 @@ export default function AdminOrders() {
                       <Text style={styles.addressText}>{selectedOrder.delivery_address}</Text>
                     </View>
                   )}
-                  {selectedOrder.status_note && (
+                  {!!selectedOrder.status_note && selectedOrder.status_note.trim().length > 0 && (
                     <View style={[styles.addressInfo, { marginTop: 8 }] }>
                       <Text style={styles.addressLabel}>Customer Note:</Text>
                       <Text style={styles.addressText}>{selectedOrder.status_note}</Text>
@@ -417,8 +418,11 @@ export default function AdminOrders() {
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
           </View>
+          <View style={{ height: 10 }} />
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
@@ -432,7 +436,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#4caf50',
     position: 'relative',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },

@@ -38,13 +38,13 @@ export default function Profile() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top','bottom']}>
       <View style={styles.header}>
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
         <Text style={styles.headerTitle}>{t('nav.profile')}</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }}>
         <View style={styles.infoCard}>
           <Text style={styles.label}>{t('auth.fullname')}</Text>
           <Text style={styles.value}>{user?.full_name || 'N/A'}</Text>
@@ -72,12 +72,17 @@ export default function Profile() {
           <Text style={[styles.logoutButtonText, { color: '#333' }]}>{t('nav.orders')}</Text>
         </TouchableOpacity>
 
+        {user?.is_admin === 1 && (
+          <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#4caf50' }]} onPress={() => router.push('/masters')}>
+            <Text style={[styles.logoutButtonText]}>{'Masters'}</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#d32f2f' }]} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>{t('auth.logout')}</Text>
         </TouchableOpacity>
       </ScrollView>
-      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
-    </View>
+    </SafeAreaView>
   );
 }
 

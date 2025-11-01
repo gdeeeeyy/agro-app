@@ -29,9 +29,10 @@ interface ProductCardProps {
   product: Product;
   onPress?: () => void;
   listOnlyDescription?: boolean;
+  compact?: boolean;
 }
 
-export default function ProductCard({ product, onPress, listOnlyDescription }: ProductCardProps) {
+export default function ProductCard({ product, onPress, listOnlyDescription, compact = false }: ProductCardProps) {
   const { addItem } = useCart();
   const { t, currentLanguage } = useLanguage();
   const [selectedQuantity, setSelectedQuantity] = useState(1);
@@ -61,78 +62,84 @@ export default function ProductCard({ product, onPress, listOnlyDescription }: P
   const Unit = (product as any).unit || 'units';
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress || openDetails}>
+    <TouchableOpacity style={[styles.card, compact && styles.cardCompact]} onPress={onPress || openDetails}>
       {!listOnlyDescription && product.image && (
-        <Image source={{ uri: product.image }} style={styles.image} />
+        <Image source={{ uri: product.image }} style={[styles.image, compact && styles.imageCompact]} />
       )}
       
-      <View style={styles.content}>
+      <View style={[styles.content, compact && styles.contentCompact]}>
         {!listOnlyDescription && (
-          <Text style={styles.name} numberOfLines={2}>
+          <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
             {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
           </Text>
         )}
         
-        {listOnlyDescription ? null : (
+        {!compact && !listOnlyDescription ? (
           <Text style={styles.plantUsed} numberOfLines={1}>
             {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
           </Text>
+        ) : null}
+        
+        {!compact && (
+          <Text style={styles.details} numberOfLines={listOnlyDescription ? 6 : 3}>
+            {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
+          </Text>
         )}
         
-        <Text style={styles.details} numberOfLines={listOnlyDescription ? 6 : 3}>
-          {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
-        </Text>
-        
         {listOnlyDescription ? null : (
-          <View style={styles.footer}>
-            <View style={styles.priceContainer}>
-              <Text style={styles.price}>₹{product.cost_per_unit} / {Unit}</Text>
-              <Text style={styles.stock}>
-                {product.stock_available > 0 
-                  ? `${product.stock_available} ${Unit} ${t('store.inStock')}` 
-                  : t('store.outOfStock')
-                }
+          <>
+            {/* Divider */}
+            <View style={styles.divider} />
+            {/* Name and Price row */}
+            <View style={styles.topRow}>
+              <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={1}>
+                {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
+              <Text style={styles.price}>₹{product.cost_per_unit} / {Unit}</Text>
             </View>
+            {/* Stock */}
+            <Text style={styles.stock} numberOfLines={1}>
+              {product.stock_available > 0 
+                ? `Stock: ${product.stock_available} ${Unit}`
+                : t('store.outOfStock')}
+            </Text>
+            {/* Bottom row with qty and big add button */}
+            <View style={styles.bottomRow}>
+              <View style={styles.inlineQuantity}>
+                <TouchableOpacity
+                  style={styles.qtyBtn}
+                  onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
+                  disabled={product.stock_available <= 0}
+                >
+                  <Ionicons name="remove" size={16} color="#4caf50" />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.qtyInput}
+                  value={String(selectedQuantity)}
+                  onChangeText={(txt) => {
+                    const n = parseInt(txt) || 1;
+                    setSelectedQuantity(Math.max(1, Math.min(product.stock_available, n)));
+                  }}
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity
+                  style={styles.qtyBtn}
+                  onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}
+                  disabled={product.stock_available <= 0}
+                >
+                  <Ionicons name="add" size={16} color="#4caf50" />
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.inlineQuantity}>
               <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
+                style={[styles.fabAdd, product.stock_available <= 0 && styles.addButtonDisabled]}
+                onPress={handleAddToCart}
                 disabled={product.stock_available <= 0}
               >
-                <Ionicons name="remove" size={16} color="#4caf50" />
-              </TouchableOpacity>
-              <TextInput
-                style={styles.qtyInput}
-                value={String(selectedQuantity)}
-                onChangeText={(txt) => {
-                  const n = parseInt(txt) || 1;
-                  setSelectedQuantity(Math.max(1, Math.min(product.stock_available, n)));
-                }}
-                keyboardType="numeric"
-              />
-              <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}
-                disabled={product.stock_available <= 0}
-              >
-                <Ionicons name="add" size={16} color="#4caf50" />
+                <Ionicons name="add" size={22} color={product.stock_available <= 0 ? '#999' : '#fff'} />
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={[styles.addButton, product.stock_available <= 0 && styles.addButtonDisabled]}
-              onPress={handleAddToCart}
-              disabled={product.stock_available <= 0}
-            >
-              <Ionicons 
-                name="add" 
-                size={20} 
-                color={product.stock_available <= 0 ? '#999' : '#fff'}
-              />
-            </TouchableOpacity>
-          </View>
+          </>
         )}
       </View>
 
@@ -179,14 +186,27 @@ const styles = StyleSheet.create({
     height: 200,
     resizeMode: 'cover',
   },
+  imageCompact: {
+    height: 110,
+  },
   content: {
     padding: 16,
+  },
+  contentCompact: {
+    padding: 10,
   },
   name: {
     fontSize: 18,
     fontWeight: '600',
     color: '#2d5016',
     marginBottom: 8,
+  },
+  nameCompact: {
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  cardCompact: {
+    width: '48%',
   },
   plantUsed: {
     fontSize: 14,
@@ -200,23 +220,18 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 16,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  divider: { height: 1, backgroundColor: '#eee', marginTop: 8, marginBottom: 8 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  price: { fontSize: 16, fontWeight: '700', color: '#2d5016' },
+  stock: { fontSize: 12, color: '#666', marginTop: 4 },
+  fabAdd: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4caf50',
     alignItems: 'center',
-  },
-  priceContainer: {
-    flex: 1,
-  },
-  price: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#2d5016',
-    marginBottom: 4,
-  },
-  stock: {
-    fontSize: 12,
-    color: '#666',
+    justifyContent: 'center',
   },
   addButton: {
     backgroundColor: '#4caf50',

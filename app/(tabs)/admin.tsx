@@ -70,6 +70,7 @@ export default function AdminDashboard() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [newKeywordName, setNewKeywordName] = useState('');
   const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   const [adminNumber, setAdminNumber] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminFullName, setAdminFullName] = useState('');
@@ -353,9 +354,7 @@ mediaTypes: ['images'] as any,
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.productPlant} numberOfLines={1}>
-          Plant: {item.plant_used}
-        </Text>
+        {/* Removed Plant: line as requested */}
         <Text style={styles.productPrice}>
           ₹{item.cost_per_unit} • Stock: {item.stock_available}
         </Text>
@@ -467,7 +466,8 @@ mediaTypes: ['images'] as any,
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
+          <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 20 }}>
             <TextInput
               style={styles.input}
               placeholder="Product Name (English)"
@@ -483,20 +483,7 @@ mediaTypes: ['images'] as any,
               onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Plant Used (English)"
-              placeholderTextColor="#999"
-              value={formData.plant_used}
-              onChangeText={(text) => setFormData({ ...formData, plant_used: text })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="பயன்படுத்தும் தாவரம் (தமிழ்)"
-              placeholderTextColor="#999"
-              value={formData.plant_used_ta}
-              onChangeText={(text) => setFormData({ ...formData, plant_used_ta: text })}
-            />
+            {/* Removed Plant Used fields as requested */}
 
             <View style={styles.keywordSection}>
               <View style={styles.keywordHeader}>
@@ -584,14 +571,25 @@ mediaTypes: ['images'] as any,
               keyboardType="numeric"
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Unit (e.g., kg, litre, pcs)"
-              placeholderTextColor="#999"
-              value={formData.unit}
-              onChangeText={(text) => setFormData({ ...formData, unit: text })}
-              autoCapitalize="none"
-            />
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ marginBottom: 6, color: '#666', fontSize: 14, fontWeight: '600' }}>Unit</Text>
+              <TouchableOpacity
+                style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                onPress={() => setUnitPickerOpen(prev => !prev)}
+              >
+                <Text style={{ color: '#333' }}>{formData.unit || 'Select unit'}</Text>
+                <Ionicons name="chevron-down" size={18} color="#666" />
+              </TouchableOpacity>
+              {unitPickerOpen && (
+                <View style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, backgroundColor: '#fff', marginTop: 6, overflow: 'hidden' }}>
+                  {['kg','grams','Litres','mL','Nos','Pieces'].map(u => (
+                    <TouchableOpacity key={u} onPress={() => { setFormData({ ...formData, unit: u }); setUnitPickerOpen(false); }} style={{ paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}>
+                      <Text style={{ color: '#333' }}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           </ScrollView>
 
           <View style={styles.modalFooter}>
@@ -602,6 +600,8 @@ mediaTypes: ['images'] as any,
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
           </View>
+          <View style={{ height: 10 }} />
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
 
@@ -610,6 +610,7 @@ mediaTypes: ['images'] as any,
         animationType="slide"
         presentationStyle="pageSheet"
       >
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Manage Keywords</Text>
@@ -659,6 +660,8 @@ mediaTypes: ['images'] as any,
               }
             />
           </View>
+          <View style={{ height: 10 }} />
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
 
@@ -667,6 +670,7 @@ mediaTypes: ['images'] as any,
         animationType="slide"
         presentationStyle="pageSheet"
       >
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create Admin</Text>
@@ -716,8 +720,11 @@ mediaTypes: ['images'] as any,
               <Text style={styles.saveButtonText}>Create</Text>
             </TouchableOpacity>
           </View>
+          <View style={{ height: 10 }} />
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
+      <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
   );
@@ -731,7 +738,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#4caf50',
     position: 'relative',
-    paddingTop: 0,
+    paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 12,
   },
