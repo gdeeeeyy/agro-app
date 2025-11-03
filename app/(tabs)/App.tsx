@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
-import { savePlant, findProductsByKeywords, getRelatedProductsByName, getScanPlants } from "../../lib/database";
+import { savePlant, findProductsByKeywords, getRelatedProductsByName, getAllCrops } from "../../lib/database";
 import { analyzePlantImage } from "../../lib/gemini";
 import ProductCard from "../../components/ProductCard";
 import { useLanguage } from "../../context/LanguageContext";
@@ -29,8 +29,10 @@ export default function App() {
   const { currentLanguage, t } = useLanguage();
   const [plantName, setPlantName] = useState<string>("");
   const [plantNote, setPlantNote] = useState<string>("");
-  const [scanPlants, setScanPlants] = useState<any[]>([]);
+  const [pickerCrops, setPickerCrops] = useState<any[]>([]);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [othersOpen, setOthersOpen] = useState(false);
+  const [othersName, setOthersName] = useState('');
   const [result, setResult] = useState<any>(null);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -187,8 +189,8 @@ mediaTypes: ['images'] as any,
   React.useEffect(() => {
     (async () => {
       try {
-        const rows = await getScanPlants() as any[];
-        setScanPlants(rows);
+        const rows = await getAllCrops() as any[];
+        setPickerCrops(rows);
       } catch {}
     })();
   }, []);
@@ -204,12 +206,12 @@ mediaTypes: ['images'] as any,
             style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
             onPress={() => setPickerVisible(true)}
           >
-            <Text style={{ color: plantName ? '#333' : '#999' }}>{plantName || 'Select plant (from Masters)'}</Text>
+            <Text style={{ color: plantName ? '#333' : '#999' }}>{plantName || t('scanner.selectFromMasters')}</Text>
             <Ionicons name="chevron-down" size={18} color="#666" />
           </TouchableOpacity>
           <TextInput
             style={[styles.input, { marginTop: 10 }]}
-            placeholder={'Optional note about the plant'}
+            placeholder={t('scanner.optionalNote')}
             value={plantNote}
             onChangeText={setPlantNote}
             placeholderTextColor="#999"
@@ -268,14 +270,29 @@ mediaTypes: ['images'] as any,
       >
         <View style={styles.modalOverlay}>
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Select Plant</Text>
-            <ScrollView style={{ maxHeight: 280 }}>
-              {scanPlants.map((p:any) => (
-                <TouchableOpacity key={p.id} style={styles.sheetRow} onPress={() => { setPlantName(p.name); setPickerVisible(false); }}>
+              <Text style={styles.sheetTitle}>{t('scanner.plantName')}</Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {pickerCrops.map((c:any) => (
+                <TouchableOpacity key={c.id} style={styles.sheetRow} onPress={() => { setPlantName(c.name); setPickerVisible(false); setOthersOpen(false); }}>
                   <Ionicons name="leaf" size={20} color="#4caf50" />
-                  <Text style={styles.sheetText}>{p.name}</Text>
+                  <Text style={styles.sheetText}>{c.name}</Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity style={[styles.sheetRow, { justifyContent: 'space-between' }]} onPress={() => setOthersOpen(o => !o)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Ionicons name="ellipsis-horizontal-circle" size={20} color="#4caf50" />
+                  <Text style={styles.sheetText}>{t('scanner.others')}</Text>
+                </View>
+                <Ionicons name={othersOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#666" />
+              </TouchableOpacity>
+              {othersOpen && (
+                <View style={{ paddingHorizontal: 16, gap: 8 }}>
+                  <TextInput value={othersName} onChangeText={setOthersName} placeholder={t('scanner.enterPlantName')} placeholderTextColor="#999" style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 12, backgroundColor: '#fff' }} />
+                  <TouchableOpacity onPress={() => { if (othersName.trim()) { setPlantName(othersName.trim()); setPickerVisible(false); } }} style={{ backgroundColor: '#4caf50', padding: 12, borderRadius: 8, alignItems: 'center' }}>
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>{t('scanner.useThisName')}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </ScrollView>
             <TouchableOpacity style={[styles.sheetRow, { justifyContent: 'center' }]} onPress={() => setPickerVisible(false)}>
               <Text style={[styles.sheetText, { color: '#f44336' }]}>{t('common.close')}</Text>

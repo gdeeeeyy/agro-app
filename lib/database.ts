@@ -4,7 +4,7 @@ import { api, API_URL } from './api';
 const db = SQLite.openDatabaseSync("agroappDatabase.db");
 
 (async () => {
-  if (API_URL) return; // remote mode: API owns schema
+  // Always ensure local schema exists so we can fall back if remote API is unavailable
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -198,6 +198,19 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
     if (!disImgColNames.includes('caption_ta')) {
       await db.runAsync('ALTER TABLE crop_disease_images ADD COLUMN caption_ta TEXT');
     }
+
+    // bilingual columns for pests/diseases (local fallback compatibility)
+    const pestCols = await db.getAllAsync("PRAGMA table_info(crop_pests)");
+    const pestColNames = (pestCols as any[]).map(c => c.name);
+    if (!pestColNames.includes('name_ta')) await db.runAsync('ALTER TABLE crop_pests ADD COLUMN name_ta TEXT');
+    if (!pestColNames.includes('description_ta')) await db.runAsync('ALTER TABLE crop_pests ADD COLUMN description_ta TEXT');
+    if (!pestColNames.includes('management_ta')) await db.runAsync('ALTER TABLE crop_pests ADD COLUMN management_ta TEXT');
+
+    const disCols = await db.getAllAsync("PRAGMA table_info(crop_diseases)");
+    const disColNames = (disCols as any[]).map(c => c.name);
+    if (!disColNames.includes('name_ta')) await db.runAsync('ALTER TABLE crop_diseases ADD COLUMN name_ta TEXT');
+    if (!disColNames.includes('description_ta')) await db.runAsync('ALTER TABLE crop_diseases ADD COLUMN description_ta TEXT');
+    if (!disColNames.includes('management_ta')) await db.runAsync('ALTER TABLE crop_diseases ADD COLUMN management_ta TEXT');
   } catch (e) {
     console.warn('Migration check failed:', e);
   }
@@ -738,8 +751,12 @@ export async function getAllCrops() {
 export async function addCrop(input: { name: string; name_ta?: string; image?: string; }) {
   try {
     if (API_URL) {
-      const res = await api.post('/crops', input);
-      return (res as any).id || null;
+      try {
+        const res = await api.post('/crops', input);
+        return (res as any).id || null;
+      } catch (e) {
+        console.warn('Remote addCrop failed, falling back to local:', e);
+      }
     }
     const result = await db.runAsync(
       "INSERT INTO crops (name, name_ta, image) VALUES (?, ?, ?)",
@@ -774,7 +791,12 @@ export async function deleteCrop(id: number) {
 
 export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
   try {
-    if (API_URL) return await api.get(`/crops/${cropId}/guide?lang=${language}`);
+    if (API_URL) {
+      const res = await api.get(`/crops/${cropId}/guide?lang=${language}`);
+      // Normalize: always return the guide row object
+      if (res && typeof res === 'object' && 'guide' in (res as any)) return (res as any).guide;
+      return res as any;
+    }
     const rows = await db.getAllAsync(
       "SELECT * FROM crop_guides WHERE crop_id = ? AND language = ?",
       cropId, language
@@ -785,7 +807,10 @@ export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
 
 export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data: { cultivation_guide?: string; pest_management?: string; disease_management?: string; }) {
   try {
-    if (API_URL) { await api.put(`/crops/${cropId}/guide`, { language, ...data }); return true; }
+    if (API_URL) {
+      try { await api.put(`/crops/${cropId}/guide`, { language, ...data }); return true; }
+      catch (e) { console.warn('Remote upsertCropGuide failed, falling back to local:', e); }
+    }
     await db.runAsync(
       `INSERT INTO crop_guides (crop_id, language, cultivation_guide, pest_management, disease_management)
        VALUES (?, ?, ?, ?, ?)
@@ -804,11 +829,24 @@ export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') 
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
+export async function updateCropPest(pestId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
+  try {
+    // Remote API has no update route; fall back to local
+    const sets: string[] = []; const vals: any[] = [];
+    Object.entries(fields).forEach(([k,v]) => { if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); } });
+    if (!sets.length) return true;
+    vals.push(pestId);
+    await db.runAsync(`UPDATE crop_pests SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) { console.error('SQLite update error:', err); return false; }
+}
 export async function addCropPest(cropId: number, language: 'en'|'ta', name: string, description?: string, management?: string) {
   try {
     if (API_URL) {
-      const res = await api.post(`/crops/${cropId}/pests`, { language, name, description, management });
-      return (res as any).id || null;
+      try {
+        const res = await api.post(`/crops/${cropId}/pests`, { language, name, description, management });
+        return (res as any).id || null;
+      } catch (e) { console.warn('Remote addCropPest failed, falling back to local:', e); }
     }
     const r = await db.runAsync("INSERT INTO crop_pests (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
     return r.lastInsertRowId;
@@ -817,8 +855,10 @@ export async function addCropPest(cropId: number, language: 'en'|'ta', name: str
 export async function addCropPestBoth(cropId: number, input: { name_en: string; name_ta: string; description_en?: string; description_ta?: string; management_en?: string; management_ta?: string; }) {
   try {
     if (API_URL) {
-      const res = await api.post(`/crops/${cropId}/pests-both`, input);
-      return (res as any).id || null;
+      try {
+        const res = await api.post(`/crops/${cropId}/pests-both`, input);
+        return (res as any).id || null;
+      } catch (e) { console.warn('Remote addCropPestBoth failed, falling back to local:', e); }
     }
     const r = await db.runAsync(
       "INSERT INTO crop_pests (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES (?, 'en', ?, ?, ?, ?, ?, ?)",
@@ -829,10 +869,20 @@ export async function addCropPestBoth(cropId: number, input: { name_en: string; 
 }
 export async function addCropPestImage(pestId: number, image: string, caption?: string, caption_ta?: string) {
   try {
-    if (API_URL) { const res = await api.post(`/pests/${pestId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+    if (API_URL) {
+      try { const res = await api.post(`/pests/${pestId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+      catch (e) { console.warn('Remote addCropPestImage failed, falling back to local:', e); }
+    }
     const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption, caption_ta) VALUES (?, ?, ?, ?)", pestId, image, caption || null, caption_ta || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function listCropPestImages(pestId: number) {
+  try {
+    if (API_URL) return await api.get(`/pests/${pestId}/images`);
+    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta FROM crop_pest_images WHERE pest_id = ? ORDER BY id", pestId);
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en') {
   try {
@@ -841,11 +891,23 @@ export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
+export async function updateCropDisease(diseaseId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
+  try {
+    const sets: string[] = []; const vals: any[] = [];
+    Object.entries(fields).forEach(([k,v]) => { if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); } });
+    if (!sets.length) return true;
+    vals.push(diseaseId);
+    await db.runAsync(`UPDATE crop_diseases SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) { console.error('SQLite update error:', err); return false; }
+}
 export async function addCropDisease(cropId: number, language: 'en'|'ta', name: string, description?: string, management?: string) {
   try {
     if (API_URL) {
-      const res = await api.post(`/crops/${cropId}/diseases`, { language, name, description, management });
-      return (res as any).id || null;
+      try {
+        const res = await api.post(`/crops/${cropId}/diseases`, { language, name, description, management });
+        return (res as any).id || null;
+      } catch (e) { console.warn('Remote addCropDisease failed, falling back to local:', e); }
     }
     const r = await db.runAsync("INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
     return r.lastInsertRowId;
@@ -854,8 +916,10 @@ export async function addCropDisease(cropId: number, language: 'en'|'ta', name: 
 export async function addCropDiseaseBoth(cropId: number, input: { name_en: string; name_ta: string; description_en?: string; description_ta?: string; management_en?: string; management_ta?: string; }) {
   try {
     if (API_URL) {
-      const res = await api.post(`/crops/${cropId}/diseases-both`, input);
-      return (res as any).id || null;
+      try {
+        const res = await api.post(`/crops/${cropId}/diseases-both`, input);
+        return (res as any).id || null;
+      } catch (e) { console.warn('Remote addCropDiseaseBoth failed, falling back to local:', e); }
     }
     const r = await db.runAsync(
       "INSERT INTO crop_diseases (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES (?, 'en', ?, ?, ?, ?, ?, ?)",
@@ -866,10 +930,20 @@ export async function addCropDiseaseBoth(cropId: number, input: { name_en: strin
 }
 export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string, caption_ta?: string) {
   try {
-    if (API_URL) { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+    if (API_URL) {
+      try { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+      catch (e) { console.warn('Remote addCropDiseaseImage failed, falling back to local:', e); }
+    }
     const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption, caption_ta) VALUES (?, ?, ?, ?)", diseaseId, image, caption || null, caption_ta || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function listCropDiseaseImages(diseaseId: number) {
+  try {
+    if (API_URL) return await api.get(`/diseases/${diseaseId}/images`);
+    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta FROM crop_disease_images WHERE disease_id = ? ORDER BY id", diseaseId);
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 
 export async function getScanPlants() {

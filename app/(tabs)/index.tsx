@@ -1,12 +1,10 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useLanguage } from '../../context/LanguageContext';
 import {
-  FlatList,
   Image,
-  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -14,12 +12,10 @@ import {
   Modal,
   ScrollView,
   TextInput,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
-import { UserContext } from '../../context/UserContext';
-import { getAllPlants } from '../../lib/database';
+import { getAllCrops, addScanPlant, getCropGuide, listCropPests, listCropDiseases, listCropPestImages, listCropDiseaseImages } from '../../lib/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { resetDatabase } from '../../lib/resetDatabase';
 
@@ -28,225 +24,361 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 //   // database.ts will recreate tables automatically
 // })();
 
+function getWeatherLabelFromCode(code?: number) {
+  if (code === undefined || code === null) return '';
+  if (code === 0) return 'Sunny';
+  if ([1,2].includes(code)) return 'Partly cloudy';
+  if (code === 3) return 'Cloudy';
+  if ([45,48].includes(code)) return 'Fog';
+  if (code>=51 && code<=57) return 'Drizzle';
+  if ((code>=61 && code<=67) || [80,81,82].includes(code)) return 'Rain';
+  if ((code>=71 && code<=77) || [85,86].includes(code)) return 'Snow';
+  if ([95,96,97,98,99].includes(code)) return 'Thunder';
+  return 'Cloudy';
+}
+function getWeatherIconFromCode(code?: number): keyof typeof Ionicons.glyphMap {
+  if (code === 0) return 'sunny';
+  if ([1,2].includes(code||-1)) return 'partly-sunny';
+  if (code === 3) return 'cloudy';
+  if ((code||0)>=51 && (code||0)<=67) return 'rainy';
+  if ((code||0)>=71 && (code||0)<=77) return 'snow';
+  if ([80,81,82].includes(code||-1)) return 'rainy';
+  if ([95,96,97,98,99].includes(code||-1)) return 'thunderstorm';
+  return 'cloudy';
+}
+
 export default function Home() {
-  const { user } = useContext(UserContext);
   const { t, currentLanguage } = useLanguage();
-  const isAdmin = user?.is_admin === 1;
-  const [plants, setPlants] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [locationName, setLocationName] = useState<string>('');
-  const [weather, setWeather] = useState<{ temp?: number; condition?: string }>({});
-  const [hourly, setHourly] = useState<Array<{ time: string; temp: number; desc?: string; icon?: string }>>([]);
-  const [dateLabel, setDateLabel] = useState<string>('');
-  const [timeLabel, setTimeLabel] = useState<string>('');
 
-  const loadPlants = async () => {
-    if (!user) return;
-    const allPlants = await getAllPlants(user.id);
-    setPlants(allPlants);
+  // Crop Doctor selection
+  const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [allCrops, setAllCrops] = useState<any[]>([]);
+  const [selectedCrops, setSelectedCrops] = useState<number[]>([]);
+  const [newScannerCropName, setNewScannerCropName] = useState('');
+  const [newScannerCropNameTa, setNewScannerCropNameTa] = useState('');
+
+  // Weather state
+  const [weather, setWeather] = useState<{ temperature: number; humidity?: number; wind?: number } | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [locationLabel, setLocationLabel] = useState<string>('');
+  const [hourly, setHourly] = useState<Array<{ time: string; temperature: number; code?: number }>>([]);
+
+  const fetchWeather = async () => {
+    try {
+      setWeatherLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setWeather(null);
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Lowest });
+      const lat = loc.coords.latitude;
+      const lon = loc.coords.longitude;
+      // reverse geocode for location label
+      try {
+        const place = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+        if (place && place[0]) {
+          const p = place[0];
+          setLocationLabel([p.city || p.subregion || p.district, p.region, p.country].filter(Boolean).join(', '));
+        }
+      } catch {}
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto`;
+      const res = await fetch(url);
+      const data: any = await res.json();
+      const cur = data?.current || {};
+      setWeather({
+        temperature: typeof cur.temperature_2m === 'number' ? cur.temperature_2m : NaN,
+      });
+      // hourly starting from now
+      const nowIso = new Date().toISOString().slice(0,13); // YYYY-MM-DDTHH
+      const h = data?.hourly || {};
+      const times: string[] = h.time || [];
+      const list = times.map((t: string, idx: number) => ({
+        time: t,
+        temperature: typeof h.temperature_2m?.[idx] === 'number' ? h.temperature_2m[idx] : NaN,
+        code: h.weather_code?.[idx],
+      }))
+      .filter((row: any) => String(row.time).slice(0,13) >= nowIso)
+      .slice(0, 12);
+      setHourly(list);
+    } catch {
+      setWeather(null);
+    } finally {
+      setWeatherLoading(false);
+    }
   };
-
-  useEffect(() => {
-    loadPlants();
-  }, [user]);
-
-
-  // Keep header time real-time (updates every 30s)
-  useEffect(() => {
-    const tick = () => {
-      const nowFmt = new Date();
-      setDateLabel(nowFmt.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }));
-      setTimeLabel(nowFmt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
-    };
-    tick();
-    const id = setInterval(tick, 30000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        // eslint-disable-next-line import/no-unresolved
-        const Location = await import('expo-location');
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-        const loc = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = loc.coords;
-        const rev = await Location.reverseGeocodeAsync({ latitude, longitude });
-        const place = rev?.[0];
-        const city = [place?.city, place?.subregion, place?.region].filter(Boolean)[0];
-        setLocationName(city || `${latitude.toFixed(2)},${longitude.toFixed(2)}`);
-
-        // Open-Meteo hourly forecast for today (no API key)
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation,weather_code&timezone=auto`;
-        const res = await fetch(url).then(r => r.json()).catch(() => null);
-        const times: string[] = res?.hourly?.time || [];
-        const temps: number[] = res?.hourly?.temperature_2m || [];
-        const precs: number[] = res?.hourly?.precipitation || [];
-        // API may return weather_code or weathercode depending on version
-        const codes: number[] = res?.hourly?.weather_code || res?.hourly?.weathercode || [];
-
-        const nowFmt = new Date();
-        setDateLabel(nowFmt.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }));
-        setTimeLabel(nowFmt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
-
-        const codeToText = (c: number) => {
-          const map: Record<number, string> = {
-            0: 'Clear', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Cloudy',
-            45: 'Fog', 48: 'Fog', 51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle',
-            56: 'Freezing Drizzle', 57: 'Freezing Drizzle',
-            61: 'Light Rain', 63: 'Rain', 65: 'Heavy Rain',
-            66: 'Freezing Rain', 67: 'Freezing Rain',
-            71: 'Light Snow', 73: 'Snow', 75: 'Heavy Snow', 77: 'Snow Grains',
-            80: 'Rain Showers', 81: 'Rain Showers', 82: 'Heavy Showers',
-            85: 'Snow Showers', 86: 'Snow Showers',
-            95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm'
-          };
-          return map[c] || '—';
-        };
-
-        // Build list for today only
-        const now = new Date();
-        const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-        const items: Array<{ time: string; temp: number; desc?: string; icon?: string }> = [];
-        const nowDt = new Date();
-        for (let i = 0; i < times.length; i++) {
-          const dt = new Date(times[i]);
-          if (dt.getFullYear() === y && dt.getMonth() === m && dt.getDate() === d && dt >= nowDt) {
-            const hh = dt.getHours().toString().padStart(2, '0');
-            const desc = codeToText(Number(codes[i] ?? -1));
-            items.push({ time: `${hh}:00`, temp: Math.round(Number(temps[i] ?? 0)), desc });
-          }
-        }
-        setHourly(items);
-
-        // Set current temperature/condition from the closest hour
-        if (items.length > 0) {
-          const idx = (() => {
-            let best = 0; let bestDiff = Infinity;
-            for (let i = 0; i < times.length; i++) {
-              const dt = new Date(times[i]).getTime();
-              const diff = Math.abs(dt - Date.now());
-              if (diff < bestDiff) { best = i; bestDiff = diff; }
-            }
-            return best;
-          })();
-          setWeather({ temp: Math.round(Number(temps[idx] ?? items[0].temp)), condition: codeToText(Number(codes[idx] ?? -1)) });
-        } else {
-          setWeather({ temp: undefined, condition: '' });
-        }
+        const saved = await AsyncStorage.getItem('@agro_crops');
+        if (saved) setSelectedCrops(JSON.parse(saved));
+        const crops = await getAllCrops() as any[];
+        setAllCrops(crops);
       } catch {}
     })();
   }, []);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadPlants();
-    setRefreshing(false);
-  };
+  // Kick off weather fetch once
+  useEffect(() => {
+    fetchWeather();
+  }, []);
 
-  const renderPlant = ({ item }: { item: any }) => {
-    let parsedResult = null;
-    try {
-      parsedResult = JSON.parse(item.result);
-    } catch (e) {}
+  // Prefetch guides and counts for selected crops so cards can show content
+  useEffect(() => {
+    (async () => {
+      const lang = currentLanguage === 'ta' ? 'ta' : 'en';
+      const entries = await Promise.all(selectedCrops.map(async (id) => {
+        try { const g = await getCropGuide(Number(id), lang); return [Number(id), (g as any)?.cultivation_guide || null] as const; }
+        catch { return [Number(id), null] as const; }
+      }));
+      const map: Record<number, string | null> = {};
+      entries.forEach(([id, v]) => { map[id] = v; });
+      setGuideCache(map);
 
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardDate}>
-            {new Date(item.created_at).toLocaleDateString()}
-          </Text>
-        </View>
-        {item.imageUri && (
-          <Image source={{ uri: item.imageUri }} style={styles.cardImage} />
-        )}
-        {parsedResult && (
-          <View style={styles.resultContainer}>
-            <Text style={styles.resultLabel}>{t('orders.status')}:</Text>
-            <Text style={styles.resultValue}>{parsedResult.disease_status || 'N/A'}</Text>
+      const countEntries = await Promise.all(selectedCrops.map(async (id) => {
+        try {
+          const [p, d] = await Promise.all([listCropPests(Number(id), lang) as any, listCropDiseases(Number(id), lang) as any]);
+          return [Number(id), (p?.length || 0), (d?.length || 0)] as const;
+        } catch { return [Number(id), 0, 0] as const; }
+      }));
+      const pc: Record<number, number> = {}; const dc: Record<number, number> = {};
+      countEntries.forEach(([id, pcount, dcount]) => { pc[id] = pcount; dc[id] = dcount; });
+      setPestCountCache(pc); setDiseaseCountCache(dc);
+    })();
+  }, [selectedCrops, currentLanguage]);
 
-            {parsedResult.disease_name && (
-              <>
-                <Text style={styles.resultLabel}>{t('analysis.diseaseOrPest')}</Text>
-                <Text style={styles.resultValue}>{parsedResult.disease_name}</Text>
-              </>
-            )}
+  // (Removed weather and scans)
 
-            {parsedResult.severity && (
-              <>
-                <Text style={styles.resultLabel}>{t('analysis.severity')}</Text>
-                <Text style={styles.resultValue}>{parsedResult.severity}</Text>
-              </>
-            )}
-          </View>
-        )}
-      </View>
-    );
-  };
+  // Bottom sheet state
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetCropId, setSheetCropId] = useState<number | null>(null);
+  const [sheetCrop, setSheetCrop] = useState<any | null>(null);
+  const [sheetGuide, setSheetGuide] = useState<string | null>(null);
+  const [guideCache, setGuideCache] = useState<Record<number, string | null>>({});
+  const [pestCountCache, setPestCountCache] = useState<Record<number, number>>({});
+  const [diseaseCountCache, setDiseaseCountCache] = useState<Record<number, number>>({});
+  const [sheetPests, setSheetPests] = useState<any[]>([]);
+  const [sheetDiseases, setSheetDiseases] = useState<any[]>([]);
+  const [sheetPestImages, setSheetPestImages] = useState<Record<number, any[]>>({});
+  const [sheetDiseaseImages, setSheetDiseaseImages] = useState<Record<number, any[]>>({});
 
   return (
     <View style={styles.container}>
       <AppHeader />
 
-      {/* Weather card */}
+      {/* Weather */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            {dateLabel ? (
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016' }}>{dateLabel}</Text>
-            ) : null}
-            {timeLabel ? (
-              <Text style={{ fontSize: 16, color: '#2d5016', marginTop: 2 }}>{timeLabel}</Text>
-            ) : null}
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016', marginTop: 6 }} numberOfLines={1}>{locationName || 'Your location'}</Text>
-          </View>
-          {weather?.temp !== undefined && (
-            <View style={{ alignItems: 'flex-end', minWidth: 80 }}>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: '#2d5016' }}>{Math.round(weather.temp)}°C</Text>
-              {!!weather?.condition && (
-                <Text style={{ color: '#666', marginTop: 2 }}>{weather.condition}</Text>
-              )}
-            </View>
-          )}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{t('home.weatherTitle')}</Text>
+          <TouchableOpacity onPress={fetchWeather} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 }}>
+            <Ionicons name="refresh" size={18} color="#2d5016" />
+          </TouchableOpacity>
         </View>
-        {hourly.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }} contentContainerStyle={{ gap: 10 }}>
-            {hourly.map((h, idx) => (
-              <View key={`${h.time}-${idx}`} style={{ paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#f6faf6', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 10, minWidth: 80, alignItems: 'center' }}>
-                <Text style={{ color: '#2d5016', fontWeight: '700' }}>{h.time}</Text>
-                <Text style={{ color: '#333', marginTop: 2 }}>{h.temp}°C</Text>
-                {!!h.desc && <Text style={{ color: '#666', fontSize: 12 }} numberOfLines={1}>{h.desc}</Text>}
-              </View>
-            ))}
-          </ScrollView>
+        {locationLabel ? <Text style={{ color: '#333', marginTop: 2 }}>{locationLabel}</Text> : null}
+        <Text style={{ color: '#666', marginTop: 2 }}>{new Date().toLocaleDateString()}</Text>
+        {weatherLoading ? (
+          <Text style={{ color: '#666', marginTop: 8 }}>{t('common.loading')}</Text>
+        ) : weather ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
+              <Ionicons name={getWeatherIconFromCode(hourly?.[0]?.code)} size={28} color="#2d5016" />
+              <Text style={{ fontSize: 32, fontWeight: '700', color: '#2d5016' }}>
+                {isNaN(Number(weather.temperature)) ? '--' : Math.round(Number(weather.temperature))}°C
+              </Text>
+              <Text style={{ color: '#333', fontSize: 16, fontWeight: '600' }}>{getWeatherLabelFromCode(hourly?.[0]?.code)}</Text>
+            </View>
+            {hourly.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12, paddingRight: 12 }}>
+                {hourly.map((h, idx) => (
+                  <View key={idx} style={{ padding: 10, borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, backgroundColor: '#f9f9f9', minWidth: 90, alignItems: 'center' }}>
+                    <Ionicons name={getWeatherIconFromCode(h.code)} size={20} color="#2d5016" />
+                    <Text style={{ color: '#333', fontWeight: '600', marginTop: 4 }}>{getWeatherLabelFromCode(h.code)}</Text>
+                    <Text style={{ color: '#2d5016', fontSize: 16, fontWeight: '700' }}>{isNaN(Number(h.temperature)) ? '--' : Math.round(Number(h.temperature))}°</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : null}
+          </>
+        ) : (
+          <Text style={{ color: '#666', marginTop: 8 }}>{t('weather.enableLocation')}</Text>
         )}
       </View>
 
-
-      {plants.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🌱</Text>
-          <Text style={styles.emptyText}>{t('home.noRecentScans')}</Text>
-          <Text style={styles.emptySubtext}>
-            {t('home.getStarted')}
-          </Text>
+      {/* Crop Doctor */}
+      <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{t('home.cropDoctor')}</Text>
+          <TouchableOpacity onPress={() => setCropModalVisible(true)} style={{ backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>{t('home.manageCrops')}</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={plants}
-          renderItem={renderPlant}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        />
-      )}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12, paddingRight: 12 }}>
+          {selectedCrops.map(id => {
+            const crop = allCrops.find((c:any) => Number(c.id) === Number(id));
+            if (!crop) return null;
+            return (
+              <TouchableOpacity key={id} activeOpacity={0.9} onPress={async () => {
+                const lang = currentLanguage === 'ta' ? 'ta' : 'en';
+                const [g, pests, diseases] = await Promise.all([
+                  getCropGuide(Number(id), lang),
+                  listCropPests(Number(id), lang) as any,
+                  listCropDiseases(Number(id), lang) as any,
+                ]);
+                // fetch images per pest/disease
+                const pestImgsEntries = await Promise.all((Array.isArray(pests) ? pests : []).map(async (p: any) => [p.id, await listCropPestImages(Number(p.id))] as const));
+                const diseaseImgsEntries = await Promise.all((Array.isArray(diseases) ? diseases : []).map(async (d: any) => [d.id, await listCropDiseaseImages(Number(d.id))] as const));
+                const pim: Record<number, any[]> = {}; pestImgsEntries.forEach(([pid, imgs]) => { pim[pid] = imgs as any[]; });
+                const dim: Record<number, any[]> = {}; diseaseImgsEntries.forEach(([did, imgs]) => { dim[did] = imgs as any[]; });
 
-    <View style={{ height: 10 }} />
-    <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+                setSheetCropId(Number(id));
+                setSheetCrop(crop);
+                setSheetGuide((g as any)?.cultivation_guide || null);
+                setSheetPests(Array.isArray(pests) ? pests : []);
+                setSheetDiseases(Array.isArray(diseases) ? diseases : []);
+                setSheetPestImages(pim);
+                setSheetDiseaseImages(dim);
+                setSheetVisible(true);
+              }} style={{ width: 240, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e0e0e0', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6 }}>
+                <Image source={crop.image ? { uri: crop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 140 }} />
+                <View style={{ padding: 12 }}>
+                  <Text style={{ color: '#2d5016', fontWeight: '700', fontSize: 16 }} numberOfLines={1}>{currentLanguage==='ta' && crop.name_ta ? crop.name_ta : crop.name}</Text>
+                  <View style={{ borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 8, padding: 8, marginTop: 8 }}>
+                    <Text style={{ color: '#99a598', fontSize: 11, fontWeight: '700' }}>{t('guide.cultivationShort')}</Text>
+                    <Text style={{ color: '#334', fontSize: 12 }} numberOfLines={3}>{(guideCache[id] && guideCache[id]!.trim()) ? guideCache[id] : '—'}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                    <View style={{ flex: 1, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, backgroundColor: '#fafafa' }}>
+                      <Text style={{ color: '#666', fontSize: 12 }}>Pests</Text>
+                      <Text style={{ color: '#2d5016', fontWeight: '700' }}>{pestCountCache[id] ?? 0}</Text>
+                    </View>
+                    <View style={{ flex: 1, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, backgroundColor: '#fafafa' }}>
+                      <Text style={{ color: '#666', fontSize: 12 }}>Diseases</Text>
+                      <Text style={{ color: '#2d5016', fontWeight: '700' }}>{diseaseCountCache[id] ?? 0}</Text>
+                    </View>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => {
+                  const next = selectedCrops.filter(c => Number(c) !== Number(id));
+                  setSelectedCrops(next);
+                  AsyncStorage.setItem('@agro_crops', JSON.stringify(next)).catch(()=>{});
+                }} style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12, padding: 4 }}>
+                  <Ionicons name="trash" size={16} color="#fff" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          })}
+          {selectedCrops.length === 0 && (
+            <Text style={{ color: '#666' }}>{t('home.tapManage')}</Text>
+          )}
+        </ScrollView>
+      </View>
+
+      {/* Crop selection modal */}
+      <Modal visible={cropModalVisible} transparent animationType="fade" onRequestClose={() => setCropModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '92%', maxHeight: '70%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>{t('home.manageCrops')}</Text>
+              <TouchableOpacity onPress={() => setCropModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 8, color: '#2d5016' }}>{t('home.selectCrops')}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {allCrops.map((crop:any) => {
+                  const active = selectedCrops.includes(Number(crop.id));
+                  return (
+                    <TouchableOpacity key={crop.id} onPress={() => {
+                      const next = active
+                        ? selectedCrops.filter(c => Number(c) !== Number(crop.id))
+                        : [...selectedCrops, Number(crop.id)];
+                      setSelectedCrops(next);
+                      AsyncStorage.setItem('@agro_crops', JSON.stringify(next)).catch(()=>{});
+                    }} style={{ paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, borderWidth: 2, borderColor: active ? '#4caf50' : '#e0e0e0', backgroundColor: active ? '#f1f8f4' : '#f9f9f9' }}>
+                      <Text style={{ color: active ? '#4caf50' : '#333', fontWeight: '600' }}>{crop.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0' }}>
+              <TouchableOpacity onPress={() => setCropModalVisible(false)} style={{ backgroundColor: '#4caf50', padding: 14, borderRadius: 12, alignItems: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t('common.done')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <View style={{ height: 10 }} />
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+
+      {/* Crop guide modal (page style, similar to manager) */}
+      <Modal visible={sheetVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheetVisible(false)}>
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
+        <View style={{ backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TouchableOpacity onPress={() => setSheetVisible(false)}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>{currentLanguage==='ta' ? 'பயிர் வழிகாட்டி' : 'Crop Guide'}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+          {sheetCrop && (
+            <View>
+              <Image source={sheetCrop.image ? { uri: sheetCrop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 220 }} />
+              <View style={{ padding: 16 }}>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{currentLanguage==='ta' && sheetCrop.name_ta ? sheetCrop.name_ta : sheetCrop.name}</Text>
+                <View style={{ borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 10, padding: 12, marginTop: 10 }}>
+                  <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.cultivationTitle')}</Text>
+                  <Text style={{ marginTop: 6, color: '#333' }}>{sheetGuide || 'No cultivation guide yet.'}</Text>
+                </View>
+
+                <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
+                  <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.pests')}</Text>
+                  {sheetPests.length ? sheetPests.map((p, idx) => (
+                    <View key={idx} style={{ marginTop: 8 }}>
+                      <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && p.name_ta) ? p.name_ta : p.name}</Text>
+                      {p.description || p.description_ta ? (
+                        <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && p.description_ta) ? p.description_ta : p.description}</Text>
+                      ) : null}
+                      {sheetPestImages[p.id]?.length ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
+                          {sheetPestImages[p.id].map((img: any) => (
+                            <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                          ))}
+                        </ScrollView>
+                      ) : null}
+                    </View>
+                  )) : <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noPests')}</Text>}
+                </View>
+
+                <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
+                  <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.diseases')}</Text>
+                  {sheetDiseases.length ? sheetDiseases.map((d, idx) => (
+                    <View key={idx} style={{ marginTop: 8 }}>
+                      <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && d.name_ta) ? d.name_ta : d.name}</Text>
+                      {d.description || d.description_ta ? (
+                        <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && d.description_ta) ? d.description_ta : d.description}</Text>
+                      ) : null}
+                      {sheetDiseaseImages[d.id]?.length ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
+                          {sheetDiseaseImages[d.id].map((img: any) => (
+                            <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                          ))}
+                        </ScrollView>
+                      ) : null}
+                    </View>
+                  )) : <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noDiseases')}</Text>}
+                </View>
+              </View>
+            </View>
+          )}
+          <SafeAreaView edges={['bottom']} />
+        </ScrollView>
+      </Modal>
     </View>
   );
 }

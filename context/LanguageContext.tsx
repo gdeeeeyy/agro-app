@@ -45,7 +45,12 @@ const translations = {
     'nav.orders': 'Orders',
     'nav.admin': 'Admin',
     'nav.manage': 'Manage',
-    'nav.profile': 'Profile',
+'nav.profile': 'Profile',
+
+    // Account/Profile
+    'account.title': 'Account',
+    'account.profile': 'Profile',
+    'profile.masterControls': 'Master Controls',
     
     // Authentication
     'auth.signin': 'Sign In',
@@ -74,7 +79,23 @@ const translations = {
     'home.browseStore': 'Browse Store',
     'home.viewOrders': 'View Orders',
     'home.noRecentScans': 'No recent scans',
-    'home.getStarted': 'Get started by scanning your first plant',
+'home.getStarted': 'Get started by scanning your first plant',
+
+    // Home additions
+    'home.weatherTitle': 'Weather',
+    'home.cropDoctor': 'Crop Doctor',
+    'home.manageCrops': 'Manage Crops',
+    'home.selectCrops': 'Select Crops',
+    'home.tapManage': 'Tap Manage to add crops from list',
+    'home.noPests': 'No pests added.',
+    'home.noDiseases': 'No diseases added.',
+    'weather.enableLocation': 'Enable location to see local weather.',
+
+    // Guide
+    'guide.cultivationShort': 'Cultivation',
+    'guide.cultivationTitle': 'Cultivation Guide',
+    'guide.pests': 'Pests',
+    'guide.diseases': 'Diseases',
     
     // Plant Analysis
     'scan.title': 'Plant Analysis',
@@ -198,7 +219,8 @@ const translations = {
     'language.english': 'English',
     'language.tamil': 'தமிழ்',
     'language.selectLanguage': 'Select Language',
-    'language.changed': 'Language changed successfully',
+'language.changed': 'Language changed successfully',
+    'language.selectLanguageTitle': 'Select Language',
     
     // Status
     'status.pending': 'Pending',
@@ -212,7 +234,12 @@ const translations = {
     'scanner.headerTitle': 'Agriismart Scanner',
     'scanner.headerSubtitle': 'Faith of the Farmers - AI Plant Analysis',
     'scanner.plantName': 'Plant Name',
-    'scanner.placeholder': 'e.g., Tomato, Rose, Wheat',
+'scanner.placeholder': 'e.g., Tomato, Rose, Wheat',
+    'scanner.selectFromMasters': 'Select plant (from Master)',
+    'scanner.optionalNote': 'Optional note about the plant',
+    'scanner.others': 'Others',
+    'scanner.enterPlantName': 'Enter plant name',
+    'scanner.useThisName': 'Use this name',
     'scanner.chooseSource': 'Choose Image Source',
     'scanner.takePhoto': 'Take Photo',
     'scanner.gallery': 'Gallery',
@@ -277,7 +304,12 @@ const translations = {
     'nav.orders': 'ஆர்டர்கள்',
     'nav.admin': 'நிர்வாகி',
     'nav.manage': 'நிர்வகி',
-    'nav.profile': 'சுயவிவரம்',
+'nav.profile': 'சுயவிவரம்',
+
+    // Account/Profile
+    'account.title': 'கணக்கு',
+    'account.profile': 'சுயவிவரம்',
+    'profile.masterControls': 'மாஸ்டர் கட்டுப்பாடுகள்',
     
     // Authentication
     'auth.signin': 'உள்நுழை',
@@ -306,7 +338,23 @@ const translations = {
     'home.browseStore': 'கடையை உலாவவும்',
     'home.viewOrders': 'ஆர்டர்களைப் பார்க்கவும்',
     'home.noRecentScans': 'சமீபத்திய ஸ்கேன்கள் இல்லை',
-    'home.getStarted': 'உங்கள் முதல் தாவரத்தை ஸ்கேன் செய்வதன் மூலம் தொடங்கவும்',
+'home.getStarted': 'உங்கள் முதல் தாவரத்தை ஸ்கேன் செய்வதன் மூலம் தொடங்கவும்',
+
+    // Home additions
+    'home.weatherTitle': 'வானிலை',
+    'home.cropDoctor': 'பயிர் மருத்துவர்',
+    'home.manageCrops': 'பயிர்களை நிர்வகிக்க',
+    'home.selectCrops': 'பயிர்களைத் தேர்ந்தெடுக்கவும்',
+    'home.tapManage': 'பட்டியலிலிருந்து பயிர்களைச் சேர்க்க நிர்வகி-ஐ தட்டவும்',
+    'home.noPests': 'பூச்சிகள் சேர்க்கப்படவில்லை.',
+    'home.noDiseases': 'நோய்கள் சேர்க்கப்படவில்லை.',
+    'weather.enableLocation': 'உள்ளூர் வானிலையைப் பார்க்க இருப்பிடத்தை இயக்கவும்.',
+
+    // Guide
+    'guide.cultivationShort': 'வளர்ப்பு',
+    'guide.cultivationTitle': 'வளர்ப்பு வழிகாட்டி',
+    'guide.pests': 'பூச்சிகள்',
+    'guide.diseases': 'நோய்கள்',
     
     // Plant Analysis
     'scan.title': 'தாவர ஆய்வு',
@@ -430,7 +478,8 @@ const translations = {
     'language.english': 'English',
     'language.tamil': 'தமிழ்',
     'language.selectLanguage': 'மொழியைத் தேர்ந்தெடுக்கவும்',
-    'language.changed': 'மொழி வெற்றிகரமாக மாற்றப்பட்டது',
+'language.changed': 'மொழி வெற்றிகரமாக மாற்றப்பட்டது',
+    'language.selectLanguageTitle': 'மொழியைத் தேர்ந்தெடுக்கவும்',
     
     // Status
     'status.pending': 'நிலுவையில்',
@@ -444,7 +493,12 @@ const translations = {
     'scanner.headerTitle': 'அக்ரிஸ்மார்ட் ஸ்கேனர்',
     'scanner.headerSubtitle': 'விவசாயிகளின் நம்பிக்கை - AI தாவர ஆய்வு',
     'scanner.plantName': 'தாவரத்தின் பெயர்',
-    'scanner.placeholder': 'உதா., தக்காளி, ரோஜா, கோதுமை',
+'scanner.placeholder': 'உதா., தக்காளி, ரோஜா, கோதுமை',
+    'scanner.selectFromMasters': 'மாஸ்டரில் இருந்து தாவரத்தைத் தேர்ந்தெடுக்கவும்',
+    'scanner.optionalNote': 'தாவரத்துக்கான விருப்ப குறிப்பு',
+    'scanner.others': 'மற்றவை',
+    'scanner.enterPlantName': 'தாவரத்தின் பெயரை உள்ளிடவும்',
+    'scanner.useThisName': 'இந்த பெயரைப் பயன்படுத்து',
     'scanner.chooseSource': 'பட மூலத்தைத் தேர்ந்தெடுக்கவும்',
     'scanner.takePhoto': 'புகைப்படம் எடு',
     'scanner.gallery': 'கேலரி',

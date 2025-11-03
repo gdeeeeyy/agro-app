@@ -1,5 +1,6 @@
 // router imported once below
 import React, { useContext } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   Alert,
   StyleSheet,
@@ -13,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserContext } from '../../context/UserContext';
 import { router } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
-import LanguageSelector from '../../components/LanguageSelector';
 import AppHeader from '../../components/AppHeader';
 
 export default function Profile() {
@@ -45,26 +45,24 @@ export default function Profile() {
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }}>
         <View style={styles.infoCard}>
-          <Text style={styles.label}>{t('auth.fullname')}</Text>
-          <Text style={styles.value}>{user?.full_name || 'N/A'}</Text>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.label}>{t('auth.number')}</Text>
-          <Text style={styles.value}>{user?.number || 'N/A'}</Text>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.label}>{t('profile.memberSince')}</Text>
-          <Text style={styles.value}>
-            {user?.created_at
-              ? new Date(user.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-              : 'N/A'}
-          </Text>
-        </View>
-
-        <View style={styles.languageCard}>
-          <LanguageSelector />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Ionicons name="person-circle" size={24} color="#4caf50" />
+          <Text style={[styles.value]}>{t('account.profile')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Ionicons name="id-card" size={18} color="#99a598" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>{t('auth.fullname')}</Text>
+              <Text style={styles.value}>{user?.full_name || 'N/A'}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="call" size={18} color="#99a598" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>{t('auth.number')}</Text>
+              <Text style={styles.value}>{user?.number || 'N/A'}</Text>
+            </View>
+          </View>
         </View>
 
         <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#FFD54F' }]} onPress={() => router.push('/(tabs)/orders')}>
@@ -72,8 +70,9 @@ export default function Profile() {
         </TouchableOpacity>
 
         {user?.is_admin === 1 && (
-          <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#4caf50' }]} onPress={() => router.push('/masters')}>
-            <Text style={[styles.logoutButtonText]}>{'Masters'}</Text>
+          <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#4caf50', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]} onPress={() => router.push('/masters')}>
+            <Ionicons name="construct" size={20} color="#fff" />
+            <Text style={[styles.logoutButtonText]}>{t('profile.masterControls')}</Text>
           </TouchableOpacity>
         )}
 
@@ -142,15 +141,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-  },
-  languageCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
 });
