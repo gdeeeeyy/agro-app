@@ -91,7 +91,11 @@ export default function Home() {
         temperature: typeof cur.temperature_2m === 'number' ? cur.temperature_2m : NaN,
       });
       // hourly starting from now
-      const nowIso = new Date().toISOString().slice(0,13); // YYYY-MM-DDTHH
+      // Only remaining hours for today (local time)
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; // YYYY-MM-DD
+      const hourStr = `${dateStr}T${pad(now.getHours())}`; // YYYY-MM-DDTHH
       const h = data?.hourly || {};
       const times: string[] = h.time || [];
       const list = times.map((t: string, idx: number) => ({
@@ -99,8 +103,7 @@ export default function Home() {
         temperature: typeof h.temperature_2m?.[idx] === 'number' ? h.temperature_2m[idx] : NaN,
         code: h.weather_code?.[idx],
       }))
-      .filter((row: any) => String(row.time).slice(0,13) >= nowIso)
-      .slice(0, 12);
+      .filter((row: any) => String(row.time).slice(0,10) === dateStr && String(row.time).slice(0,13) >= hourStr);
       setHourly(list);
     } catch {
       setWeather(null);
@@ -194,7 +197,8 @@ export default function Home() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12, paddingRight: 12 }}>
                 {hourly.map((h, idx) => (
                   <View key={idx} style={{ padding: 10, borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, backgroundColor: '#f9f9f9', minWidth: 90, alignItems: 'center' }}>
-                    <Ionicons name={getWeatherIconFromCode(h.code)} size={20} color="#2d5016" />
+                    <Text style={{ color: '#666', fontSize: 12 }}>{new Date(h.time).toLocaleTimeString([], { hour: 'numeric' })}</Text>
+                    <Ionicons name={getWeatherIconFromCode(h.code)} size={20} color="#2d5016" style={{ marginTop: 2 }} />
                     <Text style={{ color: '#333', fontWeight: '600', marginTop: 4 }}>{getWeatherLabelFromCode(h.code)}</Text>
                     <Text style={{ color: '#2d5016', fontSize: 16, fontWeight: '700' }}>{isNaN(Number(h.temperature)) ? '--' : Math.round(Number(h.temperature))}°</Text>
                   </View>
@@ -334,81 +338,84 @@ export default function Home() {
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
 
-      {/* Crop guide modal (page style, similar to manager) */}
-      <Modal visible={sheetVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheetVisible(false)}>
-        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
-        <View style={{ backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <TouchableOpacity onPress={() => setSheetVisible(false)}>
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>{currentLanguage==='ta' ? 'பயிர் வழிகாட்டி' : 'Crop Guide'}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
-          {sheetCrop && (
-            <View>
-              <Image source={sheetCrop.image ? { uri: sheetCrop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 220 }} />
-              <View style={{ padding: 16 }}>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{currentLanguage==='ta' && sheetCrop.name_ta ? sheetCrop.name_ta : sheetCrop.name}</Text>
-                <View style={{ borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 10, padding: 12, marginTop: 10 }}>
-                  <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.cultivationTitle')}</Text>
-                  <Text style={{ marginTop: 6, color: '#333' }}>{sheetGuide || 'No cultivation guide yet.'}</Text>
-                </View>
-
-                <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
-                  <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.pests')}</Text>
-                  {sheetLoading ? (
-                    <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
-                  ) : sheetPests.length ? (
-                    sheetPests.map((p, idx) => (
-                      <View key={idx} style={{ marginTop: 8 }}>
-                        <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && p.name_ta) ? p.name_ta : p.name}</Text>
-                        {p.description || p.description_ta ? (
-                          <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && p.description_ta) ? p.description_ta : p.description}</Text>
-                        ) : null}
-                        {sheetPestImages[p.id]?.length ? (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                            {sheetPestImages[p.id].map((img: any) => (
-                              <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
-                            ))}
-                          </ScrollView>
-                        ) : null}
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noPests')}</Text>
-                  )}
-                </View>
-
-                <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
-                  <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.diseases')}</Text>
-                  {sheetLoading ? (
-                    <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
-                  ) : sheetDiseases.length ? (
-                    sheetDiseases.map((d, idx) => (
-                      <View key={idx} style={{ marginTop: 8 }}>
-                        <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && d.name_ta) ? d.name_ta : d.name}</Text>
-                        {d.description || d.description_ta ? (
-                          <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && d.description_ta) ? d.description_ta : d.description}</Text>
-                        ) : null}
-                        {sheetDiseaseImages[d.id]?.length ? (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                            {sheetDiseaseImages[d.id].map((img: any) => (
-                              <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
-                            ))}
-                          </ScrollView>
-                        ) : null}
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noDiseases')}</Text>
-                  )}
-                </View>
-              </View>
+      {/* Crop guide bottom sheet (transparent so home stays visible) */}
+      <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={() => setSheetVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-end' }}>
+          <View style={{ maxHeight: '85%', backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' }}>
+            <View style={{ backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <TouchableOpacity onPress={() => setSheetVisible(false)}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>{currentLanguage==='ta' ? 'பயிர் வழிகாட்டி' : 'Crop Guide'}</Text>
+              <View style={{ width: 24 }} />
             </View>
-          )}
-          <SafeAreaView edges={['bottom']} />
-        </ScrollView>
+            <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+              {sheetCrop && (
+                <View>
+                  <Image source={sheetCrop.image ? { uri: sheetCrop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 220 }} />
+                  <View style={{ padding: 16 }}>
+                    <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{currentLanguage==='ta' && sheetCrop.name_ta ? sheetCrop.name_ta : sheetCrop.name}</Text>
+                    <View style={{ borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 10, padding: 12, marginTop: 10 }}>
+                      <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.cultivationTitle')}</Text>
+                      <Text style={{ marginTop: 6, color: '#333' }}>{sheetGuide || 'No cultivation guide yet.'}</Text>
+                    </View>
+
+                    <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
+                      <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.pests')}</Text>
+                      {sheetLoading ? (
+                        <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
+                      ) : sheetPests.length ? (
+                        sheetPests.map((p, idx) => (
+                          <View key={idx} style={{ marginTop: 8 }}>
+                            <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && p.name_ta) ? p.name_ta : p.name}</Text>
+                            {p.description || p.description_ta ? (
+                              <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && p.description_ta) ? p.description_ta : p.description}</Text>
+                            ) : null}
+                            {sheetPestImages[p.id]?.length ? (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
+                                {sheetPestImages[p.id].map((img: any) => (
+                                  <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                                ))}
+                              </ScrollView>
+                            ) : null}
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noPests')}</Text>
+                      )}
+                    </View>
+
+                    <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
+                      <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.diseases')}</Text>
+                      {sheetLoading ? (
+                        <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
+                      ) : sheetDiseases.length ? (
+                        sheetDiseases.map((d, idx) => (
+                          <View key={idx} style={{ marginTop: 8 }}>
+                            <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && d.name_ta) ? d.name_ta : d.name}</Text>
+                            {d.description || d.description_ta ? (
+                              <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && d.description_ta) ? d.description_ta : d.description}</Text>
+                            ) : null}
+                            {sheetDiseaseImages[d.id]?.length ? (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
+                                {sheetDiseaseImages[d.id].map((img: any) => (
+                                  <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                                ))}
+                              </ScrollView>
+                            ) : null}
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noDiseases')}</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )}
+              <SafeAreaView edges={['bottom']} />
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </View>
   );

@@ -193,10 +193,16 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
     if (!pestImgColNames.includes('caption_ta')) {
       await db.runAsync('ALTER TABLE crop_pest_images ADD COLUMN caption_ta TEXT');
     }
+    if (!pestImgColNames.includes('public_id')) {
+      await db.runAsync('ALTER TABLE crop_pest_images ADD COLUMN public_id TEXT');
+    }
     const disImgCols = await db.getAllAsync("PRAGMA table_info(crop_disease_images)");
     const disImgColNames = (disImgCols as any[]).map(c => c.name);
     if (!disImgColNames.includes('caption_ta')) {
       await db.runAsync('ALTER TABLE crop_disease_images ADD COLUMN caption_ta TEXT');
+    }
+    if (!disImgColNames.includes('public_id')) {
+      await db.runAsync('ALTER TABLE crop_disease_images ADD COLUMN public_id TEXT');
     }
 
     // bilingual columns for pests/diseases (local fallback compatibility)
@@ -876,13 +882,13 @@ export async function addCropPestBoth(cropId: number, input: { name_en: string; 
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
-export async function addCropPestImage(pestId: number, image: string, caption?: string, caption_ta?: string) {
+export async function addCropPestImage(pestId: number, image: string, caption?: string, caption_ta?: string, public_id?: string) {
   try {
     if (API_URL) {
-      try { const res = await api.post(`/pests/${pestId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+      try { const res = await api.post(`/pests/${pestId}/images`, { image, caption, caption_ta, public_id }); return (res as any).id || null; }
       catch (e) { console.warn('Remote addCropPestImage failed, falling back to local:', e); }
     }
-    const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption, caption_ta) VALUES (?, ?, ?, ?)", pestId, image, caption || null, caption_ta || null);
+    const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption, caption_ta, public_id) VALUES (?, ?, ?, ?, ?)", pestId, image, caption || null, caption_ta || null, public_id || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
@@ -892,7 +898,7 @@ export async function listCropPestImages(pestId: number) {
       try { return await api.get(`/pests/${pestId}/images`); }
       catch (e) { console.warn('Remote listCropPestImages failed, using local DB:', e); }
     }
-    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta FROM crop_pest_images WHERE pest_id = ? ORDER BY id", pestId);
+    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta, public_id FROM crop_pest_images WHERE pest_id = ? ORDER BY id", pestId);
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
@@ -943,13 +949,13 @@ export async function addCropDiseaseBoth(cropId: number, input: { name_en: strin
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
-export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string, caption_ta?: string) {
+export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string, caption_ta?: string, public_id?: string) {
   try {
     if (API_URL) {
-      try { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
+      try { const res = await api.post(`/diseases/${diseaseId}/images`, { image, caption, caption_ta, public_id }); return (res as any).id || null; }
       catch (e) { console.warn('Remote addCropDiseaseImage failed, falling back to local:', e); }
     }
-    const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption, caption_ta) VALUES (?, ?, ?, ?)", diseaseId, image, caption || null, caption_ta || null);
+    const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption, caption_ta, public_id) VALUES (?, ?, ?, ?, ?)", diseaseId, image, caption || null, caption_ta || null, public_id || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
@@ -959,9 +965,53 @@ export async function listCropDiseaseImages(diseaseId: number) {
       try { return await api.get(`/diseases/${diseaseId}/images`); }
       catch (e) { console.warn('Remote listCropDiseaseImages failed, using local DB:', e); }
     }
-    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta FROM crop_disease_images WHERE disease_id = ? ORDER BY id", diseaseId);
+    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta, public_id FROM crop_disease_images WHERE disease_id = ? ORDER BY id", diseaseId);
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
+export async function deleteCropPestImage(imageId: number) {
+  try {
+    if (API_URL) {
+      try { await api.del(`/pest-images/${imageId}`); } catch (e) { console.warn('Remote deleteCropPestImage failed, deleting local only:', e); }
+    }
+    await db.runAsync("DELETE FROM crop_pest_images WHERE id = ?", imageId);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
+export async function deleteCropDiseaseImage(imageId: number) {
+  try {
+    if (API_URL) {
+      try { await api.del(`/disease-images/${imageId}`); } catch (e) { console.warn('Remote deleteCropDiseaseImage failed, deleting local only:', e); }
+    }
+    await db.runAsync("DELETE FROM crop_disease_images WHERE id = ?", imageId);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
+export async function deleteCropPest(pestId: number) {
+  try {
+    if (API_URL) { try { await api.del(`/pests/${pestId}`); } catch (e) { console.warn('Remote deleteCropPest failed, deleting local only:', e); } }
+    await db.runAsync("DELETE FROM crop_pests WHERE id = ?", pestId);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
+export async function deleteCropDisease(diseaseId: number) {
+  try {
+    if (API_URL) { try { await api.del(`/diseases/${diseaseId}`); } catch (e) { console.warn('Remote deleteCropDisease failed, deleting local only:', e); } }
+    await db.runAsync("DELETE FROM crop_diseases WHERE id = ?", diseaseId);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
+export async function deleteCropGuide(cropId: number, language: 'en'|'ta') {
+  try {
+    if (API_URL) { try { await api.del(`/crops/${cropId}/guide?lang=${language}`); } catch (e) { console.warn('Remote deleteCropGuide failed, deleting local only:', e); } }
+    await db.runAsync("DELETE FROM crop_guides WHERE crop_id = ? AND language = ?", cropId, language);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
 }
 
 export async function getScanPlants() {

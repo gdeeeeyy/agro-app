@@ -264,8 +264,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 100, // Extra padding for tab bar
+    padding: 12,
+    paddingBottom: 120, // Extra padding for tab bar and Android nav
   },
   emptyContainer: {
     flex: 1,

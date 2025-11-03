@@ -13,6 +13,7 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
@@ -143,7 +144,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                   onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
                   disabled={product.stock_available <= 0}
                 >
-                  <Ionicons name="remove" size={16} color="#4caf50" />
+                  <Ionicons name="remove" size={14} color="#4caf50" />
                 </TouchableOpacity>
                 <TextInput
                   style={[styles.qtyInput, compact && styles.qtyInputCompact]}
@@ -153,13 +154,17 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                     setSelectedQuantity(Math.max(1, Math.min(product.stock_available, n)));
                   }}
                   keyboardType="numeric"
+                  underlineColorAndroid="transparent"
+                  placeholderTextColor="#777"
+                  selectionColor="#4caf50"
+                  allowFontScaling={false}
                 />
                 <TouchableOpacity
                   style={[styles.qtyBtn, compact && styles.qtyBtnCompact]}
                   onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}
                   disabled={product.stock_available <= 0}
                 >
-                  <Ionicons name="add" size={16} color="#4caf50" />
+                  <Ionicons name="add" size={14} color="#4caf50" />
                 </TouchableOpacity>
               </View>
 
@@ -233,7 +238,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#eef2e6',
   },
   imageCompact: {
-    height: 140,
+    height: undefined,
+    aspectRatio: 1.2,
   },
   content: {
     padding: 12,
@@ -257,7 +263,7 @@ const styles = StyleSheet.create({
   },
   cardCompact: {
     width: '48%',
-    minHeight: 300,
+    minHeight: 0,
   },
   plantUsed: {
     fontSize: 14,
@@ -297,8 +303,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
   fabAddCompact: { width: 34, height: 34, borderRadius: 17 },
-  qtyBtnCompact: { width: 26, height: 26, borderRadius: 13 },
-  qtyInputCompact: { width: 40, height: 26, fontSize: 14 },
+  qtyBtnCompact: { width: 24, height: 24, borderRadius: 12 },
+  qtyInputCompact: { width: 46, height: 30, fontSize: 15, lineHeight: 20, ...Platform.select({ android: { height: 32, lineHeight: 20 } }) },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -356,22 +362,30 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   qtyBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   qtyInput: {
-    width: 48,
-    height: 32,
+    width: 54,
+    height: 34,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#bdbdbd',
     borderRadius: 6,
     textAlign: 'center',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    lineHeight: 22,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    fontWeight: '700',
+    color: '#111',
+    backgroundColor: '#fff',
+    ...Platform.select({ android: { height: 36, lineHeight: 22 } }),
   },
   quantityButton: {
     width: 40,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -13,6 +13,7 @@ export default function AppHeader() {
   return (
     <View>
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
+      {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <Image source={require('../assets/images/icon.png')} style={styles.logo} />
