@@ -19,7 +19,6 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "@supabase/supabase-js": "^2.58.0",
     "axios": "^1.12.2",
     "cloudinary": "^2.7.0",
     "eas": "^0.1.0",

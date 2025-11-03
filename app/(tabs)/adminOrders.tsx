@@ -11,10 +11,8 @@ import {
   Modal,
   ScrollView,
   TextInput,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { UserContext } from '../../context/UserContext';
 import { getAllOrders, getOrderItems, updateOrderStatus, deleteOrder } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,6 +51,11 @@ const ORDER_STATUSES = [
   { value: 'cancelled', label: 'Cancelled', icon: 'close-circle', color: '#f44336' },
 ];
 
+const PRE_CONFIRM_OPTIONS = ['confirmed', 'cancelled'] as const;
+const POST_CONFIRM_OPTIONS = ['processing', 'shipped', 'delivered'] as const;
+
+const getStatusMeta = (value: string) => ORDER_STATUSES.find(s => s.value === value);
+
 export default function AdminOrders() {
   const { user } = useContext(UserContext);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -63,10 +66,12 @@ export default function AdminOrders() {
   const [newStatus, setNewStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [logisticsName, setLogisticsName] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingUrl, setTrackingUrl] = useState('');
+  const [showPreDropdown, setShowPreDropdown] = useState(false);
+  const [showPostDropdown, setShowPostDropdown] = useState(false);
+  const [stage1Choice, setStage1Choice] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
 
   const isAdmin = user?.is_admin === 1;
 
@@ -95,6 +100,14 @@ export default function AdminOrders() {
     setLogisticsName((order as any).logistics_name || '');
     setTrackingNumber((order as any).tracking_number || '');
     setTrackingUrl((order as any).tracking_url || '');
+
+    const s = (order.status || '').toLowerCase();
+    if (s === 'cancelled') setStage1Choice('cancelled');
+    else if (s === 'pending') setStage1Choice('pending');
+    else setStage1Choice('confirmed');
+
+    setShowPreDropdown(false);
+    setShowPostDropdown(false);
     setModalVisible(true);
   };
 
@@ -157,17 +170,12 @@ export default function AdminOrders() {
     );
   };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setDeliveryDate(selectedDate);
-    }
-  };
 
   const getStatusColor = (status: string) => {
     const statusObj = ORDER_STATUSES.find(s => s.value === status.toLowerCase());
     return statusObj?.color || '#666';
   };
+
 
   const renderOrder = ({ item }: { item: Order }) => (
     <TouchableOpacity
@@ -328,33 +336,90 @@ export default function AdminOrders() {
 
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Update Status</Text>
-                  <View style={styles.statusOptions}>
-                    {ORDER_STATUSES.map((status) => (
-                      <TouchableOpacity
-                        key={status.value}
-                        style={[
-                          styles.statusOption,
-                          newStatus === status.value && styles.statusOptionSelected,
-                          { borderColor: status.color }
-                        ]}
-                        onPress={() => setNewStatus(status.value)}
-                      >
-                        <Ionicons
-                          name={status.icon as any}
-                          size={24}
-                          color={newStatus === status.value ? status.color : '#999'}
-                        />
-                        <Text
-                          style={[
-                            styles.statusOptionText,
-                            newStatus === status.value && { color: status.color }
-                          ]}
-                        >
-                          {status.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+
+                  {/* Step 1: Confirm or Cancel */}
+                  <TouchableOpacity
+                    style={[styles.dropdownTrigger, stage1Choice !== 'pending' && styles.dropdownDisabled]}
+                    onPress={() => { if (stage1Choice === 'pending') setShowPreDropdown(v => !v); }}
+                    activeOpacity={0.8}
+                    disabled={stage1Choice !== 'pending'}
+                  >
+                    <Ionicons name="swap-vertical" size={18} color="#4caf50" />
+                    <Text style={styles.dropdownTriggerText} numberOfLines={1}>
+                      {`Step 1: ${stage1Choice === 'pending' ? 'Pending' : stage1Choice === 'confirmed' ? 'Confirmed' : 'Cancelled'}`}
+                    </Text>
+                    <Ionicons name={showPreDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#4caf50" />
+                  </TouchableOpacity>
+                  {showPreDropdown && (
+                    <View style={styles.dropdownPanel}>
+                      {PRE_CONFIRM_OPTIONS.map((val) => {
+                        const meta = getStatusMeta(val as string)!;
+                        const selected = (newStatus || selectedOrder?.status || '').toLowerCase() === (val as string);
+                        return (
+                          <TouchableOpacity
+                            key={val as string}
+                            style={[styles.dropdownItem, selected && { backgroundColor: '#f1f8f4', borderColor: meta.color }]}
+                            onPress={() => {
+                              setStage1Choice(val as 'confirmed' | 'cancelled');
+                              setNewStatus(val as string);
+                              setShowPreDropdown(false);
+                              if ((val as string) === 'confirmed') setShowPostDropdown(true);
+                              else setShowPostDropdown(false);
+                            }}
+                          >
+                            <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : '#666'} />
+                            <Text style={[styles.dropdownItemText, selected && { color: meta.color }]}>
+                              {meta.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Step 2: Processing -> Shipped -> Delivered */}
+                  <TouchableOpacity
+                    style={[styles.dropdownTrigger, { marginTop: 10, opacity: stage1Choice === 'confirmed' ? 1 : 0.6 }]}
+                    onPress={() => setShowPostDropdown(v => !v)}
+                    activeOpacity={0.8}
+                    disabled={stage1Choice !== 'confirmed'}
+                  >
+                    <Ionicons name="swap-vertical" size={18} color="#4caf50" />
+                    <Text style={styles.dropdownTriggerText} numberOfLines={1}>
+                      {(() => {
+                        const s = (newStatus || selectedOrder?.status || '').toLowerCase();
+                        if (stage1Choice !== 'confirmed') return 'Step 2: Available after confirmation';
+                        const isPost = POST_CONFIRM_OPTIONS.includes(s as any);
+                        if (!isPost) return 'Step 2: Select next status';
+                        const meta = getStatusMeta(s);
+                        return `Step 2: ${meta?.label || 'Select next status'}`;
+                      })()}
+                    </Text>
+                    <Ionicons name={showPostDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#4caf50" />
+                  </TouchableOpacity>
+                  {showPostDropdown && (
+                    <View style={styles.dropdownPanel}>
+                      {POST_CONFIRM_OPTIONS.map((val) => {
+                        const meta = getStatusMeta(val as string)!;
+                        const selected = (newStatus || selectedOrder?.status || '').toLowerCase() === (val as string);
+                        return (
+                          <TouchableOpacity
+                            key={val as string}
+                            style={[styles.dropdownItem, selected && { backgroundColor: '#f1f8f4', borderColor: meta.color }]}
+                            onPress={() => {
+                              setNewStatus(val as string);
+                              setShowPostDropdown(false);
+                            }}
+                          >
+                            <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : '#666'} />
+                            <Text style={[styles.dropdownItemText, selected && { color: meta.color }]}>
+                              {meta.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.section}>
@@ -680,6 +745,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#999',
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  dropdownTriggerText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  dropdownPanel: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  dropdownDisabled: {
+    opacity: 0.7,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1,
