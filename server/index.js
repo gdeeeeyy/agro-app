@@ -119,6 +119,17 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUn
       caption_ta TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
+
+    // Simplify bilingual columns (one row per pest/disease with EN+TA fields)
+    await pool.query("ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS name_ta TEXT");
+    await pool.query("ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS description_ta TEXT");
+    await pool.query("ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS management_ta TEXT");
+    await pool.query("ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS name_ta TEXT");
+    await pool.query("ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS description_ta TEXT");
+    await pool.query("ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS management_ta TEXT");
+    await pool.query("ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS cultivation_guide_ta TEXT");
+    await pool.query("ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS pest_management_ta TEXT");
+    await pool.query("ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS disease_management_ta TEXT");
     await pool.query("ALTER TABLE crop_disease_images ADD COLUMN IF NOT EXISTS caption_ta TEXT");
 
     await pool.query(`CREATE TABLE IF NOT EXISTS cart_items (
@@ -154,6 +165,13 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUn
       quantity INTEGER NOT NULL,
       price_per_unit DOUBLE PRECISION NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+
+    // scan_plants table for mobile Scanner Plants
+    await pool.query(`CREATE TABLE IF NOT EXISTS scan_plants (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      name_ta TEXT
     )`);
   } catch (e) { console.warn('Startup migration warning:', e.message); }
 })();
@@ -312,9 +330,21 @@ app.delete('/crops/:id', async (req, res) => {
 app.get('/crops/:id/guide', async (req, res) => {
   const lang = String(req.query.lang || 'en');
   const g = await one('SELECT * FROM crop_guides WHERE crop_id=$1 AND language=$2', [req.params.id, lang]);
-  const pests = await all('SELECT * FROM crop_pests WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]);
-  const diseases = await all('SELECT * FROM crop_diseases WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]);
-  res.json({ guide: g || { crop_id: Number(req.params.id), language: lang }, pests, diseases });
+  // Return bilingual data regardless of requested lang
+  const pests = await all('SELECT id, crop_id, name, name_ta, description, description_ta, management, management_ta FROM crop_pests WHERE crop_id=$1 ORDER BY name ASC', [req.params.id]);
+  const diseases = await all('SELECT id, crop_id, name, name_ta, description, description_ta, management, management_ta FROM crop_diseases WHERE crop_id=$1 ORDER BY name ASC', [req.params.id]);
+
+  // Attach images for each pest/disease
+  const pestIds = pests.map(p => p.id);
+  const diseaseIds = diseases.map(d => d.id);
+  const pestImages = pestIds.length ? await all('SELECT * FROM crop_pest_images WHERE pest_id = ANY($1::bigint[]) ORDER BY id', [pestIds]) : [];
+  const diseaseImages = diseaseIds.length ? await all('SELECT * FROM crop_disease_images WHERE disease_id = ANY($1::bigint[]) ORDER BY id', [diseaseIds]) : [];
+  const imgsByPest = pestImages.reduce((m, r) => { (m[r.pest_id] ||= []).push({ id: r.id, image: r.image_url, caption: r.caption, caption_ta: r.caption_ta }); return m; }, {});
+  const imgsByDisease = diseaseImages.reduce((m, r) => { (m[r.disease_id] ||= []).push({ id: r.id, image: r.image_url, caption: r.caption, caption_ta: r.caption_ta }); return m; }, {});
+  const pestsWithImages = pests.map(p => ({ ...p, images: imgsByPest[p.id] || [] }));
+  const diseasesWithImages = diseases.map(d => ({ ...d, images: imgsByDisease[d.id] || [] }));
+
+  res.json({ guide: g || { crop_id: Number(req.params.id), language: lang }, pests: pestsWithImages, diseases: diseasesWithImages });
 });
 
 app.put('/crops/:id/guide', async (req, res) => {
@@ -332,12 +362,25 @@ app.put('/crops/:id/guide', async (req, res) => {
 
 // Pests
 app.get('/crops/:id/pests', async (req, res) => {
-  const lang = String(req.query.lang || 'en');
-  res.json(await all('SELECT * FROM crop_pests WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]));
+  res.json(await all('SELECT id, crop_id, name, name_ta, description, description_ta, management, management_ta FROM crop_pests WHERE crop_id=$1 ORDER BY name ASC', [req.params.id]));
 });
 app.post('/crops/:id/pests', async (req, res) => {
+  // Legacy: single-language insert (kept for compatibility)
   const { language, name, description, management } = req.body || {};
-  const r = await one('INSERT INTO crop_pests (crop_id, language, name, description, management) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, language || 'en', name, description || null, management || null]);
+  const lang = (language || 'en').toLowerCase();
+  if (lang === 'ta') {
+    const r = await one('INSERT INTO crop_pests (crop_id, language, name_ta, description_ta, management_ta) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, 'ta', name, description || null, management || null]);
+    return res.json(r);
+  }
+  const r = await one('INSERT INTO crop_pests (crop_id, language, name, description, management) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, 'en', name, description || null, management || null]);
+  res.json(r);
+});
+app.post('/crops/:id/pests-both', async (req, res) => {
+  const { name_en, name_ta, description_en, description_ta, management_en, management_ta } = req.body || {};
+  const r = await one(
+    'INSERT INTO crop_pests (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES ($1,\'en\',$2,$3,$4,$5,$6,$7) RETURNING id',
+    [req.params.id, name_en, name_ta || null, description_en || null, description_ta || null, management_en || null, management_ta || null]
+  );
   res.json(r);
 });
 app.post('/pests/:id/images', async (req, res) => {
@@ -345,21 +388,40 @@ app.post('/pests/:id/images', async (req, res) => {
   const r = await one('INSERT INTO crop_pest_images (pest_id, image_url, caption, caption_ta) VALUES ($1,$2,$3,$4) RETURNING id', [req.params.id, image, caption || null, caption_ta || null]);
   res.json(r);
 });
+app.get('/pests/:id/images', async (req, res) => {
+  res.json(await all('SELECT id, image_url as image, caption, caption_ta FROM crop_pest_images WHERE pest_id=$1 ORDER BY id', [req.params.id]));
+});
 
 // Diseases
 app.get('/crops/:id/diseases', async (req, res) => {
-  const lang = String(req.query.lang || 'en');
-  res.json(await all('SELECT * FROM crop_diseases WHERE crop_id=$1 AND language=$2 ORDER BY name ASC', [req.params.id, lang]));
+  res.json(await all('SELECT id, crop_id, name, name_ta, description, description_ta, management, management_ta FROM crop_diseases WHERE crop_id=$1 ORDER BY name ASC', [req.params.id]));
 });
 app.post('/crops/:id/diseases', async (req, res) => {
+  // Legacy single-language insert
   const { language, name, description, management } = req.body || {};
-  const r = await one('INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, language || 'en', name, description || null, management || null]);
+  const lang = (language || 'en').toLowerCase();
+  if (lang === 'ta') {
+    const r = await one('INSERT INTO crop_diseases (crop_id, language, name_ta, description_ta, management_ta) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, 'ta', name, description || null, management || null]);
+    return res.json(r);
+  }
+  const r = await one('INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES ($1,$2,$3,$4,$5) RETURNING id', [req.params.id, 'en', name, description || null, management || null]);
+  res.json(r);
+});
+app.post('/crops/:id/diseases-both', async (req, res) => {
+  const { name_en, name_ta, description_en, description_ta, management_en, management_ta } = req.body || {};
+  const r = await one(
+    'INSERT INTO crop_diseases (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES ($1,\'en\',$2,$3,$4,$5,$6,$7) RETURNING id',
+    [req.params.id, name_en, name_ta || null, description_en || null, description_ta || null, management_en || null, management_ta || null]
+  );
   res.json(r);
 });
 app.post('/diseases/:id/images', async (req, res) => {
   const { image, caption, caption_ta } = req.body || {};
   const r = await one('INSERT INTO crop_disease_images (disease_id, image_url, caption, caption_ta) VALUES ($1,$2,$3,$4) RETURNING id', [req.params.id, image, caption || null, caption_ta || null]);
   res.json(r);
+});
+app.get('/diseases/:id/images', async (req, res) => {
+  res.json(await all('SELECT id, image_url as image, caption, caption_ta FROM crop_disease_images WHERE disease_id=$1 ORDER BY id', [req.params.id]));
 });
 
 app.post('/keywords', async (req, res) => {
@@ -374,6 +436,25 @@ app.post('/keywords', async (req, res) => {
 
 app.delete('/keywords/:id', async (req, res) => {
   await pool.query('DELETE FROM keywords WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Scanner plants
+app.get('/scan-plants', async (req, res) => {
+  res.json(await all('SELECT * FROM scan_plants ORDER BY name ASC'));
+});
+app.post('/scan-plants', async (req, res) => {
+  const { name, name_ta } = req.body || {};
+  try {
+    const r = await one('INSERT INTO scan_plants (name, name_ta) VALUES ($1,$2) RETURNING id', [String(name).trim(), name_ta || null]);
+    res.json(r);
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
+    console.error(e); res.status(500).json({ error: 'failed' });
+  }
+});
+app.delete('/scan-plants/:id', async (req, res) => {
+  await pool.query('DELETE FROM scan_plants WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
 

@@ -799,8 +799,8 @@ export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data:
 
 export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') {
   try {
-    if (API_URL) return await api.get(`/crops/${cropId}/pests?lang=${language}`);
-    const rows = await db.getAllAsync("SELECT * FROM crop_pests WHERE crop_id = ? AND language = ? ORDER BY name ASC", cropId, language);
+    if (API_URL) return await api.get(`/crops/${cropId}/pests`);
+    const rows = await db.getAllAsync("SELECT * FROM crop_pests WHERE crop_id = ? ORDER BY name ASC", cropId);
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
@@ -814,6 +814,19 @@ export async function addCropPest(cropId: number, language: 'en'|'ta', name: str
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
+export async function addCropPestBoth(cropId: number, input: { name_en: string; name_ta: string; description_en?: string; description_ta?: string; management_en?: string; management_ta?: string; }) {
+  try {
+    if (API_URL) {
+      const res = await api.post(`/crops/${cropId}/pests-both`, input);
+      return (res as any).id || null;
+    }
+    const r = await db.runAsync(
+      "INSERT INTO crop_pests (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES (?, 'en', ?, ?, ?, ?, ?, ?)",
+      cropId, input.name_en, input.name_ta || null, input.description_en || null, input.description_ta || null, input.management_en || null, input.management_ta || null
+    );
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
 export async function addCropPestImage(pestId: number, image: string, caption?: string, caption_ta?: string) {
   try {
     if (API_URL) { const res = await api.post(`/pests/${pestId}/images`, { image, caption, caption_ta }); return (res as any).id || null; }
@@ -823,8 +836,8 @@ export async function addCropPestImage(pestId: number, image: string, caption?: 
 }
 export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en') {
   try {
-    if (API_URL) return await api.get(`/crops/${cropId}/diseases?lang=${language}`);
-    const rows = await db.getAllAsync("SELECT * FROM crop_diseases WHERE crop_id = ? AND language = ? ORDER BY name ASC", cropId, language);
+    if (API_URL) return await api.get(`/crops/${cropId}/diseases`);
+    const rows = await db.getAllAsync("SELECT * FROM crop_diseases WHERE crop_id = ? ORDER BY name ASC", cropId);
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
@@ -835,6 +848,19 @@ export async function addCropDisease(cropId: number, language: 'en'|'ta', name: 
       return (res as any).id || null;
     }
     const r = await db.runAsync("INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function addCropDiseaseBoth(cropId: number, input: { name_en: string; name_ta: string; description_en?: string; description_ta?: string; management_en?: string; management_ta?: string; }) {
+  try {
+    if (API_URL) {
+      const res = await api.post(`/crops/${cropId}/diseases-both`, input);
+      return (res as any).id || null;
+    }
+    const r = await db.runAsync(
+      "INSERT INTO crop_diseases (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES (?, 'en', ?, ?, ?, ?, ?, ?)",
+      cropId, input.name_en, input.name_ta || null, input.description_en || null, input.description_ta || null, input.management_en || null, input.management_ta || null
+    );
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
