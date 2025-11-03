@@ -12,6 +12,7 @@ import {
   Modal,
   ScrollView,
   TextInput,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
@@ -162,6 +163,7 @@ export default function Home() {
   const [sheetDiseases, setSheetDiseases] = useState<any[]>([]);
   const [sheetPestImages, setSheetPestImages] = useState<Record<number, any[]>>({});
   const [sheetDiseaseImages, setSheetDiseaseImages] = useState<Record<number, any[]>>({});
+  const [sheetLoading, setSheetLoading] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -218,27 +220,44 @@ export default function Home() {
             const crop = allCrops.find((c:any) => Number(c.id) === Number(id));
             if (!crop) return null;
             return (
-              <TouchableOpacity key={id} activeOpacity={0.9} onPress={async () => {
+              <TouchableOpacity key={id} activeOpacity={0.9} onPress={() => {
                 const lang = currentLanguage === 'ta' ? 'ta' : 'en';
-                const [g, pests, diseases] = await Promise.all([
-                  getCropGuide(Number(id), lang),
-                  listCropPests(Number(id), lang) as any,
-                  listCropDiseases(Number(id), lang) as any,
-                ]);
-                // fetch images per pest/disease
-                const pestImgsEntries = await Promise.all((Array.isArray(pests) ? pests : []).map(async (p: any) => [p.id, await listCropPestImages(Number(p.id))] as const));
-                const diseaseImgsEntries = await Promise.all((Array.isArray(diseases) ? diseases : []).map(async (d: any) => [d.id, await listCropDiseaseImages(Number(d.id))] as const));
-                const pim: Record<number, any[]> = {}; pestImgsEntries.forEach(([pid, imgs]) => { pim[pid] = imgs as any[]; });
-                const dim: Record<number, any[]> = {}; diseaseImgsEntries.forEach(([did, imgs]) => { dim[did] = imgs as any[]; });
 
+                // Open fast with cached/empty data, then fetch details
                 setSheetCropId(Number(id));
                 setSheetCrop(crop);
-                setSheetGuide((g as any)?.cultivation_guide || null);
-                setSheetPests(Array.isArray(pests) ? pests : []);
-                setSheetDiseases(Array.isArray(diseases) ? diseases : []);
-                setSheetPestImages(pim);
-                setSheetDiseaseImages(dim);
+                setSheetGuide(guideCache[id] ?? null);
+                setSheetPests([]);
+                setSheetDiseases([]);
+                setSheetPestImages({});
+                setSheetDiseaseImages({});
+                setSheetLoading(true);
                 setSheetVisible(true);
+
+                InteractionManager.runAfterInteractions(async () => {
+                  try {
+                    const [g, pests, diseases] = await Promise.all([
+                      getCropGuide(Number(id), lang),
+                      listCropPests(Number(id), lang) as any,
+                      listCropDiseases(Number(id), lang) as any,
+                    ]);
+                    setSheetGuide((g as any)?.cultivation_guide || null);
+                    const pestArr = Array.isArray(pests) ? pests : [];
+                    const diseaseArr = Array.isArray(diseases) ? diseases : [];
+                    setSheetPests(pestArr);
+                    setSheetDiseases(diseaseArr);
+
+                    // Fetch images after content is shown
+                    const pestImgsEntries = await Promise.all(pestArr.map(async (p: any) => [p.id, await listCropPestImages(Number(p.id))] as const));
+                    const diseaseImgsEntries = await Promise.all(diseaseArr.map(async (d: any) => [d.id, await listCropDiseaseImages(Number(d.id))] as const));
+                    const pim: Record<number, any[]> = {}; pestImgsEntries.forEach(([pid, imgs]) => { pim[pid] = imgs as any[]; });
+                    const dim: Record<number, any[]> = {}; diseaseImgsEntries.forEach(([did, imgs]) => { dim[did] = imgs as any[]; });
+                    setSheetPestImages(pim);
+                    setSheetDiseaseImages(dim);
+                  } finally {
+                    setSheetLoading(false);
+                  }
+                });
               }} style={{ width: 240, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e0e0e0', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6 }}>
                 <Image source={crop.image ? { uri: crop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 140 }} />
                 <View style={{ padding: 12 }}>
@@ -338,40 +357,52 @@ export default function Home() {
 
                 <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
                   <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.pests')}</Text>
-                  {sheetPests.length ? sheetPests.map((p, idx) => (
-                    <View key={idx} style={{ marginTop: 8 }}>
-                      <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && p.name_ta) ? p.name_ta : p.name}</Text>
-                      {p.description || p.description_ta ? (
-                        <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && p.description_ta) ? p.description_ta : p.description}</Text>
-                      ) : null}
-                      {sheetPestImages[p.id]?.length ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                          {sheetPestImages[p.id].map((img: any) => (
-                            <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
-                          ))}
-                        </ScrollView>
-                      ) : null}
-                    </View>
-                  )) : <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noPests')}</Text>}
+                  {sheetLoading ? (
+                    <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
+                  ) : sheetPests.length ? (
+                    sheetPests.map((p, idx) => (
+                      <View key={idx} style={{ marginTop: 8 }}>
+                        <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && p.name_ta) ? p.name_ta : p.name}</Text>
+                        {p.description || p.description_ta ? (
+                          <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && p.description_ta) ? p.description_ta : p.description}</Text>
+                        ) : null}
+                        {sheetPestImages[p.id]?.length ? (
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
+                            {sheetPestImages[p.id].map((img: any) => (
+                              <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                            ))}
+                          </ScrollView>
+                        ) : null}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noPests')}</Text>
+                  )}
                 </View>
 
                 <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
                   <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.diseases')}</Text>
-                  {sheetDiseases.length ? sheetDiseases.map((d, idx) => (
-                    <View key={idx} style={{ marginTop: 8 }}>
-                      <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && d.name_ta) ? d.name_ta : d.name}</Text>
-                      {d.description || d.description_ta ? (
-                        <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && d.description_ta) ? d.description_ta : d.description}</Text>
-                      ) : null}
-                      {sheetDiseaseImages[d.id]?.length ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                          {sheetDiseaseImages[d.id].map((img: any) => (
-                            <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
-                          ))}
-                        </ScrollView>
-                      ) : null}
-                    </View>
-                  )) : <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noDiseases')}</Text>}
+                  {sheetLoading ? (
+                    <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
+                  ) : sheetDiseases.length ? (
+                    sheetDiseases.map((d, idx) => (
+                      <View key={idx} style={{ marginTop: 8 }}>
+                        <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && d.name_ta) ? d.name_ta : d.name}</Text>
+                        {d.description || d.description_ta ? (
+                          <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && d.description_ta) ? d.description_ta : d.description}</Text>
+                        ) : null}
+                        {sheetDiseaseImages[d.id]?.length ? (
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
+                            {sheetDiseaseImages[d.id].map((img: any) => (
+                              <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                            ))}
+                          </ScrollView>
+                        ) : null}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noDiseases')}</Text>
+                  )}
                 </View>
               </View>
             </View>
