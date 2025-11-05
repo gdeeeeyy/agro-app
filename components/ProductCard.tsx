@@ -131,7 +131,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
-            <Text style={[styles.price, compact && styles.priceCompact]}>₹{product.cost_per_unit}</Text>
+            <Text style={[styles.price, compact && styles.priceCompact]}>Rs. {product.cost_per_unit}{(product as any).unit ? `/${(product as any).unit}` : ''}</Text>
             <Text style={styles.stock} numberOfLines={1}>
               {product.stock_available > 0 
                 ? `Stock: ${product.stock_available} ${Unit}`
@@ -205,6 +205,12 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </TouchableOpacity>
             </View>
             <Image source={{ uri: productImage }} style={styles.fullImage} resizeMode="contain" />
+            <View style={{ paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <Text style={{ color:'#2d5016', fontWeight:'700' }}>Rs. {product.cost_per_unit}{(product as any).unit ? `/${(product as any).unit}` : ''}</Text>
+              {(product as any).seller_name ? (
+                <Text style={{ color:'#666' }}>Seller: {(product as any).seller_name}</Text>
+              ) : null}
+            </View>
             <ScrollView style={styles.descScroll} contentContainerStyle={styles.descScrollContent}>
               <Text style={styles.fullDetails}>
                 {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}

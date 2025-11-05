@@ -19,6 +19,7 @@ import { getAllProducts, searchProducts, getAllKeywords, getProductsByKeyword } 
 import ProductCard from '../../components/ProductCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
+import UpdateNotes from '../../components/UpdateNotes';
 
 interface Keyword {
   id: number;
@@ -143,6 +144,7 @@ export default function Products() {
     <View style={styles.container}>
       <AppHeader />
 
+      <UpdateNotes context="Products" />
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />

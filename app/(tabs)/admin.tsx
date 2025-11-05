@@ -27,6 +27,7 @@ import { addSampleProducts } from '../../lib/sampleProducts';
 import { createDefaultAdmin, createAdminCustom } from '../../lib/createAdmin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import UpdateNotes from '../../components/UpdateNotes';
 
 interface Product {
   id: number;
@@ -40,17 +41,17 @@ interface Product {
 }
 
 interface ProductForm {
+  seller_name: string;
   name: string;
   name_ta: string;
-  plant_used: string;
-  plant_used_ta: string;
-  keywords: string;
   details: string;
   details_ta: string;
   image?: string;
-  stock_available: string;
-  cost_per_unit: string;
-  unit?: string;
+  stock_available: string; // quantity
+  cost_per_unit: string; // price
+  unit?: string; // e.g., "500 gms"
+  pack_size?: string; // numeric
+  pack_unit?: string; // gms/kgs/L/mL/Nos
 }
 
 interface Keyword {
@@ -75,17 +76,17 @@ export default function AdminDashboard() {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminFullName, setAdminFullName] = useState('');
   const [formData, setFormData] = useState<ProductForm>({
+    seller_name: '',
     name: '',
     name_ta: '',
-    plant_used: '',
-    plant_used_ta: '',
-    keywords: '',
     details: '',
     details_ta: '',
     image: '',
     stock_available: '',
     cost_per_unit: '',
-    unit: 'units',
+    unit: '',
+    pack_size: '',
+    pack_unit: 'gms',
   });
 
   // Check if user is admin
@@ -140,17 +141,17 @@ export default function AdminDashboard() {
 
   const openEditModal = (product: any) => {
     setFormData({
+      seller_name: (product as any).seller_name || '',
       name: product.name || '',
       name_ta: (product as any).name_ta || '',
-      plant_used: product.plant_used || '',
-      plant_used_ta: (product as any).plant_used_ta || '',
-      keywords: product.keywords || '',
       details: product.details || '',
       details_ta: (product as any).details_ta || '',
       image: product.image || '',
       stock_available: String(product.stock_available ?? ''),
       cost_per_unit: String(product.cost_per_unit ?? ''),
-      unit: (product as any).unit || 'units',
+      unit: (product as any).unit || '',
+      pack_size: ((product as any).unit||'').split(' ')[0] || '',
+      pack_unit: ((product as any).unit||'').split(' ')[1] || 'gms',
     });
     // Parse existing keywords
     const existingKeywords = product.keywords.split(',').map(k => k.trim()).filter(k => k);
@@ -239,8 +240,8 @@ mediaTypes: ['images'] as any,
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim() || !formData.plant_used.trim() || 
-        selectedKeywords.length === 0 || !formData.details.trim() ||
+    if (!formData.name.trim() ||
+        !formData.details.trim() ||
         !formData.stock_available.trim() || !formData.cost_per_unit.trim()) {
       Alert.alert('Error', 'Please fill in all required fields and select at least one keyword');
       return;
@@ -257,7 +258,8 @@ mediaTypes: ['images'] as any,
       image: formData.image || undefined,
       stock_available: parseInt(formData.stock_available),
       cost_per_unit: parseFloat(formData.cost_per_unit),
-      unit: formData.unit?.trim() || undefined,
+      unit: (formData.pack_size && formData.pack_unit) ? `${formData.pack_size.trim()} ${formData.pack_unit}` : (formData.unit?.trim() || undefined),
+      seller_name: formData.seller_name?.trim() || undefined,
     };
 
     try {
@@ -413,6 +415,7 @@ mediaTypes: ['images'] as any,
         </View>
       </View>
 
+      <UpdateNotes context="Admin – Add Products" />
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Ionicons name="add" size={24} color="#fff" />
@@ -468,65 +471,39 @@ mediaTypes: ['images'] as any,
 
           <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
           <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 20 }}>
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Seller Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Seller Name"
+              placeholderTextColor="#666"
+              value={formData.seller_name}
+              onChangeText={(text) => setFormData({ ...formData, seller_name: text })}
+            />
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>English Name</Text>
             <TextInput
               style={styles.input}
               placeholder="Product Name (English)"
-              placeholderTextColor="#999"
+              placeholderTextColor="#666"
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
             />
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Tamil Name</Text>
             <TextInput
               style={styles.input}
               placeholder="பொருளின் பெயர் (தமிழ்)"
-              placeholderTextColor="#999"
+              placeholderTextColor="#666"
               value={formData.name_ta}
               onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
             />
 
-            {/* Removed Plant Used fields as requested */}
+            {/* Keywords UI hidden to match new design */}
 
-            <View style={styles.keywordSection}>
-              <View style={styles.keywordHeader}>
-                <Text style={styles.keywordTitle}>Select Keywords *</Text>
-                <Text style={styles.keywordCount}>
-                  {selectedKeywords.length} selected
-                </Text>
-              </View>
-              
-              <View style={styles.keywordGrid}>
-                {keywords.map((keyword) => (
-                  <TouchableOpacity
-                    key={keyword.id}
-                    style={[
-                      styles.keywordChip,
-                      selectedKeywords.includes(keyword.name) && styles.keywordChipSelected
-                    ]}
-                    onPress={() => toggleKeyword(keyword.name)}
-                  >
-                    <Text style={[
-                      styles.keywordChipText,
-                      selectedKeywords.includes(keyword.name) && styles.keywordChipTextSelected
-                    ]}>
-                      {keyword.name}
-                    </Text>
-                    {selectedKeywords.includes(keyword.name) && (
-                      <Ionicons name="checkmark-circle" size={16} color="#4caf50" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              {keywords.length === 0 && (
-                <Text style={styles.noKeywordsText}>
-                  No keywords available. Use &quot;Manage Keywords&quot; to add some.
-                </Text>
-              )}
-            </View>
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Description</Text>
 
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Product Details (English)"
-              placeholderTextColor="#999"
+              placeholderTextColor="#666"
               value={formData.details}
               onChangeText={(text) => setFormData({ ...formData, details: text })}
               multiline
@@ -535,12 +512,32 @@ mediaTypes: ['images'] as any,
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="பொருள் விவரங்கள் (தமிழ்)"
-              placeholderTextColor="#999"
+              placeholderTextColor="#666"
               value={formData.details_ta}
               onChangeText={(text) => setFormData({ ...formData, details_ta: text })}
               multiline
               numberOfLines={4}
             />
+
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Log details</Text>
+            <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom:12 }}>
+              <TextInput style={[styles.input, { flexBasis:'22%', flexGrow:1 }]} placeholder="Pack size (e.g., 200)" placeholderTextColor="#666" keyboardType="numeric" value={formData.pack_size} onChangeText={(v)=> setFormData({ ...formData, pack_size: v })} />
+              <TouchableOpacity style={[styles.input, { flexBasis:'22%', flexGrow:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> setUnitPickerOpen(p=>!p)}>
+                <Text style={{ color:'#333' }}>{formData.pack_unit || 'Unit'}</Text>
+                <Ionicons name="chevron-down" size={16} color="#666" />
+              </TouchableOpacity>
+              <TextInput style={[styles.input, { flexBasis:'22%', flexGrow:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={formData.cost_per_unit} onChangeText={(v)=> setFormData({ ...formData, cost_per_unit: v })} />
+              <TextInput style={[styles.input, { flexBasis:'22%', flexGrow:1 }]} placeholder="Quantity" placeholderTextColor="#666" keyboardType="numeric" value={formData.stock_available} onChangeText={(v)=> setFormData({ ...formData, stock_available: v })} />
+            </View>
+            {unitPickerOpen && (
+              <View style={{ borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginBottom:12 }}>
+                {['gms','kg','mL','Litres','Nos'].map(u => (
+                  <TouchableOpacity key={u} onPress={()=> { setFormData({ ...formData, pack_unit: u }); setUnitPickerOpen(false); }} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f0f0f0' }}>
+                    <Text style={{ color:'#333' }}>{u}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
               <Ionicons name="camera" size={24} color="#4caf50" />

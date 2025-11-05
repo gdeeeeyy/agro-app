@@ -172,6 +172,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
     await addProdTextCol('plant_used_ta');
     await addProdTextCol('details_ta');
     await addProdTextCol('unit');
+    await addProdTextCol('seller_name');
 
     // orders migration (align with server: add logistics fields if missing)
     const orderCols = await db.getAllAsync("PRAGMA table_info(orders)");
@@ -280,6 +281,7 @@ export async function addProduct(product: {
   stock_available: number;
   cost_per_unit: number;
   unit?: string;
+  seller_name?: string;
 }) {
   try {
     if (API_URL) {
@@ -287,7 +289,7 @@ export async function addProduct(product: {
       return (res as any).id || null;
     }
     const result = await db.runAsync(
-      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, seller_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
       product.plant_used,
       product.keywords,
@@ -298,7 +300,8 @@ export async function addProduct(product: {
       product.image || null,
       product.unit || null,
       product.stock_available,
-      product.cost_per_unit
+      product.cost_per_unit,
+      product.seller_name || null
     );
     return result.lastInsertRowId;
   } catch (err) {
@@ -319,6 +322,7 @@ export async function updateProduct(id: number, product: {
   stock_available?: number;
   cost_per_unit?: number;
   unit?: string;
+  seller_name?: string;
 }) {
   try {
     if (API_URL) {

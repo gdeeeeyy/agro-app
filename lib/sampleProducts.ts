@@ -2,77 +2,97 @@ import { addProduct } from '../lib/database';
 
 const sampleProducts = [
   {
-    name: "Organic Tomato Seeds",
-    plant_used: "Tomato",
-    keywords: "tomato, seeds, organic, planting, vegetables",
-    details: "High-quality organic tomato seeds perfect for home gardening. Produces juicy, flavorful tomatoes.",
+    seller_name: 'AgriVendor',
+    name: 'Organic Tomato Seeds',
+    details: 'High-quality organic tomato seeds perfect for home gardening. Produces juicy, flavorful tomatoes.',
+    unit: '200 gms',
     stock_available: 50,
     cost_per_unit: 299,
+    plant_used: 'General',
+    keywords: '',
   },
   {
-    name: "Plant Disease Control Spray",
-    plant_used: "General",
-    keywords: "disease, spray, control, treatment, fungicide, pesticide",
-    details: "Effective plant disease control spray that treats common fungal infections and bacterial diseases.",
+    seller_name: 'GreenCare',
+    name: 'Plant Disease Control Spray',
+    details: 'Effective plant disease control spray that treats common fungal infections and bacterial diseases.',
+    unit: '1 Litre',
     stock_available: 25,
     cost_per_unit: 450,
+    plant_used: 'General',
+    keywords: '',
   },
   {
-    name: "Rose Plant Fertilizer",
-    plant_used: "Rose",
-    keywords: "rose, fertilizer, nutrients, growth, flowering",
-    details: "Specialized fertilizer for rose plants that promotes healthy growth and beautiful blooms.",
+    seller_name: 'BloomMart',
+    name: 'Rose Plant Fertilizer',
+    details: 'Specialized fertilizer for rose plants that promotes healthy growth and beautiful blooms.',
+    unit: '500 gms',
     stock_available: 30,
     cost_per_unit: 350,
+    plant_used: 'Rose',
+    keywords: '',
   },
   {
-    name: "Wheat Seed Treatment",
-    plant_used: "Wheat",
-    keywords: "wheat, seeds, treatment, farming, agriculture",
-    details: "Professional wheat seed treatment solution for improved germination and disease resistance.",
+    seller_name: 'FarmPro',
+    name: 'Wheat Seed Treatment',
+    details: 'Professional wheat seed treatment solution for improved germination and disease resistance.',
+    unit: '1 Litre',
     stock_available: 100,
     cost_per_unit: 1200,
+    plant_used: 'Wheat',
+    keywords: '',
   },
   {
-    name: "Plant Growth Hormone",
-    plant_used: "General",
-    keywords: "growth, hormone, rooting, propagation, cuttings",
-    details: "Natural plant growth hormone that stimulates root development and accelerates plant growth.",
+    seller_name: 'AgriPlus',
+    name: 'Plant Growth Hormone',
+    details: 'Natural plant growth hormone that stimulates root development and accelerates plant growth.',
+    unit: '250 mL',
     stock_available: 40,
     cost_per_unit: 180,
+    plant_used: 'General',
+    keywords: '',
   },
   {
-    name: "Leaf Spot Treatment",
-    plant_used: "General",
-    keywords: "leaf spot, treatment, disease, fungal, control",
-    details: "Effective treatment for leaf spot diseases affecting various plants and crops.",
+    seller_name: 'PlantMedic',
+    name: 'Leaf Spot Treatment',
+    details: 'Effective treatment for leaf spot diseases affecting various plants and crops.',
+    unit: '500 mL',
     stock_available: 20,
     cost_per_unit: 320,
+    plant_used: 'General',
+    keywords: '',
   },
   {
-    name: "Potting Soil Mix",
-    plant_used: "General",
-    keywords: "soil, potting, mix, nutrients, planting",
-    details: "Premium potting soil mix enriched with nutrients for healthy plant growth.",
+    seller_name: 'GrowHub',
+    name: 'Potting Soil Mix',
+    details: 'Premium potting soil mix enriched with nutrients for healthy plant growth.',
+    unit: '10 kg',
     stock_available: 60,
     cost_per_unit: 250,
+    plant_used: 'General',
+    keywords: '',
   },
   {
-    name: "Plant Watering System",
-    plant_used: "General",
-    keywords: "watering, irrigation, system, automatic, drip",
-    details: "Automatic plant watering system with drip irrigation for efficient water management.",
+    seller_name: 'IrrigaTech',
+    name: 'Plant Watering System',
+    details: 'Automatic plant watering system with drip irrigation for efficient water management.',
+    unit: '1 Nos',
     stock_available: 15,
     cost_per_unit: 850,
+    plant_used: 'General',
+    keywords: '',
   },
 ];
 
 export async function addSampleProducts() {
-  console.log('Adding sample products...');
-  
+  console.log('Resetting products and adding new samples...');
+  try {
+    await (db as any).runAsync?.('DELETE FROM products');
+  } catch (e) {
+    console.warn('Could not clear products table:', e);
+  }
   for (const product of sampleProducts) {
     try {
-      const productId = await addProduct(product);
+      const productId = await addProduct(product as any);
       if (productId) {
         console.log(`Added product: ${product.name} (ID: ${productId})`);
       } else {
@@ -82,8 +102,7 @@ export async function addSampleProducts() {
       console.error(`Error adding product ${product.name}:`, error);
     }
   }
-  
-  console.log('Sample products addition completed!');
+  console.log('Sample products reset completed!');
 }
 
 // Run this function to add sample products
