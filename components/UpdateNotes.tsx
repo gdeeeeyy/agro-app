@@ -35,7 +35,7 @@ export default function UpdateNotes({ context }: { context?: string }) {
           <Text style={styles.subBullet}>◦ Log details row with Pack Size, Unit (gms/kg/mL/Litres/Nos), Price, Quantity</Text>
           <Text style={styles.subBullet}>◦ You can still attach an image and Save</Text>
           <Text style={styles.bullet}>• Data mapping:</Text>
-          <Text style={styles.subBullet}>{'◦ unit is saved as “<pack_size> <pack_unit>” (e.g., “500 gms”)'}</Text>
+          <Text style={styles.subBullet}>◦ unit is saved as “{'<'}pack_size{'>'} {'<'}pack_unit{'>'}” (e.g., “500 gms”)</Text>
           <Text style={styles.subBullet}>◦ cost_per_unit is the price you enter</Text>
         </View>
       </ScrollView>
