@@ -221,7 +221,7 @@ export default function Home() {
       {/* Crop Doctor */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{t('home.cropDoctor')}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Cultivation Guide</Text>
           <TouchableOpacity onPress={() => setCropModalVisible(true)} style={{ backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
             <Text style={{ color: '#fff', fontWeight: '600' }}>{t('home.manageCrops')}</Text>
           </TouchableOpacity>
@@ -273,28 +273,7 @@ export default function Home() {
                 <Image source={crop.image ? { uri: crop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 140 }} />
                 <View style={{ padding: 12 }}>
                   <Text style={{ color: '#2d5016', fontWeight: '700', fontSize: 16 }} numberOfLines={1}>{currentLanguage==='ta' && crop.name_ta ? crop.name_ta : crop.name}</Text>
-                  <View style={{ borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 8, padding: 8, marginTop: 8 }}>
-                    <Text style={{ color: '#99a598', fontSize: 11, fontWeight: '700' }}>{t('guide.cultivationShort')}</Text>
-                    <Text style={{ color: '#334', fontSize: 12 }} numberOfLines={3}>{(guideCache[id] && guideCache[id]!.trim()) ? guideCache[id] : '—'}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-                    <View style={{ flex: 1, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, backgroundColor: '#fafafa' }}>
-                      <Text style={{ color: '#666', fontSize: 12 }}>Pests</Text>
-                      <Text style={{ color: '#2d5016', fontWeight: '700' }}>{pestCountCache[id] ?? 0}</Text>
-                    </View>
-                    <View style={{ flex: 1, borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, backgroundColor: '#fafafa' }}>
-                      <Text style={{ color: '#666', fontSize: 12 }}>Diseases</Text>
-                      <Text style={{ color: '#2d5016', fontWeight: '700' }}>{diseaseCountCache[id] ?? 0}</Text>
-                    </View>
-                  </View>
                 </View>
-                <TouchableOpacity onPress={() => {
-                  const next = selectedCrops.filter(c => Number(c) !== Number(id));
-                  setSelectedCrops(next);
-                  AsyncStorage.setItem('@agro_crops', JSON.stringify(next)).catch(()=>{});
-                }} style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 12, padding: 4 }}>
-                  <Ionicons name="trash" size={16} color="#fff" />
-                </TouchableOpacity>
               </TouchableOpacity>
             );
           })}
@@ -367,75 +346,7 @@ export default function Home() {
                       <Text style={{ marginTop: 6, color: '#333' }}>{sheetGuide || 'No cultivation guide yet.'}</Text>
                     </View>
 
-                    <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
-                      <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.pests')}</Text>
-                      {sheetLoading ? (
-                        <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
-                      ) : sheetPests.length ? (
-                        sheetPests.map((p, idx) => (
-                          <View key={idx} style={{ marginTop: 8 }}>
-                            <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && p.name_ta) ? p.name_ta : p.name}</Text>
-                            {p.description || p.description_ta ? (
-                              <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && p.description_ta) ? p.description_ta : p.description}</Text>
-                            ) : null}
-                            {sheetPestImages[p.id]?.length ? (
-                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                                {sheetPestImages[p.id].map((img: any, i: number) => (
-                                  <View key={img.id} style={{ width: 110 }}>
-                                    <TouchableOpacity onPress={() => setViewImg({ uri: img.image, caption: (currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption })}>
-                                      <Image source={{ uri: img.image }} style={{ width: 110, height: 110, borderRadius: 8 }} />
-                                    </TouchableOpacity>
-                                    <Text style={{ color:'#99a598', fontSize: 11, marginTop: 4 }}>Image {i+1}</Text>
-                                    {((currentLanguage==='ta' && img.caption_ta) || img.caption) ? (
-                                      <Text style={{ color:'#555', fontSize: 12 }} numberOfLines={2}>
-                                        {(currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption}
-                                      </Text>
-                                    ) : null}
-                                  </View>
-                                ))}
-                              </ScrollView>
-                            ) : null}
-                          </View>
-                        ))
-                      ) : (
-                        <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noPests')}</Text>
-                      )}
-                    </View>
 
-                    <View style={{ borderWidth: 1, borderColor: '#eee', backgroundColor: '#fafafa', borderRadius: 10, padding: 12, marginTop: 12 }}>
-                      <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.diseases')}</Text>
-                      {sheetLoading ? (
-                        <Text style={{ color: '#666', marginTop: 6 }}>{t('common.loading')}</Text>
-                      ) : sheetDiseases.length ? (
-                        sheetDiseases.map((d, idx) => (
-                          <View key={idx} style={{ marginTop: 8 }}>
-                            <Text style={{ fontWeight: '600', color: '#2d5016' }}>{(currentLanguage==='ta' && d.name_ta) ? d.name_ta : d.name}</Text>
-                            {d.description || d.description_ta ? (
-                              <Text style={{ color: '#555', marginTop: 2 }} numberOfLines={3}>{(currentLanguage==='ta' && d.description_ta) ? d.description_ta : d.description}</Text>
-                            ) : null}
-                            {sheetDiseaseImages[d.id]?.length ? (
-                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                                {sheetDiseaseImages[d.id].map((img: any, i: number) => (
-                                  <View key={img.id} style={{ width: 110 }}>
-                                    <TouchableOpacity onPress={() => setViewImg({ uri: img.image, caption: (currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption })}>
-                                      <Image source={{ uri: img.image }} style={{ width: 110, height: 110, borderRadius: 8 }} />
-                                    </TouchableOpacity>
-                                    <Text style={{ color:'#99a598', fontSize: 11, marginTop: 4 }}>Image {i+1}</Text>
-                                    {((currentLanguage==='ta' && img.caption_ta) || img.caption) ? (
-                                      <Text style={{ color:'#555', fontSize: 12 }} numberOfLines={2}>
-                                        {(currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption}
-                                      </Text>
-                                    ) : null}
-                                  </View>
-                                ))}
-                              </ScrollView>
-                            ) : null}
-                          </View>
-                        ))
-                      ) : (
-                        <Text style={{ color: '#666', marginTop: 6 }}>{t('home.noDiseases')}</Text>
-                      )}
-                    </View>
                   </View>
                 </View>
               )}

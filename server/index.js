@@ -321,6 +321,9 @@ app.patch('/products/:id', async (req, res) => {
 });
 
 app.delete('/products/:id', async (req, res) => {
+  // Prevent deleting a product that appears in order_items (preserve order history integrity)
+  const ref = await one('SELECT 1 FROM order_items WHERE product_id=$1 LIMIT 1', [req.params.id]);
+  if (ref) return res.status(400).json({ error: 'cannot delete product with order history' });
   await pool.query('DELETE FROM products WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
@@ -411,9 +414,20 @@ app.post('/crops/:id/pests', async (req, res) => {
 });
 app.post('/crops/:id/pests-both', async (req, res) => {
   const { name_en, name_ta, description_en, description_ta, management_en, management_ta } = req.body || {};
+  const nameUnique = String((name_en || name_ta || '')).trim();
+  if (!nameUnique) return res.status(400).json({ error: 'name required' });
   const r = await one(
-    'INSERT INTO crop_pests (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES ($1,\'en\',$2,$3,$4,$5,$6,$7) RETURNING id',
-    [req.params.id, name_en, name_ta || null, description_en || null, description_ta || null, management_en || null, management_ta || null]
+    `INSERT INTO crop_pests (crop_id, language, name, name_ta, description, description_ta, management, management_ta)
+     VALUES ($1,'en',$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (crop_id, language, name)
+     DO UPDATE SET 
+       name_ta = COALESCE(EXCLUDED.name_ta, crop_pests.name_ta),
+       description = COALESCE(EXCLUDED.description, crop_pests.description),
+       description_ta = COALESCE(EXCLUDED.description_ta, crop_pests.description_ta),
+       management = COALESCE(EXCLUDED.management, crop_pests.management),
+       management_ta = COALESCE(EXCLUDED.management_ta, crop_pests.management_ta)
+     RETURNING id`,
+    [req.params.id, nameUnique, name_ta || null, description_en || null, description_ta || null, management_en || null, management_ta || null]
   );
   res.json(r);
 });
@@ -443,9 +457,20 @@ app.post('/crops/:id/diseases', async (req, res) => {
 });
 app.post('/crops/:id/diseases-both', async (req, res) => {
   const { name_en, name_ta, description_en, description_ta, management_en, management_ta } = req.body || {};
+  const nameUnique = String((name_en || name_ta || '')).trim();
+  if (!nameUnique) return res.status(400).json({ error: 'name required' });
   const r = await one(
-    'INSERT INTO crop_diseases (crop_id, language, name, name_ta, description, description_ta, management, management_ta) VALUES ($1,\'en\',$2,$3,$4,$5,$6,$7) RETURNING id',
-    [req.params.id, name_en, name_ta || null, description_en || null, description_ta || null, management_en || null, management_ta || null]
+    `INSERT INTO crop_diseases (crop_id, language, name, name_ta, description, description_ta, management, management_ta)
+     VALUES ($1,'en',$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (crop_id, language, name)
+     DO UPDATE SET 
+       name_ta = COALESCE(EXCLUDED.name_ta, crop_diseases.name_ta),
+       description = COALESCE(EXCLUDED.description, crop_diseases.description),
+       description_ta = COALESCE(EXCLUDED.description_ta, crop_diseases.description_ta),
+       management = COALESCE(EXCLUDED.management, crop_diseases.management),
+       management_ta = COALESCE(EXCLUDED.management_ta, crop_diseases.management_ta)
+     RETURNING id`,
+    [req.params.id, nameUnique, name_ta || null, description_en || null, description_ta || null, management_en || null, management_ta || null]
   );
   res.json(r);
 });

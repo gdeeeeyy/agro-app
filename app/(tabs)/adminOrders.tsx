@@ -73,7 +73,7 @@ export default function AdminOrders() {
   const [showPostDropdown, setShowPostDropdown] = useState(false);
   const [stage1Choice, setStage1Choice] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
 
-  const isAdmin = user?.is_admin === 1;
+  const isAdmin = (user?.is_admin || 0) >= 1;
 
   const loadOrders = async () => {
     const allOrders = await getAllOrders() as Order[];
