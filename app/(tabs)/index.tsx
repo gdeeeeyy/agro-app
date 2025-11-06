@@ -167,6 +167,7 @@ export default function Home() {
   const [sheetPestImages, setSheetPestImages] = useState<Record<number, any[]>>({});
   const [sheetDiseaseImages, setSheetDiseaseImages] = useState<Record<number, any[]>>({});
   const [sheetLoading, setSheetLoading] = useState(false);
+  const [viewImg, setViewImg] = useState<{ uri: string; caption?: string } | null>(null);
 
   return (
     <View style={styles.container}>
@@ -379,8 +380,18 @@ export default function Home() {
                             ) : null}
                             {sheetPestImages[p.id]?.length ? (
                               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                                {sheetPestImages[p.id].map((img: any) => (
-                                  <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                                {sheetPestImages[p.id].map((img: any, i: number) => (
+                                  <View key={img.id} style={{ width: 110 }}>
+                                    <TouchableOpacity onPress={() => setViewImg({ uri: img.image, caption: (currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption })}>
+                                      <Image source={{ uri: img.image }} style={{ width: 110, height: 110, borderRadius: 8 }} />
+                                    </TouchableOpacity>
+                                    <Text style={{ color:'#99a598', fontSize: 11, marginTop: 4 }}>Image {i+1}</Text>
+                                    {((currentLanguage==='ta' && img.caption_ta) || img.caption) ? (
+                                      <Text style={{ color:'#555', fontSize: 12 }} numberOfLines={2}>
+                                        {(currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption}
+                                      </Text>
+                                    ) : null}
+                                  </View>
                                 ))}
                               </ScrollView>
                             ) : null}
@@ -404,8 +415,18 @@ export default function Home() {
                             ) : null}
                             {sheetDiseaseImages[d.id]?.length ? (
                               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 8 }}>
-                                {sheetDiseaseImages[d.id].map((img: any) => (
-                                  <Image key={img.id} source={{ uri: img.image }} style={{ width: 90, height: 90, borderRadius: 8 }} />
+                                {sheetDiseaseImages[d.id].map((img: any, i: number) => (
+                                  <View key={img.id} style={{ width: 110 }}>
+                                    <TouchableOpacity onPress={() => setViewImg({ uri: img.image, caption: (currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption })}>
+                                      <Image source={{ uri: img.image }} style={{ width: 110, height: 110, borderRadius: 8 }} />
+                                    </TouchableOpacity>
+                                    <Text style={{ color:'#99a598', fontSize: 11, marginTop: 4 }}>Image {i+1}</Text>
+                                    {((currentLanguage==='ta' && img.caption_ta) || img.caption) ? (
+                                      <Text style={{ color:'#555', fontSize: 12 }} numberOfLines={2}>
+                                        {(currentLanguage==='ta' && img.caption_ta) ? img.caption_ta : img.caption}
+                                      </Text>
+                                    ) : null}
+                                  </View>
                                 ))}
                               </ScrollView>
                             ) : null}
@@ -421,6 +442,26 @@ export default function Home() {
               <SafeAreaView edges={['bottom']} />
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* Image viewer for guide photos */}
+      <Modal visible={!!viewImg} transparent animationType="fade" onRequestClose={() => setViewImg(null)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.6)', justifyContent:'center', alignItems:'center', padding:16 }}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewImg(null)} />
+          {viewImg && (
+            <View style={{ width:'92%', backgroundColor:'#fff', borderRadius:12, padding:12 }}>
+              <Image source={{ uri: viewImg.uri }} style={{ width:'100%', height:320, borderRadius:8, backgroundColor:'#000' }} resizeMode="contain" />
+              {viewImg.caption ? (
+                <Text style={{ color:'#333', marginTop:8 }}>{viewImg.caption}</Text>
+              ) : null}
+              <View style={{ alignItems:'flex-end', marginTop:8 }}>
+                <TouchableOpacity onPress={() => setViewImg(null)} style={{ paddingVertical:8, paddingHorizontal:12 }}>
+                  <Text style={{ color:'#2d5016', fontWeight:'700' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
     </View>
