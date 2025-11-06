@@ -976,8 +976,9 @@ export async function listCropDiseaseImages(diseaseId: number) {
 
 export async function deleteCropPestImage(imageId: number) {
   try {
-    if (API_URL) {
-      try { await api.del(`/pest-images/${imageId}`); } catch (e) { console.warn('Remote deleteCropPestImage failed, deleting local only:', e); }
+    // Only call remote if explicitly enabled
+    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
+      try { await api.del(`/pest-images/${imageId}`); } catch {/* ignore; fall back to local */}
     }
     await db.runAsync("DELETE FROM crop_pest_images WHERE id = ?", imageId);
     return true;
@@ -986,8 +987,8 @@ export async function deleteCropPestImage(imageId: number) {
 
 export async function deleteCropDiseaseImage(imageId: number) {
   try {
-    if (API_URL) {
-      try { await api.del(`/disease-images/${imageId}`); } catch (e) { console.warn('Remote deleteCropDiseaseImage failed, deleting local only:', e); }
+    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
+      try { await api.del(`/disease-images/${imageId}`); } catch {/* ignore */}
     }
     await db.runAsync("DELETE FROM crop_disease_images WHERE id = ?", imageId);
     return true;
@@ -996,7 +997,9 @@ export async function deleteCropDiseaseImage(imageId: number) {
 
 export async function deleteCropPest(pestId: number) {
   try {
-    if (API_URL) { try { await api.del(`/pests/${pestId}`); } catch (e) { console.warn('Remote deleteCropPest failed, deleting local only:', e); } }
+    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
+      try { await api.del(`/pests/${pestId}`); } catch {/* ignore */}
+    }
     await db.runAsync("DELETE FROM crop_pests WHERE id = ?", pestId);
     return true;
   } catch (err) { console.error('SQLite delete error:', err); return false; }
@@ -1004,7 +1007,9 @@ export async function deleteCropPest(pestId: number) {
 
 export async function deleteCropDisease(diseaseId: number) {
   try {
-    if (API_URL) { try { await api.del(`/diseases/${diseaseId}`); } catch (e) { console.warn('Remote deleteCropDisease failed, deleting local only:', e); } }
+    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
+      try { await api.del(`/diseases/${diseaseId}`); } catch {/* ignore */}
+    }
     await db.runAsync("DELETE FROM crop_diseases WHERE id = ?", diseaseId);
     return true;
   } catch (err) { console.error('SQLite delete error:', err); return false; }
