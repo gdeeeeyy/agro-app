@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   View,
   Modal,
+  ActionSheetIOS,
+  Platform,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -220,13 +222,22 @@ mediaTypes: ['images'] as any,
 
         <View style={styles.imagePickerSection}>
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.actionButton} onPress={takePhoto}>
-              <Ionicons name="camera" size={24} color="#fff" />
-              <Text style={styles.actionButtonText}>{t('scanner.takePhoto')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={pickImageFromGallery}>
-              <Ionicons name="images" size={24} color="#fff" />
-              <Text style={styles.actionButtonText}>{t('scanner.gallery')}</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={async () => {
+              if (Platform.OS === 'ios') {
+                ActionSheetIOS.showActionSheetWithOptions({ options: ['Cancel', t('scanner.takePhoto'), t('scanner.gallery')], cancelButtonIndex: 0 }, async (idx) => {
+                  if (idx === 1) await takePhoto();
+                  if (idx === 2) await pickImageFromGallery();
+                });
+              } else {
+                Alert.alert(t('scanner.chooseSource'), undefined, [
+                  { text: t('scanner.takePhoto'), onPress: takePhoto },
+                  { text: t('scanner.gallery'), onPress: pickImageFromGallery },
+                  { text: t('common.cancel'), style: 'cancel' },
+                ]);
+              }
+            }}>
+              <Ionicons name="image" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Add photo</Text>
             </TouchableOpacity>
           </View>
         </View>
