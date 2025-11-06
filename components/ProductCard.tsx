@@ -134,7 +134,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <Text style={[styles.price, compact && styles.priceCompact]}>Rs. {product.cost_per_unit}{(product as any).unit ? `/${(product as any).unit}` : ''}</Text>
             <Text style={styles.stock} numberOfLines={1}>
               {product.stock_available > 0 
-                ? `Stock: ${product.stock_available} ${Unit}`
+                ? `Stock: ${product.stock_available}`
                 : t('store.outOfStock')}
             </Text>
             <View style={styles.bottomRow}>

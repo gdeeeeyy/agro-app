@@ -27,7 +27,6 @@ import { addSampleProducts } from '../../lib/sampleProducts';
 import { createDefaultAdmin, createAdminCustom } from '../../lib/createAdmin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import UpdateNotes from '../../components/UpdateNotes';
 
 interface Product {
   id: number;
@@ -90,7 +89,8 @@ export default function AdminDashboard() {
   });
 
   // Check if user is admin
-  const isAdmin = user?.is_admin === 1;
+  const isAdmin = (user?.is_admin || 0) >= 1;
+  const isMaster = user?.is_admin === 2;
 
   const loadProducts = async () => {
     try {
@@ -363,12 +363,14 @@ mediaTypes: ['images'] as any,
       </View>
 
       <View style={styles.productActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => openEditModal(item)}
-        >
-          <Ionicons name="pencil" size={20} color="#4caf50" />
-        </TouchableOpacity>
+        {isMaster && (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => openEditModal(item)}
+          >
+            <Ionicons name="pencil" size={20} color="#4caf50" />
+          </TouchableOpacity>
+        )}
         
         <TouchableOpacity
           style={styles.deleteButton}
@@ -415,29 +417,27 @@ mediaTypes: ['images'] as any,
         </View>
       </View>
 
-      <UpdateNotes context="Admin – Add Products" />
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Ionicons name="add" size={24} color="#fff" />
           <Text style={styles.addButtonText}>Add Product</Text>
         </TouchableOpacity>
 
+        {isMaster && (
         <TouchableOpacity style={styles.sampleButton} onPress={handleAddSampleProducts}>
           <Ionicons name="leaf" size={24} color="#fff" />
           <Text style={styles.sampleButtonText}>Add Sample Products</Text>
         </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.adminButtonContainer}>
-        <TouchableOpacity style={styles.keywordsButton} onPress={() => setKeywordModalVisible(true)}>
-          <Ionicons name="pricetags" size={24} color="#fff" />
-          <Text style={styles.keywordsButtonText}>Manage Keywords</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.adminButton} onPress={handleCreateAdmin}>
-          <Ionicons name="person-add" size={24} color="#fff" />
-          <Text style={styles.adminButtonText}>Create Admin</Text>
-        </TouchableOpacity>
+        {isMaster && (
+          <TouchableOpacity style={styles.keywordsButton} onPress={() => setKeywordModalVisible(true)}>
+            <Ionicons name="pricetags" size={24} color="#fff" />
+            <Text style={styles.keywordsButtonText}>Manage Keywords</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
@@ -662,65 +662,7 @@ mediaTypes: ['images'] as any,
         </View>
       </Modal>
 
-      <Modal
-        visible={adminModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Create Admin</Text>
-            <TouchableOpacity onPress={() => setAdminModalVisible(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.modalContent}>
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              value={adminFullName}
-              onChangeText={setAdminFullName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number"
-              value={adminNumber}
-              onChangeText={setAdminNumber}
-              keyboardType="number-pad"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={adminPassword}
-              onChangeText={setAdminPassword}
-              secureTextEntry
-            />
-          </View>
-          <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setAdminModalVisible(false)}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={async () => {
-                if (!adminNumber || !adminPassword || !adminFullName) {
-                  Alert.alert('Error', 'Fill all fields');
-                  return;
-                }
-                const ok = await createAdminCustom(adminNumber, adminPassword, adminFullName);
-                if (ok) Alert.alert('Success', 'Admin created');
-                else Alert.alert('Error', 'Failed to create admin');
-                setAdminModalVisible(false);
-              }}
-            >
-              <Text style={styles.saveButtonText}>Create</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ height: 10 }} />
-          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
-        </View>
-      </Modal>
+      {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>

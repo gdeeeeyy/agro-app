@@ -48,7 +48,7 @@ export async function createDefaultAdmin() {
       number,
       hashedPassword,
       fullName,
-      1
+      2
     );
 
     console.log('Default admin account created successfully!');
@@ -57,12 +57,12 @@ export async function createDefaultAdmin() {
   }
 }
 
-export async function createAdminCustom(number: string, password: string, fullName: string) {
+export async function createAdminCustom(number: string, password: string, fullName: string, role: 1|2 = 1) {
   try {
     const hashed = await hashPassword(password);
     if (API_URL) {
       try {
-        await api.post('/auth/create-admin', { number, password: hashed, full_name: fullName });
+        await api.post('/auth/create-admin', { number, password: hashed, full_name: fullName, is_admin: role });
         return true;
       } catch (e) {
         return false;
@@ -71,8 +71,8 @@ export async function createAdminCustom(number: string, password: string, fullNa
     const existing = await db.getFirstAsync("SELECT id FROM users WHERE number = ?", number);
     if (existing) return false;
     await db.runAsync(
-      "INSERT INTO users (number, password, full_name, is_admin) VALUES (?, ?, ?, 1)",
-      number, hashed, fullName
+      "INSERT INTO users (number, password, full_name, is_admin) VALUES (?, ?, ?, ?)",
+      number, hashed, fullName, role
     );
     return true;
   } catch (e) {

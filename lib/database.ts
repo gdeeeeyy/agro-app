@@ -1136,4 +1136,31 @@ export async function getUserById(userId: number) {
   }
 }
 
+export async function listAdmins() {
+  try {
+    if (API_URL) {
+      try { return await api.get('/admins'); }
+      catch (e) { /* fall back to local */ }
+    }
+    const rows = await db.getAllAsync("SELECT id, number, full_name, is_admin FROM users WHERE is_admin > 0 ORDER BY created_at ASC");
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
+export async function setAdminRole(userId: number, role: 1|2) {
+  try {
+    if (API_URL) { await api.patch(`/users/${userId}`, { is_admin: role }); return true; }
+    await db.runAsync("UPDATE users SET is_admin = ? WHERE id = ?", role, userId);
+    return true;
+  } catch (err) { console.error('SQLite update error:', err); return false; }
+}
+
+export async function deleteAdmin(userId: number) {
+  try {
+    if (API_URL) { await api.del(`/admins/${userId}`); return true; }
+    await db.runAsync("DELETE FROM users WHERE id = ?", userId);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
 export default db;

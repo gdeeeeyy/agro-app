@@ -12,13 +12,13 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getUserOrders, getOrderItems } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from '../../components/AppHeader';
+import TopBar from '../../components/TopBar';
 
 interface Order {
   id: number;
@@ -211,9 +211,12 @@ export default function Orders() {
     </View>
   );
 
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const showBack = from === 'profile';
+
   return (
     <View style={styles.container}>
-      <AppHeader />
+      <TopBar title={t('orders.title')} showBack={showBack} onBack={() => router.back()} />
 
       <FlatList
         data={orders}

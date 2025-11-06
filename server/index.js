@@ -212,11 +212,12 @@ app.post('/auth/signin', async (req, res) => {
 
 // Create admin (server-side)
 app.post('/auth/create-admin', async (req, res) => {
-  const { number, password, full_name } = req.body || {};
+  const { number, password, full_name, is_admin } = req.body || {};
+  const role = [1,2].includes(Number(is_admin)) ? Number(is_admin) : 1;
   try {
     const u = await one(
-      'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1, $2, $3, 1) RETURNING id, number, full_name, is_admin, created_at',
-      [number, password, full_name || null]
+      'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1, $2, $3, $4) RETURNING id, number, full_name, is_admin, created_at',
+      [number, password, full_name || null, role]
     );
     res.json(u);
   } catch (e) {
@@ -227,15 +228,48 @@ app.post('/auth/create-admin', async (req, res) => {
 
 // Users (address update)
 app.patch('/users/:id', async (req, res) => {
-  const { address, full_name } = req.body || {};
+  const { address, full_name, is_admin } = req.body || {};
   const set = []; const vals=[]; let i=1;
   if (address !== undefined) { set.push(`address=$${i++}`); vals.push(address); }
   if (full_name !== undefined) { set.push(`full_name=$${i++}`); vals.push(full_name); }
+  // Role change with last-master guard
+  let roleToSet = null;
+  if (is_admin !== undefined) {
+    const role = [0,1,2].includes(Number(is_admin)) ? Number(is_admin) : null;
+    if (role !== null) {
+      // If demoting a master, ensure at least one master remains
+      const current = await one('SELECT is_admin FROM users WHERE id=$1', [req.params.id]);
+      if (current && Number(current.is_admin) === 2 && role !== 2) {
+        const mc = await one('SELECT COUNT(*)::int AS c FROM users WHERE is_admin=2');
+        if (mc && mc.c <= 1) {
+          return res.status(400).json({ error: 'cannot demote the last master admin' });
+        }
+      }
+      roleToSet = role;
+      set.push(`is_admin=$${i++}`); vals.push(role);
+    }
+  }
   if (!set.length) return res.json({ ok: true });
   vals.push(req.params.id);
   await pool.query(`UPDATE users SET ${set.join(', ')}, created_at=created_at WHERE id=$${i}`, vals);
   const u = await one('SELECT id, number, full_name, is_admin, created_at, address FROM users WHERE id=$1', [req.params.id]);
   res.json(u);
+});
+
+// Admins
+app.get('/admins', async (req, res) => {
+  const rows = await all('SELECT id, number, full_name, is_admin FROM users WHERE is_admin > 0 ORDER BY created_at ASC');
+  res.json(rows);
+});
+
+app.delete('/admins/:id', async (req, res) => {
+  const u = await one('SELECT is_admin FROM users WHERE id=$1', [req.params.id]);
+  if (u && Number(u.is_admin) === 2) {
+    const mc = await one('SELECT COUNT(*)::int AS c FROM users WHERE is_admin=2');
+    if (mc && mc.c <= 1) return res.status(400).json({ error: 'cannot delete the last master admin' });
+  }
+  await pool.query('DELETE FROM users WHERE id=$1 AND is_admin > 0', [req.params.id]);
+  res.json({ ok: true });
 });
 
 // Products

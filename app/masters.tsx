@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ScrollView, Image, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ScrollView, Image, Modal, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages } from '../lib/database';
+import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin } from '../lib/database';
 import { uploadImage } from '../lib/upload';
 import { UserContext } from '../context/UserContext';
 
@@ -64,6 +64,17 @@ export default function Masters() {
   const [disImgModalDiseaseId, setDisImgModalDiseaseId] = useState<number | null>(null);
   const [disImgModalImage, setDisImgModalImage] = useState<any | null>(null);
 
+  // Admin manage state (master only)
+  const [adminManageVisible, setAdminManageVisible] = useState(false);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [newAdminNumber, setNewAdminNumber] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminFullName, setNewAdminFullName] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<1|2>(1);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [adminsFilter, setAdminsFilter] = useState('');
+  const [adminCount, setAdminCount] = useState<number | null>(null);
+
   useEffect(() => { (async ()=>{ const all = await getAllCrops() as any[]; setCrops(all); if (all[0]) setSelectedCropId(Number(all[0].id)); })(); }, []);
 
   useEffect(() => {
@@ -110,8 +121,22 @@ export default function Masters() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
             <Ionicons name="pricetags" size={18} color="#4caf50" />
-            <Text style={styles.masterBtnText}>Products, Keywords & Admins</Text>
+            <Text style={styles.masterBtnText}>Products</Text>
           </TouchableOpacity>
+          {user?.is_admin === 2 && (
+            <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setAdminManageVisible(true); setAdminsLoading(true); try { const rows = await listAdmins(); setAdmins(rows as any[]); setAdminCount(Array.isArray(rows)? rows.length : 0); } finally { setAdminsLoading(false); } }}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
+                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
+                  <Ionicons name="shield-checkmark" size={20} color="#4caf50" />
+                </View>
+                <View>
+                  <Text style={styles.adminTileTitle}>Add/Manage Admins</Text>
+                  <Text style={styles.adminTileSub}>{adminCount!=null? `${adminCount} admin${adminCount===1?'':'s'}` : 'Create vendors, promote to master'}</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/adminOrders')}>
             <Ionicons name="receipt" size={18} color="#4caf50" />
             <Text style={styles.masterBtnText}>Manage Orders</Text>
@@ -577,7 +602,88 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           </View>
         </Modal>
 
+
         <View style={{ height: 10 }} />
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
+      </Modal>
+
+      {/* Manage Admins (Master only) - top-level so it opens from Masters home */}
+      <Modal visible={adminManageVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=> setAdminManageVisible(false)}>
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
+        {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setAdminManageVisible(false)}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Admins</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding:16, paddingBottom: 28 }}>
+          <TextInput style={[styles.input, { marginBottom: 14 }]} placeholder="Search by name or number" placeholderTextColor="#999" value={adminsFilter} onChangeText={setAdminsFilter} />
+          {adminsLoading ? (
+            <View style={{ alignItems:'center', padding: 20 }}>
+              <ActivityIndicator color="#4caf50" />
+            </View>
+          ) : (
+          <>
+            <View style={{ gap: 12 }}>
+            {admins.filter((a:any)=> {
+              const q = adminsFilter.toLowerCase();
+              if (!q) return true;
+              return String(a.full_name||'').toLowerCase().includes(q) || String(a.number||'').toLowerCase().includes(q);
+            }).map((a)=> (
+              <View key={a.id} style={{ padding:12, borderWidth:1, borderColor:'#e0e0e0', borderRadius:10, backgroundColor:'#fff', marginBottom:12 }}>
+                  <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <View style={{ flex:1 }}>
+                      <Text style={{ fontWeight:'700', color:'#2d5016' }}>{a.full_name || 'Admin'}</Text>
+                      <Text style={{ color:'#666' }}>{a.number}</Text>
+                    </View>
+                    <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+                      <Text style={[styles.rolePill, a.is_admin===2 ? styles.rolePillMaster : styles.rolePillVendor]}>{a.is_admin===2 ? 'MASTER' : 'VENDOR'}</Text>
+                      <TouchableOpacity onPress={async ()=>{ const ok = await deleteAdmin(Number(a.id)); if (ok) { setAdmins(prev=> { const n = prev.filter(x=> x.id!==a.id); setAdminCount(n.length); return n; }); Alert.alert('Deleted','Admin removed'); } }} style={{ padding:8, backgroundColor:'#fdecea', borderRadius:8 }}>
+                        <Ionicons name="trash" size={18} color="#d32f2f" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                <View style={[styles.segmented, { marginTop:10, alignSelf:'flex-start' }]}>
+                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 2); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:2}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===2 && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, a.is_admin===2 && styles.segmentTextActive]}>Master</Text>
+                  </TouchableOpacity>
+                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 1); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:1}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===1 && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, a.is_admin===1 && styles.segmentTextActive]}>Vendor</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+            </View>
+          </>
+          )}
+
+          <View style={{ height: 16 }} />
+          <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 8 }}>Create Admin</Text>
+          <View style={{ gap: 10 }}>
+            <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#999" value={newAdminFullName} onChangeText={setNewAdminFullName} />
+            <TextInput style={styles.input} placeholder="Phone Number" placeholderTextColor="#999" value={newAdminNumber} onChangeText={setNewAdminNumber} keyboardType="number-pad" />
+            <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#999" value={newAdminPassword} onChangeText={setNewAdminPassword} secureTextEntry />
+          </View>
+          <View style={[styles.segmented, { alignSelf:'flex-start', marginTop: 10, marginBottom: 12 }]}>
+            <TouchableOpacity onPress={()=> setNewAdminRole(2)} style={[styles.segment, newAdminRole===2 && styles.segmentActive]}>
+              <Text style={[styles.segmentText, newAdminRole===2 && styles.segmentTextActive]}>Master</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=> setNewAdminRole(1)} style={[styles.segment, newAdminRole===1 && styles.segmentActive]}>
+              <Text style={[styles.segmentText, newAdminRole===1 && styles.segmentTextActive]}>Vendor</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.savePrimaryBtn} onPress={async ()=> {
+            if (!newAdminNumber || !newAdminPassword || !newAdminFullName) { Alert.alert('Error','Fill all fields'); return; }
+            const ok = await (await import('../lib/createAdmin')).createAdminCustom(newAdminNumber, newAdminPassword, newAdminFullName, newAdminRole);
+            if (ok) { Alert.alert('Saved','Admin created'); const rows = await listAdmins(); setAdmins(rows as any[]); setAdminCount(Array.isArray(rows)? rows.length : 0); setNewAdminNumber(''); setNewAdminPassword(''); setNewAdminFullName(''); }
+            else { Alert.alert('Error','Failed to create admin'); }
+          }}>
+            <Ionicons name="save" size={18} color="#fff" />
+            <Text style={{ color:'#fff', fontWeight:'700' }}>Create</Text>
+          </TouchableOpacity>
+        </ScrollView>
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
       </Modal>
     </SafeAreaView>
@@ -610,4 +716,10 @@ const styles = StyleSheet.create({
   actionChip: { flexDirection:'row', alignItems:'center', gap:6, paddingVertical:6, paddingHorizontal:10, borderRadius:12, backgroundColor:'#f1f8f4', borderWidth:1, borderColor:'#c8e6c9' },
   actionChipDanger: { backgroundColor:'#fdecea', borderColor:'#f8d7da' },
   actionChipText: { color:'#2d5016', fontWeight:'700' },
+  adminTile: { backgroundColor:'#f1f8f4', borderWidth:1, borderColor:'#c8e6c9', padding:14, borderRadius:12, flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
+  adminTileTitle: { color:'#2d5016', fontWeight:'800' },
+  adminTileSub: { color:'#4e7c35', fontWeight:'600', fontSize:12 },
+  rolePill: { paddingVertical:4, paddingHorizontal:8, borderRadius:10, fontSize:10, fontWeight:'800' },
+  rolePillMaster: { backgroundColor:'#eaf6ec', color:'#2d5016' },
+  rolePillVendor: { backgroundColor:'#fff3cd', color:'#7a5c00' },
 });
