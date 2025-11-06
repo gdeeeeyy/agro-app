@@ -180,18 +180,24 @@ export default function Home() {
             <Ionicons name="refresh" size={18} color="#2d5016" />
           </TouchableOpacity>
         </View>
-        {locationLabel ? <Text style={{ color: '#333', marginTop: 2 }}>{locationLabel}</Text> : null}
-        <Text style={{ color: '#666', marginTop: 2 }}>{new Date().toLocaleDateString()}</Text>
         {weatherLoading ? (
           <Text style={{ color: '#666', marginTop: 8 }}>{t('common.loading')}</Text>
         ) : weather ? (
           <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
-              <Ionicons name={getWeatherIconFromCode(hourly?.[0]?.code)} size={28} color="#2d5016" />
-              <Text style={{ fontSize: 32, fontWeight: '700', color: '#2d5016' }}>
-                {isNaN(Number(weather.temperature)) ? '--' : Math.round(Number(weather.temperature))}°C
-              </Text>
-              <Text style={{ color: '#333', fontSize: 16, fontWeight: '600' }}>{getWeatherLabelFromCode(hourly?.[0]?.code)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent:'space-between', marginTop: 8 }}>
+              <View style={{ flex:1 }}>
+                <Text style={{ color: '#666', fontSize: 12 }}>{new Date().toLocaleDateString()}</Text>
+                {locationLabel ? <Text style={{ color: '#333', fontWeight:'700', marginTop: 2 }} numberOfLines={1}>{locationLabel}</Text> : null}
+              </View>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+                <Ionicons name={getWeatherIconFromCode(hourly?.[0]?.code)} size={28} color="#2d5016" />
+                <View style={{ alignItems:'flex-end' }}>
+                  <Text style={{ fontSize: 28, fontWeight: '800', color: '#2d5016' }}>
+                    {isNaN(Number(weather.temperature)) ? '--' : Math.round(Number(weather.temperature))}°C
+                  </Text>
+                  <Text style={{ color: '#333', fontSize: 12, fontWeight: '600' }}>{getWeatherLabelFromCode(hourly?.[0]?.code)}</Text>
+                </View>
+              </View>
             </View>
             {hourly.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12, paddingRight: 12 }}>
