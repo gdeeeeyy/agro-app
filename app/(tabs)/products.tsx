@@ -45,7 +45,7 @@ export default function Products() {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [numColumns] = useState(2);
+  const [numColumns] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -113,7 +113,7 @@ export default function Products() {
   }, []);
 
   const renderProduct = ({ item }: { item: Product }) => (
-    <ProductCard product={item} compact />
+    <ProductCard product={item} horizontal />
   );
 
   const renderEmptyState = () => (
@@ -170,14 +170,13 @@ export default function Products() {
         data={filteredProducts}
         renderItem={renderProduct}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={[styles.listContent, { justifyContent: 'space-between' }]}
+        contentContainerStyle={[styles.listContent]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
         numColumns={numColumns}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
       />
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />

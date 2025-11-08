@@ -188,6 +188,31 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
     await addOrderTextCol('tracking_number');
     await addOrderTextCol('tracking_url');
 
+    // variants tables (local)
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS product_variants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        label TEXT NOT NULL,
+        price REAL NOT NULL,
+        stock_available INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(product_id, label),
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      );
+    `);
+    // add variant columns to cart/order items
+    const cartCols = await db.getAllAsync("PRAGMA table_info(cart_items)");
+    const cartColNames = (cartCols as any[]).map(c => c.name);
+    if (!cartColNames.includes('variant_id')) {
+      await db.runAsync('ALTER TABLE cart_items ADD COLUMN variant_id INTEGER');
+    }
+    const orderItemCols = await db.getAllAsync("PRAGMA table_info(order_items)");
+    const orderItemColNames = (orderItemCols as any[]).map(c => c.name);
+    if (!orderItemColNames.includes('variant_id')) await db.runAsync('ALTER TABLE order_items ADD COLUMN variant_id INTEGER');
+    if (!orderItemColNames.includes('variant_label')) await db.runAsync('ALTER TABLE order_items ADD COLUMN variant_label TEXT');
+
     // image caption bilingual columns
     const pestImgCols = await db.getAllAsync("PRAGMA table_info(crop_pest_images)");
     const pestImgColNames = (pestImgCols as any[]).map(c => c.name);
@@ -483,9 +508,14 @@ export async function getCartItems(userId: number) {
   try {
     if (API_URL) return await api.get(`/cart?userId=${userId}`);
     const rows = await db.getAllAsync(
-      `SELECT ci.*, p.name, p.name_ta, p.image, p.cost_per_unit, p.stock_available 
+      `SELECT ci.*, p.name, p.name_ta, p.image,
+              COALESCE(v.price, p.cost_per_unit) as cost_per_unit,
+              v.label as variant_label,
+              v.id as variant_id,
+              p.stock_available
        FROM cart_items ci 
        JOIN products p ON ci.product_id = p.id 
+       LEFT JOIN product_variants v ON ci.variant_id = v.id
        WHERE ci.user_id = ? 
        ORDER BY ci.created_at DESC`,
       userId
@@ -497,29 +527,29 @@ export async function getCartItems(userId: number) {
   }
 }
 
-export async function addToCart(userId: number, productId: number, quantity: number = 1) {
+export async function addToCart(userId: number, productId: number, quantity: number = 1, variantId?: number) {
   try {
     if (API_URL) {
-      await api.post('/cart/add', { userId, productId, quantity });
+      await api.post('/cart/add', { userId, productId, quantity, variantId });
       return true;
     }
     // Check if item already exists in cart
     const existing = await db.getAllAsync(
-      "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?",
-      userId, productId
+      "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ? AND (variant_id IS ? OR variant_id = ?)",
+      userId, productId, variantId ?? null, variantId ?? null
     );
     
     if (existing.length > 0) {
       // Update quantity
       await db.runAsync(
-        "UPDATE cart_items SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?",
-        quantity, userId, productId
+        "UPDATE cart_items SET quantity = quantity + ? WHERE user_id = ? AND product_id = ? AND (variant_id IS ? OR variant_id = ?)",
+        quantity, userId, productId, variantId ?? null, variantId ?? null
       );
     } else {
       // Add new item
       await db.runAsync(
-        "INSERT INTO cart_items (user_id, product_id, quantity) VALUES (?, ?, ?)",
-        userId, productId, quantity
+        "INSERT INTO cart_items (user_id, product_id, quantity, variant_id) VALUES (?, ?, ?, ?)",
+        userId, productId, quantity, variantId ?? null
       );
     }
     return true;
@@ -529,21 +559,21 @@ export async function addToCart(userId: number, productId: number, quantity: num
   }
 }
 
-export async function updateCartItemQuantity(userId: number, productId: number, quantity: number) {
+export async function updateCartItemQuantity(userId: number, productId: number, quantity: number, variantId?: number) {
   try {
     if (API_URL) {
-      await api.patch('/cart/item', { userId, productId, quantity });
+      await api.patch('/cart/item', { userId, productId, quantity, variantId });
       return true;
     }
     if (quantity <= 0) {
       await db.runAsync(
-        "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
-        userId, productId
+        "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND (variant_id IS ? OR variant_id = ?)",
+        userId, productId, variantId ?? null, variantId ?? null
       );
     } else {
       await db.runAsync(
-        "UPDATE cart_items SET quantity = ? WHERE user_id = ? AND product_id = ?",
-        quantity, userId, productId
+        "UPDATE cart_items SET quantity = ? WHERE user_id = ? AND product_id = ? AND (variant_id IS ? OR variant_id = ?)",
+        quantity, userId, productId, variantId ?? null, variantId ?? null
       );
     }
     return true;
@@ -553,15 +583,15 @@ export async function updateCartItemQuantity(userId: number, productId: number, 
   }
 }
 
-export async function removeFromCart(userId: number, productId: number) {
+export async function removeFromCart(userId: number, productId: number, variantId?: number) {
   try {
     if (API_URL) {
-      await api.del('/cart/item', { userId, productId });
+      await api.del('/cart/item', { userId, productId, variantId });
       return true;
     }
     await db.runAsync(
-      "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
-      userId, productId
+      "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND (variant_id IS ? OR variant_id = ?)",
+      userId, productId, variantId ?? null, variantId ?? null
     );
     return true;
   } catch (err) {
@@ -591,9 +621,10 @@ export async function getCartTotal(userId: number) {
       return (res as any)?.total || 0;
     }
     const rows = await db.getAllAsync(
-      `SELECT SUM(ci.quantity * p.cost_per_unit) as total 
+      `SELECT SUM(ci.quantity * COALESCE(v.price, p.cost_per_unit)) as total 
        FROM cart_items ci 
        JOIN products p ON ci.product_id = p.id 
+       LEFT JOIN product_variants v ON ci.variant_id = v.id
        WHERE ci.user_id = ?`,
       userId
     );
@@ -630,16 +661,24 @@ export async function createOrder(userId: number, paymentMethod: string, deliver
 
     // Insert order items
     for (const item of cartItems as any[]) {
+      const price = (item as any).price ?? (item as any).cost_per_unit;
       await db.runAsync(
-        "INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit) VALUES (?, ?, ?, ?, ?)",
-        orderId, item.product_id, item.name, item.quantity, item.cost_per_unit
+        "INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit, variant_id, variant_label) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        orderId, item.product_id, item.name, item.quantity, price, (item as any).variant_id || null, (item as any).variant_label || null
       );
 
-      // Update product stock
-      await db.runAsync(
-        "UPDATE products SET stock_available = stock_available - ? WHERE id = ?",
-        item.quantity, item.product_id
-      );
+      // Update stock
+      if ((item as any).variant_id) {
+        await db.runAsync(
+          "UPDATE product_variants SET stock_available = stock_available - ? WHERE id = ?",
+          item.quantity, (item as any).variant_id
+        );
+      } else {
+        await db.runAsync(
+          "UPDATE products SET stock_available = stock_available - ? WHERE id = ?",
+          item.quantity, item.product_id
+        );
+      }
     }
 
     // Clear cart
@@ -1051,6 +1090,46 @@ export async function deleteScanPlant(id: number) {
 }
 
 // Keyword functions
+// Variants APIs
+export async function getProductVariants(productId: number) {
+  try {
+    if (API_URL) {
+      try { return await api.get(`/products/${productId}/variants`); }
+      catch { /* fall through to local */ }
+    }
+    const rows = await db.getAllAsync("SELECT id, product_id, label, price, stock_available FROM product_variants WHERE product_id = ? ORDER BY price ASC", productId);
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+export async function addProductVariant(productId: number, input: { label: string; price: number; stock_available?: number; }) {
+  try {
+    if (API_URL) {
+      try { const r = await api.post(`/products/${productId}/variants`, input); return (r as any).id || null; }
+      catch { /* fall back to local */ }
+    }
+    const r = await db.runAsync("INSERT INTO product_variants (product_id, label, price, stock_available) VALUES (?, ?, ?, ?)", productId, input.label, input.price, input.stock_available ?? 0);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+export async function updateProductVariant(variantId: number, fields: { label?: string; price?: number; stock_available?: number; }) {
+  try {
+    if (API_URL) { try { await api.patch(`/variants/${variantId}`, fields); return true; } catch { /* fall back */ } }
+    const sets: string[] = []; const vals: any[] = [];
+    Object.entries(fields).forEach(([k,v]) => { if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); } });
+    if (!sets.length) return true;
+    vals.push(variantId);
+    await db.runAsync(`UPDATE product_variants SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) { console.error('SQLite update error:', err); return false; }
+}
+export async function deleteProductVariant(variantId: number) {
+  try {
+    if (API_URL) { try { await api.del(`/variants/${variantId}`); return true; } catch { /* fall back */ } }
+    await db.runAsync("DELETE FROM product_variants WHERE id = ?", variantId);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
 export async function getAllKeywords() {
   try {
     if (API_URL) return await api.get('/keywords');

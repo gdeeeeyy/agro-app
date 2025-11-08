@@ -247,24 +247,9 @@ export default function Home() {
 
                 InteractionManager.runAfterInteractions(async () => {
                   try {
-                    const [g, pests, diseases] = await Promise.all([
-                      getCropGuide(Number(id), lang),
-                      listCropPests(Number(id), lang) as any,
-                      listCropDiseases(Number(id), lang) as any,
-                    ]);
+                    const g = await getCropGuide(Number(id), lang);
                     setSheetGuide((g as any)?.cultivation_guide || null);
-                    const pestArr = Array.isArray(pests) ? pests : [];
-                    const diseaseArr = Array.isArray(diseases) ? diseases : [];
-                    setSheetPests(pestArr);
-                    setSheetDiseases(diseaseArr);
-
-                    // Fetch images after content is shown
-                    const pestImgsEntries = await Promise.all(pestArr.map(async (p: any) => [p.id, await listCropPestImages(Number(p.id))] as const));
-                    const diseaseImgsEntries = await Promise.all(diseaseArr.map(async (d: any) => [d.id, await listCropDiseaseImages(Number(d.id))] as const));
-                    const pim: Record<number, any[]> = {}; pestImgsEntries.forEach(([pid, imgs]) => { pim[pid] = imgs as any[]; });
-                    const dim: Record<number, any[]> = {}; diseaseImgsEntries.forEach(([did, imgs]) => { dim[did] = imgs as any[]; });
-                    setSheetPestImages(pim);
-                    setSheetDiseaseImages(dim);
+                    // Pests and diseases are managed in Saved sections; do not fetch or show here.
                   } finally {
                     setSheetLoading(false);
                   }

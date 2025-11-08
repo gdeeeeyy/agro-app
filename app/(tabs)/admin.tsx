@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadImage } from '../../lib/upload';
 import { UserContext } from '../../context/UserContext';
 import { 
   getAllProducts, 
@@ -46,11 +47,12 @@ interface ProductForm {
   details: string;
   details_ta: string;
   image?: string;
-  stock_available: string; // quantity
-  cost_per_unit: string; // price
-  unit?: string; // e.g., "500 gms"
-  pack_size?: string; // numeric
-  pack_unit?: string; // gms/kgs/L/mL/Nos
+  stock_available: string; // quantity (fallback when no variants)
+  cost_per_unit: string; // price (fallback when no variants)
+  unit?: string; // optional display unit (fallback)
+  pack_size?: string; // deprecated in favor of variants
+  pack_unit?: string; // deprecated in favor of variants
+  plant_used?: string; // required by server; default to name
 }
 
 interface Keyword {
@@ -91,6 +93,16 @@ export default function AdminDashboard() {
   // Check if user is admin
   const isAdmin = (user?.is_admin || 0) >= 1;
   const isMaster = user?.is_admin === 2;
+
+  // Variants manage state
+  const [variantsVisible, setVariantsVisible] = useState(false);
+  const [variantsProductId, setVariantsProductId] = useState<number | null>(null);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [newVarLabel, setNewVarLabel] = useState('');
+  const [newVarPrice, setNewVarPrice] = useState('');
+  const [newVarStock, setNewVarStock] = useState('');
+  // Draft variants when adding a new product
+  const [draftVariants, setDraftVariants] = useState<{ label: string; price: number; stock_available: number; }[]>([]);
 
   const loadProducts = async () => {
     try {
@@ -136,6 +148,8 @@ export default function AdminDashboard() {
 
   const openAddModal = () => {
     resetForm();
+    setDraftVariants([]);
+    setNewVarLabel(''); setNewVarPrice(''); setNewVarStock('');
     setModalVisible(true);
   };
 
@@ -150,14 +164,23 @@ export default function AdminDashboard() {
       stock_available: String(product.stock_available ?? ''),
       cost_per_unit: String(product.cost_per_unit ?? ''),
       unit: (product as any).unit || '',
-      pack_size: ((product as any).unit||'').split(' ')[0] || '',
-      pack_unit: ((product as any).unit||'').split(' ')[1] || 'gms',
+      pack_size: '',
+      pack_unit: 'gms',
+      plant_used: (product as any).plant_used || product.name || '',
     });
     // Parse existing keywords
     const existingKeywords = product.keywords.split(',').map(k => k.trim()).filter(k => k);
     setSelectedKeywords(existingKeywords);
     setEditingProduct(product);
     setModalVisible(true);
+    // Load variants into editor
+    (async () => {
+      setVariantsProductId(Number(product.id));
+      try {
+        const list = await (await import('../../lib/database')).getProductVariants(Number(product.id));
+        setVariants(list as any[]);
+      } catch {}
+    })();
   };
 
   const closeModal = () => {
@@ -167,14 +190,19 @@ export default function AdminDashboard() {
 
 const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-mediaTypes: ['images'] as any,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
+      aspect: [1, 1],
+      quality: 0.9,
     });
 
     if (!result.canceled) {
-      setFormData({ ...formData, image: result.assets[0].uri });
+      try {
+        const up = await uploadImage(result.assets[0].uri);
+        setFormData({ ...formData, image: up.url });
+      } catch (e: any) {
+        Alert.alert('Upload failed', String(e?.message || e));
+      }
     }
   };
 
@@ -248,17 +276,16 @@ mediaTypes: ['images'] as any,
     }
 
     const productData: any = {
-      name: formData.name.trim(),
-      plant_used: formData.plant_used.trim(),
+      name: formData.name?.trim() || '',
+      plant_used: (formData.plant_used?.trim() || formData.name?.trim() || 'NA'),
       keywords: selectedKeywords.join(', '),
-      details: formData.details.trim(),
+      details: formData.details?.trim() || '',
       name_ta: formData.name_ta?.trim() || undefined,
-      plant_used_ta: formData.plant_used_ta?.trim() || undefined,
       details_ta: formData.details_ta?.trim() || undefined,
       image: formData.image || undefined,
-      stock_available: parseInt(formData.stock_available),
-      cost_per_unit: parseFloat(formData.cost_per_unit),
-      unit: (formData.pack_size && formData.pack_unit) ? `${formData.pack_size.trim()} ${formData.pack_unit}` : (formData.unit?.trim() || undefined),
+      stock_available: formData.stock_available ? parseInt(formData.stock_available) : 0,
+      cost_per_unit: formData.cost_per_unit ? parseFloat(formData.cost_per_unit) : 0,
+      unit: formData.unit?.trim() || undefined,
       seller_name: formData.seller_name?.trim() || undefined,
     };
 
@@ -275,6 +302,15 @@ mediaTypes: ['images'] as any,
       } else {
         const productId = await addProduct(productData);
         if (productId) {
+          // If we drafted variants, add them now
+          if (draftVariants.length) {
+            try {
+              const db = await import('../../lib/database');
+              for (const v of draftVariants) {
+                await db.addProductVariant(Number(productId), v);
+              }
+            } catch {}
+          }
           Alert.alert('Success', 'Product added successfully');
           await loadProducts();
           closeModal();
@@ -519,23 +555,61 @@ mediaTypes: ['images'] as any,
               numberOfLines={4}
             />
 
-            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Log details</Text>
-            <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom:12 }}>
-              <TextInput style={[styles.input, { flexBasis:'22%', flexGrow:1 }]} placeholder="Pack size (e.g., 200)" placeholderTextColor="#666" keyboardType="numeric" value={formData.pack_size} onChangeText={(v)=> setFormData({ ...formData, pack_size: v })} />
-              <TouchableOpacity style={[styles.input, { flexBasis:'22%', flexGrow:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> setUnitPickerOpen(p=>!p)}>
-                <Text style={{ color:'#333' }}>{formData.pack_unit || 'Unit'}</Text>
-                <Ionicons name="chevron-down" size={16} color="#666" />
-              </TouchableOpacity>
-              <TextInput style={[styles.input, { flexBasis:'22%', flexGrow:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={formData.cost_per_unit} onChangeText={(v)=> setFormData({ ...formData, cost_per_unit: v })} />
-              <TextInput style={[styles.input, { flexBasis:'22%', flexGrow:1 }]} placeholder="Quantity" placeholderTextColor="#666" keyboardType="numeric" value={formData.stock_available} onChangeText={(v)=> setFormData({ ...formData, stock_available: v })} />
-            </View>
-            {unitPickerOpen && (
-              <View style={{ borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginBottom:12 }}>
-                {['gms','kg','mL','Litres','Nos'].map(u => (
-                  <TouchableOpacity key={u} onPress={()=> { setFormData({ ...formData, pack_unit: u }); setUnitPickerOpen(false); }} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f0f0f0' }}>
-                    <Text style={{ color:'#333' }}>{u}</Text>
-                  </TouchableOpacity>
+            {/* Variants (log details) */}
+            {!editingProduct ? (
+              <View style={{ marginTop: 8, marginBottom: 12 }}>
+                <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 6 }}>Variants</Text>
+                {draftVariants.map((v, idx) => (
+                  <View key={idx} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:8, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}>
+                    <Text style={{ color:'#333' }}>{v.label} — Rs. {v.price} • Stock: {v.stock_available}</Text>
+                    <TouchableOpacity onPress={() => setDraftVariants(prev => prev.filter((_, i) => i !== idx))}>
+                      <Ionicons name="trash" size={18} color="#d32f2f" />
+                    </TouchableOpacity>
+                  </View>
                 ))}
+                <TextInput style={styles.input} placeholder="Label (e.g., 500 g)" placeholderTextColor="#666" value={newVarLabel} onChangeText={setNewVarLabel} />
+                <View style={{ flexDirection:'row', gap:8 }}>
+                  <TextInput style={[styles.input, { flex:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={newVarPrice} onChangeText={setNewVarPrice} />
+                  <TextInput style={[styles.input, { flex:1 }]} placeholder="Stock" placeholderTextColor="#666" keyboardType="numeric" value={newVarStock} onChangeText={setNewVarStock} />
+                </View>
+                <TouchableOpacity style={[styles.saveButton, { marginTop: 8 }]} onPress={() => {
+                  if (!newVarLabel.trim() || !newVarPrice.trim()) return;
+                  setDraftVariants(prev => [...prev, { label: newVarLabel.trim(), price: Number(newVarPrice), stock_available: Number(newVarStock||0) }]);
+                  setNewVarLabel(''); setNewVarPrice(''); setNewVarStock('');
+                }}>
+                  <Text style={styles.saveButtonText}>Add Variant</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* Variants in editor (only when editing existing product) */}
+            {editingProduct && (
+              <View style={{ marginTop: 8, marginBottom: 12 }}>
+                <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 6 }}>Variants</Text>
+                {variants.map(v => (
+                  <View key={v.id} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:8, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}>
+                    <Text style={{ color:'#333' }}>{v.label} — Rs. {v.price} • Stock: {v.stock_available}</Text>
+                    <TouchableOpacity onPress={async ()=> { await (await import('../../lib/database')).deleteProductVariant(Number(v.id)); const list = await (await import('../../lib/database')).getProductVariants(Number(variantsProductId)); setVariants(list as any[]); }}>
+                      <Ionicons name="trash" size={18} color="#d32f2f" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <TextInput style={styles.input} placeholder="Label (e.g., 500 g)" placeholderTextColor="#666" value={newVarLabel} onChangeText={setNewVarLabel} />
+                <View style={{ flexDirection:'row', gap:8 }}>
+                  <TextInput style={[styles.input, { flex:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={newVarPrice} onChangeText={setNewVarPrice} />
+                  <TextInput style={[styles.input, { flex:1 }]} placeholder="Stock" placeholderTextColor="#666" keyboardType="numeric" value={newVarStock} onChangeText={setNewVarStock} />
+                </View>
+                <TouchableOpacity style={[styles.saveButton, { marginTop: 8 }]} onPress={async ()=>{
+                  if (!variantsProductId || !newVarLabel.trim() || !newVarPrice.trim()) return;
+                  const ok = await (await import('../../lib/database')).addProductVariant(Number(variantsProductId), { label: newVarLabel.trim(), price: Number(newVarPrice), stock_available: Number(newVarStock||0) });
+                  if (ok) {
+                    const list = await (await import('../../lib/database')).getProductVariants(Number(variantsProductId));
+                    setVariants(list as any[]);
+                    setNewVarLabel(''); setNewVarPrice(''); setNewVarStock('');
+                  }
+                }}>
+                  <Text style={styles.saveButtonText}>Add Variant</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -661,6 +735,7 @@ mediaTypes: ['images'] as any,
           <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
       </Modal>
+
 
       {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
       <View style={{ height: 10 }} />

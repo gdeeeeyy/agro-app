@@ -26,9 +26,9 @@ interface CartContextType {
   cartTotal: number;
   itemCount: number;
   loading: boolean;
-  addItem: (productId: number, quantity?: number) => Promise<boolean>;
-  updateQuantity: (productId: number, quantity: number) => Promise<boolean>;
-  removeItem: (productId: number) => Promise<boolean>;
+  addItem: (productId: number, quantity?: number, variantId?: number) => Promise<boolean>;
+  updateQuantity: (productId: number, quantity: number, variantId?: number) => Promise<boolean>;
+  removeItem: (productId: number, variantId?: number) => Promise<boolean>;
   clearAll: () => Promise<boolean>;
   refreshCart: () => Promise<void>;
 }
@@ -63,11 +63,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addItem = async (productId: number, quantity: number = 1): Promise<boolean> => {
+  const addItem = async (productId: number, quantity: number = 1, variantId?: number): Promise<boolean> => {
     if (!user) return false;
 
     try {
-      const success = await addToCart(user.id, productId, quantity);
+      const success = await addToCart(user.id, productId, quantity, variantId);
       if (success) {
         await loadCart();
       }
@@ -78,11 +78,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateQuantity = async (productId: number, quantity: number): Promise<boolean> => {
+  const updateQuantity = async (productId: number, quantity: number, variantId?: number): Promise<boolean> => {
     if (!user) return false;
 
     try {
-      const success = await updateCartItemQuantity(user.id, productId, quantity);
+      const success = await updateCartItemQuantity(user.id, productId, quantity, variantId);
       if (success) {
         await loadCart();
       }
@@ -93,11 +93,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const removeItem = async (productId: number): Promise<boolean> => {
+  const removeItem = async (productId: number, variantId?: number): Promise<boolean> => {
     if (!user) return false;
 
     try {
-      const success = await removeFromCart(user.id, productId);
+      const success = await removeFromCart(user.id, productId, variantId);
       if (success) {
         await loadCart();
       }

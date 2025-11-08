@@ -35,6 +35,7 @@ export default function App() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
   const [othersName, setOthersName] = useState('');
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -222,24 +223,24 @@ mediaTypes: ['images'] as any,
 
         <View style={styles.imagePickerSection}>
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.actionButton} onPress={async () => {
-              if (Platform.OS === 'ios') {
-                ActionSheetIOS.showActionSheetWithOptions({ options: ['Cancel', t('scanner.takePhoto'), t('scanner.gallery')], cancelButtonIndex: 0 }, async (idx) => {
-                  if (idx === 1) await takePhoto();
-                  if (idx === 2) await pickImageFromGallery();
-                });
-              } else {
-                Alert.alert(t('scanner.chooseSource'), undefined, [
-                  { text: t('scanner.takePhoto'), onPress: takePhoto },
-                  { text: t('scanner.gallery'), onPress: pickImageFromGallery },
-                  { text: t('common.cancel'), style: 'cancel' },
-                ]);
-              }
-            }}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setPhotoMenuOpen(o=>!o)}>
               <Ionicons name="image" size={24} color="#fff" />
               <Text style={styles.actionButtonText}>Add photo</Text>
+              <Ionicons name={photoMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#fff" style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           </View>
+          {photoMenuOpen && (
+            <View style={styles.dropdown}>
+              <TouchableOpacity style={styles.dropdownRow} onPress={async ()=> { setPhotoMenuOpen(false); await pickImageFromGallery(); }}>
+                <Ionicons name="images" size={18} color="#2d5016" />
+                <Text style={styles.dropdownText}>{t('scanner.gallery')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dropdownRow} onPress={async ()=> { setPhotoMenuOpen(false); await takePhoto(); }}>
+                <Ionicons name="camera" size={18} color="#2d5016" />
+                <Text style={styles.dropdownText}>{t('scanner.takePhoto')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {image && <Image source={{ uri: image }} style={styles.image} />}
@@ -398,9 +399,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
-    flex: 1,
   },
+  dropdown: { marginTop: 8, backgroundColor:'#fff', borderRadius: 10, borderWidth:1, borderColor:'#e0e0e0', overflow:'hidden' },
+  dropdownRow: { flexDirection:'row', alignItems:'center', gap:10, paddingVertical:12, paddingHorizontal:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' },
+  dropdownText: { color:'#2d5016', fontWeight:'700' },
   actionButtonText: {
     color: '#fff',
     fontSize: 16,

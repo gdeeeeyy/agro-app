@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,8 +16,10 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCart } from '../context/CartContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getProductVariants } from '../lib/database';
 
 interface Product {
   id: number;
@@ -35,14 +37,31 @@ interface ProductCardProps {
   onPress?: () => void;
   listOnlyDescription?: boolean;
   compact?: boolean;
+  horizontal?: boolean;
 }
 
-export default function ProductCard({ product, onPress, listOnlyDescription, compact = false }: ProductCardProps) {
+export default function ProductCard({ product, onPress, listOnlyDescription, compact = false, horizontal = false }: ProductCardProps) {
   const { addItem } = useCart();
   const { t, currentLanguage } = useLanguage();
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | undefined>(undefined);
+  const [unitOpen, setUnitOpen] = useState(false);
   const placeholderImage = 'https://via.placeholder.com/800x600?text=Agri+Product';
   const productImage = product.image || placeholderImage;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const vs = await getProductVariants(product.id) as any[];
+        setVariants(vs);
+        if (vs && vs[0]) setSelectedVariantId(Number(vs[0].id));
+      } catch {}
+    })();
+  }, [product.id]);
+
+  const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
+  const displayPrice = selectedVariant ? Number(selectedVariant.price) : Number(product.cost_per_unit);
 
   const handleAddToCart = async () => {
     if (product.stock_available <= 0) {
@@ -53,7 +72,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
       Alert.alert(t('common.error'), t('cart.invalidQuantity'));
       return;
     }
-    const success = await addItem(product.id, selectedQuantity);
+    const success = await addItem(product.id, selectedQuantity, selectedVariantId);
     if (success) {
       Alert.alert(t('common.success'), t('store.addedToCart'));
     } else {
@@ -107,20 +126,21 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   const Unit = (product as any).unit || 'units';
 
   return (
-    <TouchableOpacity style={[styles.card, compact && styles.cardCompact]} onPress={onPress || openDetails}>
+    <TouchableOpacity style={[styles.card, horizontal ? styles.cardHorizontal : null, compact && styles.cardCompact]} onPress={onPress || openDetails}>
       {!listOnlyDescription && (
-        <Image source={{ uri: productImage }} style={[styles.image, compact && styles.imageCompact]} />
+        <Image source={{ uri: productImage }} style={[horizontal ? styles.imageSquareSmall : styles.image, compact && !horizontal && styles.imageCompact]} />
       )}
       
-      <View style={[styles.content, compact && styles.contentCompact]}>
+      <View style={[horizontal ? styles.contentRight : styles.content, compact && styles.contentCompact]}>
+        {horizontal ? null : (
+          !compact && !listOnlyDescription ? (
+            <Text style={styles.plantUsed} numberOfLines={1}>
+              {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
+            </Text>
+          ) : null
+        )}
         
-        {!compact && !listOnlyDescription ? (
-          <Text style={styles.plantUsed} numberOfLines={1}>
-            {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
-          </Text>
-        ) : null}
-        
-        {!compact && (
+        {!compact && !horizontal && (
           <Text style={styles.details} numberOfLines={listOnlyDescription ? 6 : 3}>
             {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
           </Text>
@@ -131,49 +151,44 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
-            <Text style={[styles.price, compact && styles.priceCompact]}>Rs. {product.cost_per_unit}{(product as any).unit ? `/${(product as any).unit}` : ''}</Text>
-            <Text style={styles.stock} numberOfLines={1}>
-              {product.stock_available > 0 
-                ? `Stock: ${product.stock_available}`
-                : t('store.outOfStock')}
-            </Text>
-            <View style={styles.bottomRow}>
-              <View style={styles.inlineQuantity}>
-                <TouchableOpacity
-                  style={[styles.qtyBtn, compact && styles.qtyBtnCompact]}
-                  onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
-                  disabled={product.stock_available <= 0}
-                >
-                  <Ionicons name="remove" size={14} color="#4caf50" />
+            <Text style={[styles.price, compact && styles.priceCompact]}>Rs. {displayPrice}{selectedVariant ? ` / ${selectedVariant.label}` : ''}</Text>
+            {variants.length > 0 && (
+              <View style={{ marginTop: 6 }}>
+                <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
+                  <Text style={styles.unitSelectorText}>
+                    {selectedVariant ? selectedVariant.label : 'Select unit'}
+                  </Text>
+                  <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
                 </TouchableOpacity>
-                <TextInput
-                  style={[styles.qtyInput, compact && styles.qtyInputCompact]}
-                  value={String(selectedQuantity)}
-                  onChangeText={(txt) => {
-                    const n = parseInt(txt) || 1;
-                    setSelectedQuantity(Math.max(1, Math.min(product.stock_available, n)));
-                  }}
-                  keyboardType="numeric"
-                  underlineColorAndroid="transparent"
-                  placeholderTextColor="#777"
-                  selectionColor="#4caf50"
-                  allowFontScaling={false}
-                />
-                <TouchableOpacity
-                  style={[styles.qtyBtn, compact && styles.qtyBtnCompact]}
-                  onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}
-                  disabled={product.stock_available <= 0}
-                >
-                  <Ionicons name="add" size={14} color="#4caf50" />
+                {unitOpen && (
+                  <View style={styles.unitDropdown}>
+                    {variants.map(v => (
+                      <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
+                        <Text style={styles.unitItemText}>{v.label} — Rs. {v.price}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+            <View style={styles.bottomRow}>
+              {/* Quantity control (left) */}
+              <View style={styles.qtyPill}>
+                <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}>
+                  <Ionicons name="remove" size={16} color="#2d5016" />
+                </TouchableOpacity>
+                <Text style={styles.qtyText}>{selectedQuantity}</Text>
+                <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}>
+                  <Ionicons name="add" size={16} color="#2d5016" />
                 </TouchableOpacity>
               </View>
-
+              {/* Add button (right) */}
               <TouchableOpacity
                 style={[styles.fabAdd, compact && styles.fabAddCompact, product.stock_available <= 0 && styles.addButtonDisabled]}
                 onPress={handleAddToCart}
                 disabled={product.stock_available <= 0}
               >
-                <Ionicons name="add" size={22} color={product.stock_available <= 0 ? '#999' : '#fff'} />
+                <Ionicons name="add" size={20} color={product.stock_available <= 0 ? '#999' : '#fff'} />
               </TouchableOpacity>
             </View>
           </View>
@@ -182,43 +197,100 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
       <Modal
         visible={detailsVisible}
-        transparent={true}
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={closeDetails}
       >
-        <View style={styles.sheetOverlay}>
-          <Pressable style={styles.backdrop} onPress={closeDetails} />
-          <Animated.View
-            style={[
-              styles.bottomSheet,
-              { transform: [{ translateY: sheetTranslateY }] },
-            ]}
-            {...panResponder.panHandlers}
-          >
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.modalTitle} numberOfLines={2}>
-                {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
-              </Text>
-              <TouchableOpacity onPress={closeDetails}>
-                <Ionicons name="close" size={22} color="#333" />
+        <SafeAreaView style={{ backgroundColor:'#fff' }} />
+        <ScrollView style={{ padding: 16 }} contentContainerStyle={{ paddingBottom: 24 }}>
+          <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
+            <Text style={styles.modalTitle} numberOfLines={2}>
+              {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+            </Text>
+            <TouchableOpacity onPress={closeDetails}>
+              <Ionicons name="close" size={22} color="#333" />
+            </TouchableOpacity>
+          </View>
+          <Image source={{ uri: productImage }} style={styles.fullImageSquare} resizeMode="cover" />
+
+          {/* Price row */}
+          <View style={{ paddingTop: 10, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+            <Text style={{ color:'#2d5016', fontWeight:'700' }}>Rs. {displayPrice}{selectedVariant ? ` / ${selectedVariant.label}` : ''}</Text>
+            {(product as any).seller_name ? (
+              <Text style={{ color:'#666' }}>Seller: {(product as any).seller_name}</Text>
+            ) : null}
+          </View>
+
+          {/* Product Name field */}
+          <Text style={{ fontWeight:'700', color:'#2d5016', marginTop: 12, marginBottom: 6 }}>Product Name</Text>
+          <View style={{ backgroundColor:'#eaf6ef', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12 }}>
+            <Text style={{ fontSize: 15, color:'#0b1d0b' }} numberOfLines={2}>
+              {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+            </Text>
+          </View>
+
+          {/* Variant picker field */}
+          {variants.length > 0 && (
+            <>
+              <View style={{ height: 10 }} />
+              <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
+                <Text style={styles.unitSelectorText}>
+                  {selectedVariant ? `${selectedVariant.label} — Rs. ${selectedVariant.price}` : 'Select unit'}
+                </Text>
+                <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
+              </TouchableOpacity>
+              {unitOpen && (
+                <View style={styles.unitDropdown}>
+                  {variants.map(v => (
+                    <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
+                      <Text style={styles.unitItemText}>{v.label} — Rs. {v.price}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Description field */}
+          <Text style={{ fontWeight:'700', color:'#2d5016', marginTop: 12, marginBottom: 6 }}>Description</Text>
+          <View style={{ backgroundColor:'#eaf6ef', borderRadius: 12, padding: 12 }}>
+            <Text style={{ fontSize: 14, color:'#0b1d0b' }}>
+              {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
+            </Text>
+          </View>
+
+          {/* Seller Name field */}
+          {(product as any).seller_name ? (
+            <>
+              <Text style={{ fontWeight:'700', color:'#2d5016', marginTop: 12, marginBottom: 6 }}>Seller Name</Text>
+              <View style={{ backgroundColor:'#eaf6ef', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12 }}>
+                <Text style={{ fontSize: 15, color:'#0b1d0b' }}>{(product as any).seller_name}</Text>
+              </View>
+            </>
+          ) : null}
+
+          <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginTop: 16 }}>
+            {/* Stock/quantity control (left) */}
+            <View style={[styles.qtyPill, { paddingHorizontal: 16, height: 44, borderRadius: 12 }]}>
+              <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}>
+                <Ionicons name="remove" size={18} color="#2d5016" />
+              </TouchableOpacity>
+              <Text style={[styles.qtyText, { fontSize: 18 }]}>{selectedQuantity}</Text>
+              <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}>
+                <Ionicons name="add" size={18} color="#2d5016" />
               </TouchableOpacity>
             </View>
-            <Image source={{ uri: productImage }} style={styles.fullImage} resizeMode="contain" />
-            <View style={{ paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-              <Text style={{ color:'#2d5016', fontWeight:'700' }}>Rs. {product.cost_per_unit}{(product as any).unit ? `/${(product as any).unit}` : ''}</Text>
-              {(product as any).seller_name ? (
-                <Text style={{ color:'#666' }}>Seller: {(product as any).seller_name}</Text>
-              ) : null}
-            </View>
-            <ScrollView style={styles.descScroll} contentContainerStyle={styles.descScrollContent}>
-              <Text style={styles.fullDetails}>
-                {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
-              </Text>
-            </ScrollView>
-            <View style={{ height: 10 }} />
-          </Animated.View>
-        </View>
+            {/* Add button (right) */}
+            <TouchableOpacity
+              style={[styles.fabAdd, product.stock_available <= 0 && styles.addButtonDisabled]}
+              onPress={handleAddToCart}
+              disabled={product.stock_available <= 0}
+            >
+              <Ionicons name="add" size={22} color={product.stock_available <= 0 ? '#999' : '#fff'} />
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+        <SafeAreaView style={{ backgroundColor:'#fff' }} />
       </Modal>
 
     </TouchableOpacity>
@@ -237,19 +309,37 @@ const styles = StyleSheet.create({
     elevation: 3,
     overflow: 'hidden',
   },
+  cardHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+  },
   image: {
     width: '100%',
-    height: 190,
+    aspectRatio: 1,
     resizeMode: 'cover',
     backgroundColor: '#eef2e6',
   },
+  imageSquareSmall: {
+    width: 88,
+    height: 88,
+    resizeMode: 'cover',
+    backgroundColor: '#eef2e6',
+    marginRight: 12,
+    borderRadius: 12,
+  },
   imageCompact: {
     height: undefined,
-    aspectRatio: 1.2,
+    aspectRatio: 1,
   },
   content: {
     padding: 12,
     gap: 6,
+  },
+  contentRight: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingRight: 12,
   },
   contentCompact: {
     padding: 12,
@@ -288,11 +378,11 @@ const styles = StyleSheet.create({
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   price: { fontSize: 16, fontWeight: '700', color: '#2d5016', marginBottom: 2 },
   priceCompact: { fontSize: 14 },
-  stock: { fontSize: 12, color: '#666', marginTop: 2 },
+  stock: { display: 'none' },
   fabAdd: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#4caf50',
     alignItems: 'center',
     justifyContent: 'center',
@@ -310,7 +400,9 @@ const styles = StyleSheet.create({
   },
   fabAddCompact: { width: 34, height: 34, borderRadius: 17 },
   qtyBtnCompact: { width: 24, height: 24, borderRadius: 12 },
-  qtyInputCompact: { width: 46, height: 30, fontSize: 15, lineHeight: 20, ...Platform.select({ android: { height: 32, lineHeight: 20 } }) },
+  qtyInputCompact: { display: 'none' },
+  qtyPill: { flexDirection:'row', alignItems:'center', gap: 12, backgroundColor:'#eaf6ef', paddingHorizontal: 12, height: 36, borderRadius: 10 },
+  qtyText: { fontSize: 16, fontWeight:'700', color:'#2d5016' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -326,7 +418,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   fullModalContainer: { paddingBottom: 24 },
-  fullImage: { width: '100%', height: 360, borderRadius: 8, backgroundColor: '#000' },
+  fullImageSquare: { width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: '#eef2e6' },
   fullModalContent: { padding: 16 },
   fullDetails: { fontSize: 14, color: '#333', lineHeight: 20 },
   descScroll: { maxHeight: 240 },
@@ -361,38 +453,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 20,
   },
-  inlineQuantity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginRight: 12,
-  },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  qtyInput: {
-    width: 54,
-    height: 34,
-    borderWidth: 1,
-    borderColor: '#bdbdbd',
-    borderRadius: 6,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    paddingVertical: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-    lineHeight: 22,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111',
-    backgroundColor: '#fff',
-    ...Platform.select({ android: { height: 36, lineHeight: 22 } }),
-  },
+  inlineQuantity: { display: 'none', flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 },
+  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
+  qtyInput: { width: 54, height: 34, borderWidth: 1, borderColor: '#bdbdbd', borderRadius: 6, textAlign: 'center', textAlignVertical: 'center', fontSize: 16, fontWeight: '700', color: '#111', backgroundColor: '#fff', ...Platform.select({ android: { height: 36, lineHeight: 22 } }) },
   quantityButton: {
     width: 40,
     height: 40,
@@ -413,6 +476,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     backgroundColor: '#f9f9f9',
   },
+  unitSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#c8e6c9', backgroundColor:'#f1f8f4', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+  unitSelectorText: { color:'#2d5016', fontWeight:'700' },
+  unitDropdown: { borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginTop:6, overflow:'hidden' },
+  unitItem: { padding:10, borderBottomWidth:1, borderBottomColor:'#f3f3f3' },
+  unitItemText: { color:'#333' },
   modalTotal: {
     fontSize: 18,
     fontWeight: '600',

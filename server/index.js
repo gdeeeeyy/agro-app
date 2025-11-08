@@ -173,6 +173,27 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUn
       name TEXT UNIQUE NOT NULL,
       name_ta TEXT
     )`);
+    // Product variants
+    await pool.query(`CREATE TABLE IF NOT EXISTS product_variants (
+      id BIGSERIAL PRIMARY KEY,
+      product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      price DOUBLE PRECISION NOT NULL,
+      stock_available INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(product_id, label)
+    )`);
+
+    // Cart variants support
+    await pool.query(`ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id)`);
+    // adjust unique to (user, product, variant)
+    try { await pool.query('ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_user_id_product_id_key'); } catch {}
+    await pool.query('DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = \'cart_items_user_product_variant_unique\') THEN ALTER TABLE cart_items ADD CONSTRAINT cart_items_user_product_variant_unique UNIQUE (user_id, product_id, variant_id); END IF; END $$;');
+
+    // Order items capture variant
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id BIGINT');
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label TEXT');
   } catch (e) { console.warn('Startup migration warning:', e.message); }
 })();
 
@@ -325,6 +346,29 @@ app.delete('/products/:id', async (req, res) => {
   const ref = await one('SELECT 1 FROM order_items WHERE product_id=$1 LIMIT 1', [req.params.id]);
   if (ref) return res.status(400).json({ error: 'cannot delete product with order history' });
   await pool.query('DELETE FROM products WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Variants
+app.get('/products/:id/variants', async (req, res) => {
+  const rows = await all('SELECT id, product_id, label, price, stock_available FROM product_variants WHERE product_id=$1 ORDER BY price ASC', [req.params.id]);
+  res.json(rows);
+});
+app.post('/products/:id/variants', async (req, res) => {
+  const { label, price, stock_available } = req.body || {};
+  const v = await one('INSERT INTO product_variants (product_id, label, price, stock_available) VALUES ($1,$2,$3,$4) RETURNING id', [req.params.id, label, Number(price), Number(stock_available||0)]);
+  res.json(v);
+});
+app.patch('/variants/:id', async (req, res) => {
+  const allowed = ['label','price','stock_available']; const set=[]; const vals=[]; let i=1;
+  for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE product_variants SET ${set.join(', ')}, updated_at=now() WHERE id=$${i}` , vals);
+  res.json({ ok: true });
+});
+app.delete('/variants/:id', async (req, res) => {
+  await pool.query('DELETE FROM product_variants WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
 
@@ -521,30 +565,35 @@ app.delete('/scan-plants/:id', async (req, res) => {
 app.get('/cart', async (req, res) => {
   const userId = Number(req.query.userId);
   res.json(await all(
-    `SELECT ci.*, p.name, p.name_ta, p.image, p.cost_per_unit, p.stock_available
-     FROM cart_items ci JOIN products p ON ci.product_id = p.id
+    `SELECT ci.*, p.name, p.name_ta, p.image,
+            COALESCE(v.price, p.cost_per_unit) as cost_per_unit,
+            COALESCE(v.label, NULL) as variant_label,
+            v.id AS variant_id
+     FROM cart_items ci
+     JOIN products p ON ci.product_id = p.id
+     LEFT JOIN product_variants v ON ci.variant_id = v.id
      WHERE ci.user_id = $1 ORDER BY ci.created_at DESC`, [userId]
   ));
 });
 
 app.post('/cart/add', async (req, res) => {
-  const { userId, productId, quantity } = req.body || {};
-  const ex = await one('SELECT 1 FROM cart_items WHERE user_id=$1 AND product_id=$2', [userId, productId]);
-  if (ex) await pool.query('UPDATE cart_items SET quantity = quantity + $1 WHERE user_id=$2 AND product_id=$3', [quantity || 1, userId, productId]);
-  else await pool.query('INSERT INTO cart_items (user_id, product_id, quantity) VALUES ($1,$2,$3)', [userId, productId, quantity || 1]);
+  const { userId, productId, quantity, variantId } = req.body || {};
+  const ex = await one('SELECT 1 FROM cart_items WHERE user_id=$1 AND product_id=$2 AND (variant_id IS NOT DISTINCT FROM $3)', [userId, productId, variantId || null]);
+  if (ex) await pool.query('UPDATE cart_items SET quantity = quantity + $1 WHERE user_id=$2 AND product_id=$3 AND (variant_id IS NOT DISTINCT FROM $4)', [quantity || 1, userId, productId, variantId || null]);
+  else await pool.query('INSERT INTO cart_items (user_id, product_id, quantity, variant_id) VALUES ($1,$2,$3,$4)', [userId, productId, quantity || 1, variantId || null]);
   res.json({ ok: true });
 });
 
 app.patch('/cart/item', async (req, res) => {
-  const { userId, productId, quantity } = req.body || {};
-  if (quantity <= 0) await pool.query('DELETE FROM cart_items WHERE user_id=$1 AND product_id=$2', [userId, productId]);
-  else await pool.query('UPDATE cart_items SET quantity=$1 WHERE user_id=$2 AND product_id=$3', [quantity, userId, productId]);
+  const { userId, productId, quantity, variantId } = req.body || {};
+  if (quantity <= 0) await pool.query('DELETE FROM cart_items WHERE user_id=$1 AND product_id=$2 AND (variant_id IS NOT DISTINCT FROM $3)', [userId, productId, variantId || null]);
+  else await pool.query('UPDATE cart_items SET quantity=$1 WHERE user_id=$2 AND product_id=$3 AND (variant_id IS NOT DISTINCT FROM $4)', [quantity, userId, productId, variantId || null]);
   res.json({ ok: true });
 });
 
 app.delete('/cart/item', async (req, res) => {
-  const { userId, productId } = req.body || {};
-  await pool.query('DELETE FROM cart_items WHERE user_id=$1 AND product_id=$2', [userId, productId]);
+  const { userId, productId, variantId } = req.body || {};
+  await pool.query('DELETE FROM cart_items WHERE user_id=$1 AND product_id=$2 AND (variant_id IS NOT DISTINCT FROM $3)', [userId, productId, variantId || null]);
   res.json({ ok: true });
 });
 
@@ -567,13 +616,21 @@ app.get('/cart/total', async (req, res) => {
 app.post('/orders', async (req, res) => {
   const { userId, paymentMethod, deliveryAddress, note } = req.body || {};
   const cartItems = await all(
-    `SELECT ci.product_id, ci.quantity, p.name, p.cost_per_unit
-     FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.user_id = $1`, [userId]
+    `SELECT ci.product_id, ci.variant_id, ci.quantity, p.name,
+            COALESCE(v.price, p.cost_per_unit) as price,
+            v.label as variant_label
+     FROM cart_items ci 
+     JOIN products p ON ci.product_id = p.id 
+     LEFT JOIN product_variants v ON ci.variant_id = v.id
+     WHERE ci.user_id = $1`, [userId]
   );
   if (!cartItems.length) return res.status(400).json({ error: 'Cart is empty' });
   const total = (await one(
-    `SELECT COALESCE(SUM(ci.quantity * p.cost_per_unit),0) as total
-     FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.user_id = $1`, [userId]
+    `SELECT COALESCE(SUM(ci.quantity * COALESCE(v.price, p.cost_per_unit)),0) as total
+     FROM cart_items ci 
+     JOIN products p ON ci.product_id = p.id 
+     LEFT JOIN product_variants v ON ci.variant_id = v.id
+     WHERE ci.user_id = $1`, [userId]
   )).total || 0;
   const o = await one(
     'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
@@ -581,10 +638,11 @@ app.post('/orders', async (req, res) => {
   );
   for (const it of cartItems) {
     await pool.query(
-      'INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit) VALUES ($1,$2,$3,$4,$5)',
-      [o.id, it.product_id, it.name, it.quantity, it.cost_per_unit]
+      'INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit, variant_id, variant_label) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [o.id, it.product_id, it.name, it.quantity, it.price, it.variant_id || null, it.variant_label || null]
     );
-    await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
+    if (it.variant_id) await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
+    else await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
   }
   await pool.query('DELETE FROM cart_items WHERE user_id=$1', [userId]);
   res.json({ id: o.id });
