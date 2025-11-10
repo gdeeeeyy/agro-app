@@ -86,17 +86,33 @@ export default function MastersPests() {
     })();
   }, [selectedCropId]);
 
+  const [cropPickerOpen, setCropPickerOpen] = useState(false);
   const CropSelector = () => (
     <View style={[styles.row, { marginBottom: 8, alignItems:'center' }]}>
       <TouchableOpacity style={[styles.input, { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-        onPress={() => {
-          if (!crops.length) return;
-          const idx = crops.findIndex(c=> Number(c.id)===selectedCropId);
-          const next = crops[(idx+1)%crops.length]; setSelectedCropId(Number(next.id));
-        }}>
+        onPress={() => setCropPickerOpen(true)}>
         <Text>{(crops.find(c=>Number(c.id)===selectedCropId)||{}).name || 'Select Crop'}</Text>
         <Ionicons name="chevron-down" size={18} color="#666" />
       </TouchableOpacity>
+      <Modal visible={cropPickerOpen} transparent animationType="fade" onRequestClose={()=> setCropPickerOpen(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ width: '92%', maxHeight: '70%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>Select Crop</Text>
+              <TouchableOpacity onPress={()=> setCropPickerOpen(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }}>
+              {crops.map((c:any)=> (
+                <TouchableOpacity key={c.id} style={{ paddingVertical: 12, borderBottomWidth:1, borderBottomColor:'#f0f0f0' }} onPress={()=> { setSelectedCropId(Number(c.id)); setCropPickerOpen(false); }}>
+                  <Text style={{ color:'#333' }}>{c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
@@ -186,12 +202,15 @@ export default function MastersPests() {
                   <View style={{ flexDirection:'row', gap: 8 }}>
                     <TouchableOpacity style={styles.savePrimaryBtn} onPress={async ()=>{
                       const curr = pestsEn.find(x=> x.id===p.id);
-                      if (!curr) return;
-                      if (pestLang==='en') {
-                        await updateCropPest(p.id, { name: curr.name, description: curr.description, management: curr.management });
-                      } else {
-                        await updateCropPest(p.id, { name_ta: curr.name_ta, description_ta: curr.description_ta, management_ta: curr.management_ta });
-                      }
+                      if (!curr || !selectedCropId) return;
+                      await addCropPestBoth(Number(selectedCropId), {
+                        name_en: curr.name || undefined,
+                        name_ta: curr.name_ta || undefined,
+                        description_en: curr.description || undefined,
+                        description_ta: curr.description_ta || undefined,
+                        management_en: curr.management || undefined,
+                        management_ta: curr.management_ta || undefined,
+                      });
                       setEditingPestId(null);
                       const ps = await listCropPests(Number(selectedCropId), 'en') as any[]; setPestsEn(ps);
                     }}>
@@ -318,12 +337,15 @@ export default function MastersPests() {
                   <View style={{ flexDirection:'row', gap: 8 }}>
                     <TouchableOpacity style={styles.savePrimaryBtn} onPress={async ()=>{
                       const curr = diseasesEn.find(x=> x.id===d.id);
-                      if (!curr) return;
-                      if (diseaseLang==='en') {
-                        await updateCropDisease(d.id, { name: curr.name, description: curr.description, management: curr.management });
-                      } else {
-                        await updateCropDisease(d.id, { name_ta: curr.name_ta, description_ta: curr.description_ta, management_ta: curr.management_ta });
-                      }
+                      if (!curr || !selectedCropId) return;
+                      await addCropDiseaseBoth(Number(selectedCropId), {
+                        name_en: curr.name || undefined,
+                        name_ta: curr.name_ta || undefined,
+                        description_en: curr.description || undefined,
+                        description_ta: curr.description_ta || undefined,
+                        management_en: curr.management || undefined,
+                        management_ta: curr.management_ta || undefined,
+                      });
                       setEditingDiseaseId(null);
                       const ds = await listCropDiseases(Number(selectedCropId), 'en') as any[]; setDiseasesEn(ds);
                     }}>

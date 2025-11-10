@@ -1,9 +1,16 @@
-import * as SQLite from "expo-sqlite";
+import { Platform } from 'react-native';
 import { api, API_URL } from './api';
 
-const db = SQLite.openDatabaseSync("agroappDatabase.db");
+let SQLite: any = null as any;
+if (Platform.OS !== 'web') {
+  // Lazy require to avoid importing expo-sqlite on web
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  SQLite = require('expo-sqlite');
+}
 
-(async () => {
+const db: any = Platform.OS !== 'web' ? SQLite.openDatabaseSync("agroappDatabase.db") : null;
+
+if (Platform.OS !== 'web') (async () => {
   // Always ensure local schema exists so we can fall back if remote API is unavailable
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
@@ -190,6 +197,13 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
 
     // variants tables (local)
     await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS logistics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        tracking_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS product_variants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
@@ -250,6 +264,7 @@ const db = SQLite.openDatabaseSync("agroappDatabase.db");
 
 export async function savePlant(userId: number, name: string, imageUri: string, result: string) {
   try {
+    if (Platform.OS === 'web') return; // no-op on web
     await db.runAsync("INSERT INTO plants (user_id, name, imageUri, result) VALUES (?, ?, ?, ?)",
       userId,
       name,
@@ -263,6 +278,7 @@ export async function savePlant(userId: number, name: string, imageUri: string, 
 
 export async function getAllPlants(userId: number) {
   try {
+    if (Platform.OS === 'web') return [];
     const rows = await db.getAllAsync("SELECT * FROM plants WHERE user_id = ? ORDER BY id DESC", userId);
     return rows;
   } catch (err) {
@@ -785,6 +801,35 @@ export async function deleteOrder(orderId: number) {
   }
 }
 
+// Logistics functions
+export async function listLogistics() {
+  try {
+    if (API_URL) {
+      try { return await api.get('/logistics'); } catch {}
+    }
+    const rows = await db.getAllAsync("SELECT * FROM logistics ORDER BY name ASC");
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
+export async function addLogistic(name: string, tracking_url?: string) {
+  try {
+    if (API_URL) {
+      try { const res = await api.post('/logistics', { name, tracking_url }); return (res as any)?.id || null; } catch {}
+    }
+    const r = await db.runAsync("INSERT INTO logistics (name, tracking_url) VALUES (?, ?)", name, tracking_url || null);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+
+export async function deleteLogistic(id: number) {
+  try {
+    if (API_URL) { try { await api.del(`/logistics/${id}`); return true; } catch {} }
+    await db.runAsync("DELETE FROM logistics WHERE id = ?", id);
+    return true;
+  } catch (err) { console.error('SQLite delete error:', err); return false; }
+}
+
 // Crops functions
 export async function getAllCrops() {
   try {
@@ -889,7 +934,7 @@ export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') 
 }
 export async function updateCropPest(pestId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
-    // Remote API has no update route; fall back to local
+    if (API_URL) { try { await api.patch(`/pests/${pestId}`, fields); return true; } catch {/* fall back */} }
     const sets: string[] = []; const vals: any[] = [];
     Object.entries(fields).forEach(([k,v]) => { if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); } });
     if (!sets.length) return true;
@@ -957,6 +1002,7 @@ export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en
 }
 export async function updateCropDisease(diseaseId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
+    if (API_URL) { try { await api.patch(`/diseases/${diseaseId}`, fields); return true; } catch {/* fall back */} }
     const sets: string[] = []; const vals: any[] = [];
     Object.entries(fields).forEach(([k,v]) => { if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); } });
     if (!sets.length) return true;
@@ -1034,21 +1080,17 @@ export async function deleteCropDiseaseImage(imageId: number) {
   } catch (err) { console.error('SQLite delete error:', err); return false; }
 }
 
-export async function deleteCropPest(pestId: number) {
+export async function deleteCropPest(imageId: number) {
   try {
-    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
-      try { await api.del(`/pests/${pestId}`); } catch {/* ignore */}
-    }
-    await db.runAsync("DELETE FROM crop_pests WHERE id = ?", pestId);
+    if (API_URL) { try { await api.del(`/pests/${imageId}`); } catch {/* fall back to local */} }
+    await db.runAsync("DELETE FROM crop_pests WHERE id = ?", imageId);
     return true;
   } catch (err) { console.error('SQLite delete error:', err); return false; }
 }
 
 export async function deleteCropDisease(diseaseId: number) {
   try {
-    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
-      try { await api.del(`/diseases/${diseaseId}`); } catch {/* ignore */}
-    }
+    if (API_URL) { try { await api.del(`/diseases/${diseaseId}`); } catch {/* fall back to local */} }
     await db.runAsync("DELETE FROM crop_diseases WHERE id = ?", diseaseId);
     return true;
   } catch (err) { console.error('SQLite delete error:', err); return false; }

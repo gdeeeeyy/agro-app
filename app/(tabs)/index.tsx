@@ -247,9 +247,24 @@ export default function Home() {
 
                 InteractionManager.runAfterInteractions(async () => {
                   try {
-                    const g = await getCropGuide(Number(id), lang);
+                    const [g, pests, diseases] = await Promise.all([
+                      getCropGuide(Number(id), lang),
+                      listCropPests(Number(id), lang) as any,
+                      listCropDiseases(Number(id), lang) as any,
+                    ]);
                     setSheetGuide((g as any)?.cultivation_guide || null);
-                    // Pests and diseases are managed in Saved sections; do not fetch or show here.
+                    const pestArr = Array.isArray(pests) ? pests : [];
+                    const diseaseArr = Array.isArray(diseases) ? diseases : [];
+                    setSheetPests(pestArr);
+                    setSheetDiseases(diseaseArr);
+
+                    // Fetch images after content is shown
+                    const pestImgsEntries = await Promise.all(pestArr.map(async (p: any) => [p.id, await listCropPestImages(Number(p.id))] as const));
+                    const diseaseImgsEntries = await Promise.all(diseaseArr.map(async (d: any) => [d.id, await listCropDiseaseImages(Number(d.id))] as const));
+                    const pim: Record<number, any[]> = {}; pestImgsEntries.forEach(([pid, imgs]) => { pim[pid] = imgs as any[]; });
+                    const dim: Record<number, any[]> = {}; diseaseImgsEntries.forEach(([did, imgs]) => { dim[did] = imgs as any[]; });
+                    setSheetPestImages(pim);
+                    setSheetDiseaseImages(dim);
                   } finally {
                     setSheetLoading(false);
                   }
@@ -326,11 +341,82 @@ export default function Home() {
                   <Image source={sheetCrop.image ? { uri: sheetCrop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 220 }} />
                   <View style={{ padding: 16 }}>
                     <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{currentLanguage==='ta' && sheetCrop.name_ta ? sheetCrop.name_ta : sheetCrop.name}</Text>
-                    <View style={{ borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 10, padding: 12, marginTop: 10 }}>
-                      <Text style={{ color: '#99a598', fontWeight: '700' }}>{t('guide.cultivationTitle')}</Text>
+                    <View style={styles.guideBox}>
+                      <Text style={styles.guideLabel}>{t('guide.cultivationTitle')}</Text>
                       <Text style={{ marginTop: 6, color: '#333' }}>{sheetGuide || 'No cultivation guide yet.'}</Text>
                     </View>
 
+                    {/* Pests */}
+                    {sheetPests.length ? (
+                      <View style={styles.guideBox}>
+                        <Text style={styles.guideLabel}>{t('guide.pestsTitle') || 'Pests'}</Text>
+                        {sheetPests.map((p:any) => (
+                          <View key={p.id} style={styles.guideItem}>
+                            <Text style={{ fontWeight:'700', color:'#2d5016' }}>{p.name_ta && currentLanguage==='ta' ? p.name_ta : p.name}</Text>
+                            {p.description || p.description_ta ? (
+                              <>
+                                <Text style={[styles.guideLabel, { marginTop:6 }]}>{t('guide.description')}</Text>
+                                <Text style={{ color:'#333', marginTop:2 }}>{currentLanguage==='ta' && p.description_ta ? p.description_ta : p.description}</Text>
+                              </>
+                            ) : null}
+                            {Array.isArray(sheetPestImages[p.id]) && sheetPestImages[p.id].length ? (
+                              <>
+                                <Text style={[styles.guideLabel, { marginTop:6 }]}>{t('guide.images')}</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 10, paddingRight: 6 }}>
+                                  {sheetPestImages[p.id].map((img:any) => (
+                                    <TouchableOpacity key={img.id} onPress={()=> setViewImg({ uri: img.image, caption: currentLanguage==='ta' && img.caption_ta ? img.caption_ta : img.caption })}>
+                                      <Image source={{ uri: img.image }} style={{ width: 92, height: 92, borderRadius: 8 }} />
+                                    </TouchableOpacity>
+                                  ))}
+                                </ScrollView>
+                              </>
+                            ) : null}
+                            {p.management || p.management_ta ? (
+                              <>
+                                <Text style={[styles.guideLabel, { marginTop:6 }]}>{t('guide.management')}</Text>
+                                <Text style={{ color:'#333', marginTop:2 }}>{currentLanguage==='ta' && p.management_ta ? p.management_ta : p.management}</Text>
+                              </>
+                            ) : null}
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {/* Diseases */}
+                    {sheetDiseases.length ? (
+                      <View style={styles.guideBox}>
+                        <Text style={styles.guideLabel}>{t('guide.diseasesTitle') || 'Diseases'}</Text>
+                        {sheetDiseases.map((d:any) => (
+                          <View key={d.id} style={styles.guideItem}>
+                            <Text style={{ fontWeight:'700', color:'#2d5016' }}>{currentLanguage==='ta' && d.name_ta ? d.name_ta : d.name}</Text>
+                            {d.description || d.description_ta ? (
+                              <>
+                                <Text style={[styles.guideLabel, { marginTop:6 }]}>{t('guide.description')}</Text>
+                                <Text style={{ color:'#333', marginTop:2 }}>{currentLanguage==='ta' && d.description_ta ? d.description_ta : d.description}</Text>
+                              </>
+                            ) : null}
+                            {Array.isArray(sheetDiseaseImages[d.id]) && sheetDiseaseImages[d.id].length ? (
+                              <>
+                                <Text style={[styles.guideLabel, { marginTop:6 }]}>{t('guide.images')}</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }} contentContainerStyle={{ gap: 10, paddingRight: 6 }}>
+                                  {sheetDiseaseImages[d.id].map((img:any) => (
+                                    <TouchableOpacity key={img.id} onPress={()=> setViewImg({ uri: img.image, caption: currentLanguage==='ta' && img.caption_ta ? img.caption_ta : img.caption })}>
+                                      <Image source={{ uri: img.image }} style={{ width: 92, height: 92, borderRadius: 8 }} />
+                                    </TouchableOpacity>
+                                  ))}
+                                </ScrollView>
+                              </>
+                            ) : null}
+                            {d.management || d.management_ta ? (
+                              <>
+                                <Text style={[styles.guideLabel, { marginTop:6 }]}>{t('guide.management')}</Text>
+                                <Text style={{ color:'#333', marginTop:2 }}>{currentLanguage==='ta' && d.management_ta ? d.management_ta : d.management}</Text>
+                              </>
+                            ) : null}
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
 
                   </View>
                 </View>
@@ -369,6 +455,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  guideBox: { borderWidth: 1, borderColor: '#e7efe2', backgroundColor: '#f7fbf4', borderRadius: 10, padding: 12, marginTop: 10 },
+  guideLabel: { color: '#99a598', fontWeight: '700' },
+  guideItem: { marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e7efe2' },
   header: {
     backgroundColor: '#4caf50',
     paddingTop: 10,

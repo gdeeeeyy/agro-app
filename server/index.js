@@ -527,6 +527,36 @@ app.get('/diseases/:id/images', async (req, res) => {
   res.json(await all('SELECT id, image_url as image, caption, caption_ta FROM crop_disease_images WHERE disease_id=$1 ORDER BY id', [req.params.id]));
 });
 
+// Update pest/disease (for Masters management)
+app.patch('/pests/:id', async (req, res) => {
+  const allowed = ['name','name_ta','description','description_ta','management','management_ta'];
+  const set=[]; const vals=[]; let i=1;
+  for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE crop_pests SET ${set.join(', ')}, updated_at=now() WHERE id=$${i}`, vals);
+  res.json({ ok: true });
+});
+app.patch('/diseases/:id', async (req, res) => {
+  const allowed = ['name','name_ta','description','description_ta','management','management_ta'];
+  const set=[]; const vals=[]; let i=1;
+  for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE crop_diseases SET ${set.join(', ')}, updated_at=now() WHERE id=$${i}`, vals);
+  res.json({ ok: true });
+});
+
+// Delete pest/disease (for Masters management)
+app.delete('/pests/:id', async (req, res) => {
+  await pool.query('DELETE FROM crop_pests WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+app.delete('/diseases/:id', async (req, res) => {
+  await pool.query('DELETE FROM crop_diseases WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
 app.post('/keywords', async (req, res) => {
   try {
     const r = await one('INSERT INTO keywords (name) VALUES ($1) RETURNING id', [String(req.body?.name || '').toLowerCase().trim()]);

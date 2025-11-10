@@ -94,8 +94,11 @@ const translations = {
     // Guide
     'guide.cultivationShort': 'Cultivation',
     'guide.cultivationTitle': 'Cultivation Guide',
-    'guide.pests': 'Pests',
+'guide.pests': 'Pests',
     'guide.diseases': 'Diseases',
+    'guide.description': 'Description',
+    'guide.management': 'Management',
+    'guide.images': 'Images',
     
     // Plant Analysis
     'scan.title': 'Plant Analysis',
@@ -353,8 +356,11 @@ const translations = {
     // Guide
     'guide.cultivationShort': 'வளர்ப்பு',
     'guide.cultivationTitle': 'வளர்ப்பு வழிகாட்டி',
-    'guide.pests': 'பூச்சிகள்',
+'guide.pests': 'பூச்சிகள்',
     'guide.diseases': 'நோய்கள்',
+    'guide.description': 'விளக்கம்',
+    'guide.management': 'மேலாண்மை',
+    'guide.images': 'படங்கள்',
     
     // Plant Analysis
     'scan.title': 'தாவர ஆய்வு',

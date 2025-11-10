@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
-import { getAllOrders, getOrderItems, updateOrderStatus, deleteOrder } from '../../lib/database';
+import { getAllOrders, getOrderItems, updateOrderStatus, deleteOrder, listLogistics } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
@@ -72,6 +72,8 @@ export default function AdminOrders() {
   const [showPreDropdown, setShowPreDropdown] = useState(false);
   const [showPostDropdown, setShowPostDropdown] = useState(false);
   const [stage1Choice, setStage1Choice] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
+  const [logisticsList, setLogisticsList] = useState<Array<{ id: number; name: string; tracking_url?: string }>>([]);
+  const [showLogisticsDropdown, setShowLogisticsDropdown] = useState(false);
 
   const isAdmin = (user?.is_admin || 0) >= 1;
 
@@ -88,6 +90,14 @@ export default function AdminOrders() {
     setRefreshing(true);
     await loadOrders();
     setRefreshing(false);
+  };
+
+  const computeTrackingUrl = (tpl?: string | null, num?: string) => {
+    if (!tpl) return '';
+    if (!num) return tpl;
+    if (tpl.includes('{tracking}')) return tpl.replace('{tracking}', num);
+    if (tpl.includes('%s')) return tpl.replace('%s', num);
+    return tpl.endsWith('/') ? tpl + num : `${tpl}${tpl.includes('?') ? '' : '/'}${num}`;
   };
 
   const handleUpdateOrder = async (order: Order) => {
@@ -108,6 +118,7 @@ export default function AdminOrders() {
 
     setShowPreDropdown(false);
     setShowPostDropdown(false);
+    try { const rows = await listLogistics(); setLogisticsList((rows as any[]) as any); } catch {}
     setModalVisible(true);
   };
 
@@ -435,27 +446,31 @@ export default function AdminOrders() {
                 </View>
 
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Logistics (Optional)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Logistics name (e.g., Delhivery, BlueDart)"
-                    value={logisticsName}
-                    onChangeText={setLogisticsName}
-                  />
+                  <Text style={styles.sectionTitle}>Logistics</Text>
+                  <TouchableOpacity style={styles.dropdownTrigger} onPress={()=> setShowLogisticsDropdown(v=> !v)}>
+                    <Ionicons name="trail-sign" size={18} color="#4caf50" />
+                    <Text style={styles.dropdownTriggerText}>{logisticsName || 'Select carrier'}</Text>
+                    <Ionicons name={showLogisticsDropdown? 'chevron-up':'chevron-down'} size={18} color="#4caf50" />
+                  </TouchableOpacity>
+                  {showLogisticsDropdown && (
+                    <View style={styles.dropdownPanel}>
+                      {logisticsList.length===0 ? (
+                        <View style={{ padding:12 }}><Text style={{ color:'#666' }}>No carriers yet. Add in Masters → Manage Logistics.</Text></View>
+                      ) : logisticsList.map((l)=> (
+                        <TouchableOpacity key={l.id} style={styles.dropdownItem} onPress={()=> { setLogisticsName(l.name); setShowLogisticsDropdown(false); setTrackingUrl(computeTrackingUrl(l.tracking_url, trackingNumber)); }}>
+                          <Ionicons name="cube" size={18} color="#4caf50" />
+                          <Text style={styles.dropdownItemText}>{l.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                   <TextInput
                     style={[styles.input, { marginTop: 8 }]}
                     placeholder="Tracking number"
                     value={trackingNumber}
-                    onChangeText={setTrackingNumber}
+                    onChangeText={(v)=> { setTrackingNumber(v); const tpl = (logisticsList.find(x=> x.name===logisticsName)?.tracking_url)||trackingUrl; setTrackingUrl(computeTrackingUrl(tpl, v)); }}
                   />
-                  <TextInput
-                    style={[styles.input, { marginTop: 8 }]}
-                    placeholder="Tracking URL (https://...)"
-                    autoCapitalize="none"
-                    value={trackingUrl}
-                    onChangeText={setTrackingUrl}
-                  />
-                  <Text style={styles.hint}>If URL is provided, users can tap the logistics name in their order details to open it.</Text>
+                  {!!trackingUrl && <Text style={styles.hint} numberOfLines={1}>URL: {trackingUrl}</Text>}
                 </View>
 
               </>
