@@ -488,10 +488,20 @@ const pickImage = async () => {
 
       <View style={styles.adminButtonContainer}>
         {isMaster && (
-          <TouchableOpacity style={styles.keywordsButton} onPress={() => setKeywordModalVisible(true)}>
-            <Ionicons name="pricetags" size={24} color="#fff" />
-            <Text style={styles.keywordsButtonText}>Manage Keywords</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity style={styles.keywordsButton} onPress={() => setKeywordModalVisible(true)}>
+              <Ionicons name="pricetags" size={24} color="#fff" />
+              <Text style={styles.keywordsButtonText}>Manage Keywords</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.keywordsButton} onPress={() => router.push('/masters')}>
+              <Ionicons name="shield-checkmark" size={24} color="#fff" />
+              <Text style={styles.keywordsButtonText}>Add/Manage Admins</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.keywordsButton} onPress={() => router.push('/masters')}>
+              <Ionicons name="cube" size={24} color="#fff" />
+              <Text style={styles.keywordsButtonText}>Manage Logistics</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 

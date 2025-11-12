@@ -190,6 +190,14 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
+    // Logistics carriers (for shipping/tracking)
+    await pool.query(`CREATE TABLE IF NOT EXISTS logistics (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      tracking_url TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+
     // scan_plants table for mobile Scanner Plants
     await pool.query(`CREATE TABLE IF NOT EXISTS scan_plants (
       id BIGSERIAL PRIMARY KEY,
@@ -769,6 +777,27 @@ app.post('/notifications', async (req, res) => {
   if (!title || !message) return res.status(400).json({ error: 'title and message required' });
   const r = await one('INSERT INTO notifications (title, message) VALUES ($1,$2) RETURNING id', [title, message]);
   res.json(r);
+});
+
+// Logistics APIs
+app.get('/logistics', async (req, res) => {
+  const rows = await all('SELECT * FROM logistics ORDER BY name ASC');
+  res.json(rows);
+});
+app.post('/logistics', async (req, res) => {
+  const { name, tracking_url } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
+  try {
+    const r = await one('INSERT INTO logistics (name, tracking_url) VALUES ($1,$2) RETURNING id', [String(name).trim(), tracking_url || null]);
+    res.json(r);
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
+    console.error(e); res.status(500).json({ error: 'failed' });
+  }
+});
+app.delete('/logistics/:id', async (req, res) => {
+  await pool.query('DELETE FROM logistics WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
 });
 
 app.patch('/orders/:id', async (req, res) => {

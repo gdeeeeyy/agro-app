@@ -168,7 +168,7 @@ export default function Masters() {
             <Ionicons name="pricetags" size={18} color="#4caf50" />
             <Text style={styles.masterBtnText}>Products</Text>
           </TouchableOpacity>
-          {user?.is_admin === 2 && (
+          {(isAdmin || isMaster) && (
             <>
             <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setLogisticsVisible(true); try { const rows = await listLogistics(); setLogistics(rows as any[]); } catch {} }}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
