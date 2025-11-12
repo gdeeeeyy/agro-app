@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { getAllCrops, addScanPlant, getCropGuide, listCropPests, listCropDiseases, listCropPestImages, listCropDiseaseImages, getNotifications } from '../../lib/database';
+import { initNotifications, notifyNewServerNotifications, registerPushToken } from '../../lib/systemNotify';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useContext } from 'react';
 import { UserContext } from '../../context/UserContext';
@@ -67,7 +68,12 @@ export default function Home() {
   const [notifVisible, setNotifVisible] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const loadNotifications = async () => {
-    try { const rows = await getNotifications(user?.id || undefined); setNotifications(rows as any[]); } catch {}
+    try {
+      const rows = await getNotifications(user?.id || undefined);
+      setNotifications(rows as any[]);
+      // Also surface as system notifications for new rows
+      await notifyNewServerNotifications(user?.id || null, rows as any[]);
+    } catch {}
   };
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [locationLabel, setLocationLabel] = useState<string>('');
@@ -128,14 +134,33 @@ export default function Home() {
         if (saved) setSelectedCrops(JSON.parse(saved));
         const crops = await getAllCrops() as any[];
         setAllCrops(crops);
+        // Prepare notifications permission early
+        await initNotifications();
       } catch {}
     })();
   }, []);
+
+  // Register push token when user changes
+  useEffect(() => {
+    (async () => {
+      await registerPushToken(user?.id || null);
+    })();
+  }, [user?.id]);
 
   // Kick off weather fetch once
   useEffect(() => {
     fetchWeather();
   }, []);
+
+  // Periodically refresh notifications to raise system notifs
+  useEffect(() => {
+    let t: any;
+    (async () => {
+      await loadNotifications();
+      t = setInterval(loadNotifications, 30000);
+    })();
+    return () => { if (t) clearInterval(t); };
+  }, [user?.id]);
 
   // Prefetch guides and counts for selected crops so cards can show content
   useEffect(() => {
@@ -187,9 +212,6 @@ export default function Home() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{t('home.weatherTitle')}</Text>
           <View style={{ flexDirection:'row', alignItems:'center' }}>
-            <TouchableOpacity onPress={() => setNotifVisible(true)} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 }}>
-              <Ionicons name="notifications" size={18} color="#2d5016" />
-            </TouchableOpacity>
             <TouchableOpacity onPress={fetchWeather} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 }}>
               <Ionicons name="refresh" size={18} color="#2d5016" />
             </TouchableOpacity>
@@ -476,8 +498,8 @@ export default function Home() {
                 <Text style={{ color:'#666' }}>No notifications yet</Text>
               ) : notifications.map((n:any)=> (
                 <View key={n.id} style={{ paddingVertical:10, borderBottomWidth:1, borderBottomColor:'#f0f0f0' }}>
-                  <Text style={{ fontWeight:'700', color:'#2d5016' }}>{n.title}</Text>
-                  <Text style={{ color:'#333', marginTop:4 }}>{n.message}</Text>
+                  <Text style={{ fontWeight:'700', color:'#2d5016' }}>{currentLanguage==='ta' && n.title_ta ? n.title_ta : n.title}</Text>
+                  <Text style={{ color:'#333', marginTop:4 }}>{currentLanguage==='ta' && n.message_ta ? n.message_ta : n.message}</Text>
                   <Text style={{ color:'#999', fontSize:12, marginTop:2 }}>{new Date(n.created_at || Date.now()).toLocaleString()}</Text>
                 </View>
               ))}

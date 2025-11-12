@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification } from '../lib/database';
 import { uploadImage } from '../lib/upload';
+import { emitNotificationsChanged } from '../lib/notifBus';
 import { UserContext } from '../context/UserContext';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -96,6 +97,8 @@ export default function Masters() {
   // Notifications compose
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
+  const [notifTitleTa, setNotifTitleTa] = useState('');
+  const [notifMessageTa, setNotifMessageTa] = useState('');
   const [notifModalVisible, setNotifModalVisible] = useState(false);
 
   useEffect(() => { (async ()=>{ const all = await getAllCrops() as any[]; setCrops(all); if (all[0]) setSelectedCropId(Number(all[0].id)); })(); }, []);
@@ -170,6 +173,18 @@ export default function Masters() {
           </TouchableOpacity>
           {(isAdmin || isMaster) && (
             <>
+            <TouchableOpacity style={styles.adminTile} onPress={()=> router.push('/pending-products')}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
+                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#fff8e1', alignItems:'center', justifyContent:'center' }}>
+                  <Ionicons name="time" size={20} color="#ff8f00" />
+                </View>
+                <View>
+                  <Text style={styles.adminTileTitle}>Review Product Requests</Text>
+                  <Text style={styles.adminTileSub}>Approve or reject vendor submissions</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setLogisticsVisible(true); try { const rows = await listLogistics(); setLogistics(rows as any[]); } catch {} }}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
                 <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
@@ -202,10 +217,10 @@ export default function Masters() {
           </TouchableOpacity>
 
           {/* System Notifications */}
-          {isMaster && (
+          {(isAdmin || isMaster) && (
             <TouchableOpacity style={styles.masterBtn} onPress={()=> setNotifModalVisible(true)}>
               <Ionicons name="notifications" size={18} color="#4caf50" />
-              <Text style={styles.masterBtnText}>System Notifications</Text>
+              <Text style={styles.masterBtnText}>Send Notification</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -873,12 +888,15 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
               </TouchableOpacity>
             </View>
             <View style={{ padding:16 }}>
-              <TextInput style={[styles.input,{ marginBottom:8 }]} placeholder="Title" placeholderTextColor="#999" value={notifTitle} onChangeText={setNotifTitle} />
-              <TextInput style={[styles.input,{ minHeight:100, textAlignVertical:'top' }]} placeholder="Message" placeholderTextColor="#999" value={notifMessage} onChangeText={setNotifMessage} multiline />
+              <TextInput style={[styles.input,{ marginBottom:8 }]} placeholder="Title (English)" placeholderTextColor="#999" value={notifTitle} onChangeText={setNotifTitle} />
+              <TextInput style={[styles.input,{ minHeight:100, textAlignVertical:'top' }]} placeholder="Message (English)" placeholderTextColor="#999" value={notifMessage} onChangeText={setNotifMessage} multiline />
+              <View style={{ height:10 }} />
+              <TextInput style={[styles.input,{ marginBottom:8 }]} placeholder="தலைப்பு (Tamil)" placeholderTextColor="#999" value={notifTitleTa} onChangeText={setNotifTitleTa} />
+              <TextInput style={[styles.input,{ minHeight:100, textAlignVertical:'top' }]} placeholder="செய்தி (Tamil)" placeholderTextColor="#999" value={notifMessageTa} onChangeText={setNotifMessageTa} multiline />
               <TouchableOpacity style={[styles.masterBtn, { marginTop: 12 }]} onPress={async ()=>{
-                if (!notifTitle.trim() || !notifMessage.trim()) { Alert.alert('Error','Enter title and message'); return; }
-                const id = await publishSystemNotification(notifTitle.trim(), notifMessage.trim());
-                if (id) { Alert.alert('Sent','Notification published'); setNotifTitle(''); setNotifMessage(''); setNotifModalVisible(false); } else { Alert.alert('Error','Failed to publish'); }
+                if (!notifTitle.trim() || !notifMessage.trim()) { Alert.alert('Error','Enter English title and message'); return; }
+                const id = await publishSystemNotification(notifTitle.trim(), notifMessage.trim(), notifTitleTa.trim()||undefined, notifMessageTa.trim()||undefined);
+                if (id) { Alert.alert('Sent','Notification published'); emitNotificationsChanged(); setNotifTitle(''); setNotifMessage(''); setNotifTitleTa(''); setNotifMessageTa(''); setNotifModalVisible(false); } else { Alert.alert('Error','Failed to publish'); }
               }}>
                 <Ionicons name="send" size={18} color="#4caf50" />
                 <Text style={styles.masterBtnText}>Publish</Text>

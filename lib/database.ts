@@ -87,6 +87,15 @@ if (Platform.OS !== 'web') (async () => {
       FOREIGN KEY (product_id) REFERENCES products(id)
     );
 
+    CREATE TABLE IF NOT EXISTS order_status_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS keywords (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE NOT NULL,
@@ -332,28 +341,41 @@ export async function getNotifications(userId?: number) {
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 
-export async function publishSystemNotification(title: string, message: string) {
+export async function publishSystemNotification(title: string, message: string, title_ta?: string, message_ta?: string) {
   try {
     if (API_URL) {
-      const res = await api.post('/notifications', { title, message });
+      const res = await api.post('/notifications', { title, message, title_ta, message_ta });
       return (res as any)?.id || null;
     }
-    const r = await db.runAsync('INSERT INTO notifications (title, message, user_id) VALUES (?, ?, NULL)', title, message);
+    // Local: add bilingual columns if missing
+    try { await db.runAsync('ALTER TABLE notifications ADD COLUMN title_ta TEXT'); } catch {}
+    try { await db.runAsync('ALTER TABLE notifications ADD COLUMN message_ta TEXT'); } catch {}
+    const r = await db.runAsync('INSERT INTO notifications (title, message, title_ta, message_ta, user_id) VALUES (?, ?, ?, ?, NULL)', title, message, title_ta || null, message_ta || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
 
 export async function getAllProducts() {
-  try {
-    if (API_URL) {
-      try { return await api.get('/products'); } catch (e) { /* fall through to local */ }
-    }
-    const rows = await db.getAllAsync("SELECT * FROM products ORDER BY created_at DESC");
-    return rows;
-  } catch (err) {
-    console.error("Local fetch error:", err);
-    return [];
-  }
+  // Remote-only mode: do not fall back to local SQLite
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get('/products');
+}
+
+export async function getAllProductsAdmin() {
+  // Remote-only: do not fall back to local
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get('/products/admin');
+}
+
+export async function reviewProduct(id: number, status: 'approved'|'rejected'|'pending', note?: string, reviewer_id?: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  await api.patch(`/products/${id}/review`, { status, note, reviewer_id });
+  return true;
+}
+
+export async function getPendingProducts() {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get('/products/pending');
 }
 
 export async function getProductById(id: number) {
@@ -466,18 +488,8 @@ export async function deleteProduct(id: number) {
 }
 
 export async function searchProducts(keywords: string) {
-  try {
-    if (API_URL) { try { return await api.get(`/products/search?q=${encodeURIComponent(keywords)}`); } catch (e) { /* fall back */ } }
-    const searchTerm = `%${keywords.toLowerCase()}%`;
-    const rows = await db.getAllAsync(
-      "SELECT * FROM products WHERE LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(details) LIKE ? OR LOWER(name_ta) LIKE ? OR LOWER(plant_used_ta) LIKE ? OR LOWER(details_ta) LIKE ? ORDER BY created_at DESC",
-      searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm
-    );
-    return rows;
-  } catch (err) {
-    console.error("SQLite search error:", err);
-    return [];
-  }
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/products/search?q=${encodeURIComponent(keywords)}`);
 }
 
 export async function findProductsByKeywords(analysisKeywords: string[], limit: number = 5) {
@@ -729,6 +741,8 @@ export async function createOrder(userId: number, paymentMethod: string, deliver
       "INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES (?, ?, ?, ?, ?, ?)",
       userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null
     );
+    // initial timeline status
+    try { await db.runAsync("INSERT INTO order_status_history (order_id, status, note) VALUES (?, ?, ?)", orderResult.lastInsertRowId, 'confirmed', note || null); } catch {}
 
     const orderId = orderResult.lastInsertRowId;
 
@@ -808,6 +822,19 @@ export async function getAllOrders() {
   }
 }
 
+export async function getOrderStatusHistory(orderId: number) {
+  try {
+    if (API_URL) {
+      try { return await api.get(`/orders/${orderId}/status-history`); } catch {}
+    }
+    const rows = await db.getAllAsync(
+      `SELECT status, note, created_at FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC, id ASC`,
+      orderId
+    );
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
 export async function updateOrderStatus(
   orderId: number,
   status: string,
@@ -837,6 +864,13 @@ export async function updateOrderStatus(
       `UPDATE orders SET ${fields.join(', ')} WHERE id = ?`,
       ...values
     );
+    // Append to local history timeline if status changed
+    if (status !== undefined && status !== null) {
+      await db.runAsync(
+        `INSERT INTO order_status_history (order_id, status, note) VALUES (?, ?, ?)`,
+        orderId, status, statusNote || null
+      );
+    }
     return true;
   } catch (err) {
     console.error("SQLite update error:", err);
@@ -944,22 +978,10 @@ export async function deleteCrop(id: number) {
 }
 
 export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
-  try {
-    if (API_URL) {
-      try {
-        const res = await api.get(`/crops/${cropId}/guide?lang=${language}`);
-        if (res && typeof res === 'object' && 'guide' in (res as any)) return (res as any).guide;
-        return res as any;
-      } catch (e) {
-        console.warn('Remote getCropGuide failed, using local DB:', e);
-      }
-    }
-    const rows = await db.getAllAsync(
-      "SELECT * FROM crop_guides WHERE crop_id = ? AND language = ?",
-      cropId, language
-    );
-    return rows[0] || { crop_id: cropId, language, cultivation_guide: null, pest_management: null, disease_management: null };
-  } catch (err) { console.error('SQLite fetch error:', err); return null; }
+  if (!API_URL) throw new Error('API_URL not configured');
+  const res = await api.get(`/crops/${cropId}/guide?lang=${language}`);
+  if (res && typeof res === 'object' && 'guide' in (res as any)) return (res as any).guide;
+  return res as any;
 }
 
 export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data: { cultivation_guide?: string; pest_management?: string; disease_management?: string; }) {
@@ -980,14 +1002,8 @@ export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data:
 }
 
 export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') {
-  try {
-    if (API_URL) {
-      try { return await api.get(`/crops/${cropId}/pests`); }
-      catch (e) { console.warn('Remote listCropPests failed, using local DB:', e); }
-    }
-    const rows = await db.getAllAsync("SELECT * FROM crop_pests WHERE crop_id = ? ORDER BY name ASC", cropId);
-    return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/crops/${cropId}/pests`);
 }
 export async function updateCropPest(pestId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
@@ -1038,24 +1054,12 @@ export async function addCropPestImage(pestId: number, image: string, caption?: 
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
 export async function listCropPestImages(pestId: number) {
-  try {
-    if (API_URL) {
-      try { return await api.get(`/pests/${pestId}/images`); }
-      catch (e) { console.warn('Remote listCropPestImages failed, using local DB:', e); }
-    }
-    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta, public_id FROM crop_pest_images WHERE pest_id = ? ORDER BY id", pestId);
-    return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/pests/${pestId}/images`);
 }
 export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en') {
-  try {
-    if (API_URL) {
-      try { return await api.get(`/crops/${cropId}/diseases`); }
-      catch (e) { console.warn('Remote listCropDiseases failed, using local DB:', e); }
-    }
-    const rows = await db.getAllAsync("SELECT * FROM crop_diseases WHERE crop_id = ? ORDER BY name ASC", cropId);
-    return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/crops/${cropId}/diseases`);
 }
 export async function updateCropDisease(diseaseId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
@@ -1106,14 +1110,8 @@ export async function addCropDiseaseImage(diseaseId: number, image: string, capt
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
 export async function listCropDiseaseImages(diseaseId: number) {
-  try {
-    if (API_URL) {
-      try { return await api.get(`/diseases/${diseaseId}/images`); }
-      catch (e) { console.warn('Remote listCropDiseaseImages failed, using local DB:', e); }
-    }
-    const rows = await db.getAllAsync("SELECT id, image, caption, caption_ta, public_id FROM crop_disease_images WHERE disease_id = ? ORDER BY id", diseaseId);
-    return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/diseases/${diseaseId}/images`);
 }
 
 export async function deleteCropPestImage(imageId: number) {
@@ -1280,18 +1278,8 @@ export async function deleteKeyword(id: number) {
 }
 
 export async function getProductsByKeyword(keyword: string) {
-  try {
-    if (API_URL) return await api.get(`/products/by-keyword?name=${encodeURIComponent(keyword)}`);
-    const searchTerm = `%${keyword.toLowerCase()}%`;
-    const rows = await db.getAllAsync(
-      "SELECT * FROM products WHERE LOWER(keywords) LIKE ? ORDER BY created_at DESC",
-      searchTerm
-    );
-    return rows;
-  } catch (err) {
-    console.error("SQLite fetch error:", err);
-    return [];
-  }
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/products/by-keyword?name=${encodeURIComponent(keyword)}`);
 }
 
 // User functions

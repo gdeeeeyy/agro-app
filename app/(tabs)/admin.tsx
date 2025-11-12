@@ -25,7 +25,7 @@ import {
   deleteKeyword
 } from '../../lib/database';
 import { addSampleProducts } from '../../lib/sampleProducts';
-import { createDefaultAdmin, createAdminCustom } from '../../lib/createAdmin';
+import { createAdminCustom } from '../../lib/createAdmin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
@@ -108,7 +108,8 @@ export default function AdminDashboard() {
 
   const loadProducts = async () => {
     try {
-      const allProducts = await getAllProducts() as Product[];
+      const db = await import('../../lib/database');
+      const allProducts = await db.getAllProductsAdmin() as Product[];
       setProducts(allProducts);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -130,8 +131,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadProducts();
     loadKeywords();
-    // Create default admin account if it doesn't exist
-    createDefaultAdmin();
   }, []);
 
   const resetForm = () => {
@@ -392,7 +391,7 @@ const pickImage = async () => {
     setAdminModalVisible(true);
   };
 
-  const renderProduct = ({ item }: { item: Product }) => (
+  const renderProduct = ({ item }: { item: Product & { status?: string; review_note?: string } }) => (
     <View style={styles.productCard}>
       {item.image && (
         <Image source={{ uri: item.image }} style={styles.productImage} />
@@ -402,10 +401,14 @@ const pickImage = async () => {
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
-        {/* Removed Plant: line as requested */}
         <Text style={styles.productPrice}>
           ₹{item.cost_per_unit} • Stock: {item.stock_available}
         </Text>
+        {item.status && (
+          <Text style={{ marginTop: 4, fontSize: 12, color: item.status==='approved'?'#2e7d32': item.status==='pending'?'#ff8f00':'#d32f2f' }}>
+            Status: {String(item.status).toUpperCase()} {item.review_note ? `— ${item.review_note}` : ''}
+          </Text>
+        )}
       </View>
 
       <View style={styles.productActions}>
@@ -424,6 +427,24 @@ const pickImage = async () => {
             >
               <Ionicons name="options" size={20} color="#00bcd4" />
             </TouchableOpacity>
+            {String((item as any).status||'') === 'pending' && (
+              <>
+                <TouchableOpacity style={[styles.variantButton,{ borderColor:'#c8e6c9' }]} onPress={async ()=> {
+                  const db = await import('../../lib/database');
+                  await db.reviewProduct(Number(item.id), 'approved');
+                  await loadProducts();
+                }}>
+                  <Ionicons name="checkmark" size={18} color="#2e7d32" />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.variantButton,{ borderColor:'#fdecea' }]} onPress={async ()=> {
+                  const db = await import('../../lib/database');
+                  await db.reviewProduct(Number(item.id), 'rejected');
+                  await loadProducts();
+                }}>
+                  <Ionicons name="close" size={18} color="#d32f2f" />
+                </TouchableOpacity>
+              </>
+            )}
           </>
         )}
         

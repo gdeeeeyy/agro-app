@@ -47,9 +47,19 @@ async function runMigrations() {
       unit TEXT,
       stock_available INTEGER DEFAULT 0,
       cost_per_unit DOUBLE PRECISION NOT NULL,
+      status TEXT DEFAULT 'approved',
+      created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_at TIMESTAMPTZ,
+      review_note TEXT,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved'");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS created_by BIGINT");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_by BIGINT");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS review_note TEXT");
 
     await pool.query(`CREATE TABLE IF NOT EXISTS keywords (
       id BIGSERIAL PRIMARY KEY,
@@ -181,12 +191,34 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
+    // Order status history for timeline (Flipkart-style)
+    await pool.query(`CREATE TABLE IF NOT EXISTS order_status_history (
+      id BIGSERIAL PRIMARY KEY,
+      order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      note TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+    await pool.query("CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id, created_at)");
+
     // In-app notifications (system or per-user)
     await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
       id BIGSERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       message TEXT NOT NULL,
+      title_ta TEXT,
+      message_ta TEXT,
       user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+    await pool.query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title_ta TEXT");
+    await pool.query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message_ta TEXT");
+
+    // Expo push tokens
+    await pool.query(`CREATE TABLE IF NOT EXISTS push_tokens (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT UNIQUE NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
@@ -348,6 +380,7 @@ app.get('/products', async (req, res) => {
            (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
            (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
     FROM products p
+    WHERE p.status = 'approved'
     ORDER BY p.created_at DESC`));
 });
 
@@ -360,8 +393,9 @@ app.get('/products/search', async (req, res) => {
             (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
             (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
      FROM products p WHERE 
+      p.status='approved' AND (
       lower(p.name) LIKE $1 OR lower(p.plant_used) LIKE $1 OR lower(p.keywords) LIKE $1 OR lower(p.details) LIKE $1 OR
-      lower(p.name_ta) LIKE $1 OR lower(p.plant_used_ta) LIKE $1 OR lower(p.details_ta) LIKE $1
+      lower(p.name_ta) LIKE $1 OR lower(p.plant_used_ta) LIKE $1 OR lower(p.details_ta) LIKE $1)
      ORDER BY p.created_at DESC`, [like]
   ));
 });
@@ -373,8 +407,16 @@ app.get('/products/by-keyword', async (req, res) => {
            (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
            (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
     FROM products p
-    WHERE lower(p.keywords) LIKE $1
+    WHERE p.status='approved' AND lower(p.keywords) LIKE $1
     ORDER BY p.created_at DESC`, [like]));
+});
+
+// Admin list (all products with status)
+app.get('/products/admin', async (req, res) => {
+  res.json(await all('SELECT * FROM products ORDER BY created_at DESC'));
+});
+app.get('/products/pending', async (req, res) => {
+  res.json(await all("SELECT * FROM products WHERE status='pending' ORDER BY created_at DESC"));
 });
 
 app.get('/products/:id', async (req, res) => {
@@ -385,12 +427,23 @@ app.get('/products/:id', async (req, res) => {
 
 app.post('/products', async (req, res) => {
   const p = req.body || {};
+  const createdBy = p.created_by ? Number(p.created_by) : null;
+  const creatorRole = p.creator_role != null ? Number(p.creator_role) : null; // 1=vendor,2=master
+  const status = creatorRole === 2 ? 'approved' : 'pending';
   const r = await one(
-    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0)]
+    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, status, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), status, createdBy]
   );
   res.json(r);
+});
+
+// Admin review products (approve/reject)
+app.patch('/products/:id/review', async (req, res) => {
+  const { status, note, reviewer_id } = req.body || {};
+  if (!['approved','rejected','pending'].includes(String(status||'').toLowerCase())) return res.status(400).json({ error: 'invalid status' });
+  await pool.query('UPDATE products SET status=$1, review_note=$2, reviewed_by=$3, reviewed_at=now(), updated_at=now() WHERE id=$4', [String(status).toLowerCase(), note || null, reviewer_id || null, req.params.id]);
+  res.json({ ok: true });
 });
 
 app.patch('/products/:id', async (req, res) => {
@@ -733,6 +786,8 @@ app.post('/orders', async (req, res) => {
     'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
     [userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null]
   );
+  // Record initial timeline status as "confirmed" at order creation
+  try { await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [o.id, 'confirmed', note || null]); } catch {}
   for (const it of cartItems) {
     await pool.query(
       'INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit, variant_id, variant_label) VALUES ($1,$2,$3,$4,$5,$6,$7)',
@@ -752,6 +807,10 @@ app.get('/orders', async (req, res) => {
 
 app.get('/orders/:id/items', async (req, res) => {
   res.json(await all('SELECT * FROM order_items WHERE order_id=$1 ORDER BY id', [req.params.id]));
+});
+app.get('/orders/:id/status-history', async (req, res) => {
+  const rows = await all('SELECT status, note, created_at FROM order_status_history WHERE order_id=$1 ORDER BY created_at ASC, id ASC', [req.params.id]);
+  res.json(rows);
 });
 
 app.get('/orders/all', async (req, res) => {
@@ -773,9 +832,21 @@ app.get('/notifications', async (req, res) => {
   }
 });
 app.post('/notifications', async (req, res) => {
-  const { title, message } = req.body || {};
+  const { title, message, title_ta, message_ta } = req.body || {};
   if (!title || !message) return res.status(400).json({ error: 'title and message required' });
-  const r = await one('INSERT INTO notifications (title, message) VALUES ($1,$2) RETURNING id', [title, message]);
+  const r = await one('INSERT INTO notifications (title, message, title_ta, message_ta) VALUES ($1,$2,$3,$4) RETURNING id', [title, message, title_ta || null, message_ta || null]);
+  // Broadcast push via Expo to all tokens (combine EN/TA for clarity)
+  try {
+    const rows = await all('SELECT token FROM push_tokens');
+    if (rows.length) {
+      const pushTitle = title_ta ? `${title} / ${title_ta}` : title;
+      const pushBody = message_ta ? `${message}\n\n${message_ta}` : message;
+      const msgs = rows.map(t => ({ to: t.token, sound: 'default', title: pushTitle, body: pushBody }));
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgs)
+      }).catch(()=>{});
+    }
+  } catch {}
   res.json(r);
 });
 
@@ -812,14 +883,34 @@ app.patch('/orders/:id', async (req, res) => {
   if (trackingUrl !== undefined) { set.push(`tracking_url=$${i++}`); vals.push(trackingUrl); }
   vals.push(req.params.id);
   await pool.query(`UPDATE orders SET ${set.join(', ')} WHERE id=$${i}`, vals);
+  // Append to status history timeline if status changed
+  try {
+    if (status !== undefined) {
+      await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [req.params.id, status, statusNote || null]);
+    }
+  } catch {}
   // Send notification to the order owner (user-specific)
   try {
     const o = await one('SELECT user_id FROM orders WHERE id=$1', [req.params.id]);
     if (o && o.user_id) {
       const s = (status || '').toString();
-      const title = `Order #${req.params.id} Updated`;
-      const msg = `Status: ${s || 'updated'}${statusNote ? ` - ${statusNote}` : ''}`;
-      await pool.query('INSERT INTO notifications (title, message, user_id) VALUES ($1,$2,$3)', [title, msg, o.user_id]);
+      const taMap = { pending:'நிலுவையில்', confirmed:'உறுதிப்படுத்தப்பட்டது', processing:'செயலாக்கம்', processed:'செயலாக்கப்பட்டது', dispatched:'அனுப்பப்பட்டது', shipped:'அனுப்பப்பட்டது', delivered:'அனுப்பப்பட்டது', cancelled:'ரத்து செய்யப்பட்டது', updated:'புதுப்பிக்கப்பட்டது' };
+      const statusTa = taMap[(s || 'updated').toLowerCase()] || 'புதுப்பிக்கப்பட்டது';
+      const title = `Order Status:${(s || 'updated').toString()}`;
+      const title_ta = `ஆர்டர் நிலை:${statusTa}`;
+      const msg = statusNote ? statusNote : `Your order #${req.params.id} status updated to ${s || 'updated'}`;
+      const msg_ta = statusNote ? statusNote : `உங்கள் ஆர்டர் #${req.params.id} நிலை ${statusTa} ஆக புதுப்பிக்கப்பட்டது`;
+      await pool.query('INSERT INTO notifications (title, message, title_ta, message_ta, user_id) VALUES ($1,$2,$3,$4,$5)', [title, msg, title_ta, msg_ta, o.user_id]);
+      // Push to that user's tokens (combined)
+      try {
+        const toks = await all('SELECT token FROM push_tokens WHERE user_id=$1', [o.user_id]);
+        if (toks.length) {
+          const pushTitle = `${title} / ${title_ta}`;
+          const pushBody = `${msg}\n\n${msg_ta}`;
+          const msgs = toks.map(t => ({ to: t.token, sound: 'default', title: pushTitle, body: pushBody }));
+          await fetch('https://exp.host/--/api/v2/push/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(msgs) }).catch(()=>{});
+        }
+      } catch {}
     }
   } catch {}
   res.json({ ok: true });
@@ -828,6 +919,18 @@ app.patch('/orders/:id', async (req, res) => {
 app.delete('/orders/:id', async (req, res) => {
   await pool.query('DELETE FROM orders WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
+});
+
+// Register push token
+app.post('/push/register', async (req, res) => {
+  const { userId, token } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'token required' });
+  try {
+    await pool.query('INSERT INTO push_tokens (user_id, token) VALUES ($1,$2) ON CONFLICT (token) DO UPDATE SET user_id=EXCLUDED.user_id', [userId || null, token]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e); res.status(500).json({ error: 'failed' });
+  }
 });
 
 app.listen(PORT, () => console.log(`API listening on :${PORT}`));

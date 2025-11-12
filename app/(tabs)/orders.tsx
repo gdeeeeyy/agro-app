@@ -16,7 +16,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { getUserOrders, getOrderItems } from '../../lib/database';
+import { getUserOrders, getOrderItems, getOrderStatusHistory } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../../components/TopBar';
 
@@ -53,6 +53,7 @@ export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<Array<{ status: string; note?: string; created_at: string }>>([]);
 
   const loadOrders = async () => {
     if (!user) return;
@@ -74,6 +75,7 @@ export default function Orders() {
     const items = await getOrderItems(order.id) as OrderItem[];
     setOrderItems(items);
     setSelectedOrder(order);
+    try { const hist = await getOrderStatusHistory(order.id) as any[]; setStatusHistory(Array.isArray(hist)? hist : []); } catch { setStatusHistory([]); }
     setDetailsModalVisible(true);
   };
 
@@ -327,6 +329,42 @@ export default function Orders() {
                     </TouchableOpacity>
                   </View>
                 )}
+
+                {/* Status Timeline */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Order Status</Text>
+                  <View style={styles.timeline}>
+                    {['confirmed','processed','dispatched'].map((step, idx) => {
+                      // map statuses from history; treat 'processing' as 'processed', 'shipped'/'delivered' as 'dispatched'
+                      const match = statusHistory.find(h => {
+                        const s = String(h.status||'').toLowerCase();
+                        if (step==='processed') return (s==='processed' || s==='processing');
+                        if (step==='dispatched') return (s==='dispatched' || s==='shipped' || s==='delivered');
+                        return s===step;
+                      });
+                      const done = Boolean(match);
+                      const dt = match ? new Date(match.created_at) : null;
+                      const lineActive = idx < 2 && (done || statusHistory.length>0 && ['processed','dispatched'].includes(step));
+                      return (
+                        <View key={step} style={styles.timelineRow}>
+                          <View style={styles.timelineColIcon}>
+                            <View style={[styles.timelineDot, done ? styles.timelineDotDone : styles.timelineDotPending]} />
+                            {idx < 2 && <View style={[styles.timelineLine, done ? styles.timelineLineDone : styles.timelineLinePending]} />}
+                          </View>
+                          <View style={styles.timelineColText}>
+                            <Text style={[styles.timelineTitle, done ? styles.timelineTitleDone : styles.timelineTitlePending]}>{step[0].toUpperCase()+step.slice(1)}</Text>
+                            <Text style={styles.timelineMeta}>
+                              {done && dt ? dt.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' }) : 'Pending'}
+                            </Text>
+                            {done && match?.note ? (
+                              <Text style={styles.timelineNote}>{match.note}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
 
                 <View style={styles.totalSection}>
                   <Text style={styles.totalLabel}>Total Amount</Text>
@@ -633,5 +671,53 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: '#4caf50',
+  },
+  timeline: {
+    marginTop: 4,
+    paddingLeft: 4,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  timelineColIcon: {
+    width: 24,
+    alignItems: 'center',
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 6,
+  },
+  timelineDotDone: { backgroundColor: '#4caf50' },
+  timelineDotPending: { backgroundColor: '#bdbdbd' },
+  timelineLine: {
+    width: 2,
+    flexGrow: 1,
+    marginTop: 4,
+  },
+  timelineLineDone: { backgroundColor: '#4caf50' },
+  timelineLinePending: { backgroundColor: '#e0e0e0' },
+  timelineColText: {
+    flex: 1,
+    paddingLeft: 8,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  timelineTitleDone: { color: '#2d5016' },
+  timelineTitlePending: { color: '#777' },
+  timelineMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  timelineNote: {
+    fontSize: 12,
+    color: '#2d5016',
+    marginTop: 2,
   },
 });

@@ -359,17 +359,17 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 );
               })}
               <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop: 12 }}>
-                <View style={[styles.qtyPill, { paddingHorizontal: 16, height: 40, borderRadius: 12 }] }>
+                <View style={[styles.qtyPill, { paddingHorizontal: 16, height: 44, borderRadius: 12 }] }>
                   <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}>
                     <Ionicons name="remove" size={18} color="#2d5016" />
                   </TouchableOpacity>
-                  <Text style={[styles.qtyText, { fontSize: 16 }]}>{selectedQuantity}</Text>
+                  <Text style={[styles.qtyText, { fontSize: 18 }]}>{selectedQuantity}</Text>
                   <TouchableOpacity onPress={() => setSelectedQuantity(q => q + 1)}>
                     <Ionicons name="add" size={18} color="#2d5016" />
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={[styles.fabAdd, { paddingHorizontal: 18, borderRadius: 10 }]} onPress={async ()=> { await doAddToCart(selectedQuantity, selectedVariantId); setChooserVisible(false); }}>
-                  <Text style={{ color:'#fff', fontWeight:'700' }}>Add</Text>
+                <TouchableOpacity style={styles.addPrimaryButton} onPress={async ()=> { await doAddToCart(selectedQuantity, selectedVariantId); setChooserVisible(false); }}>
+                  <Text style={styles.addPrimaryText}>Add</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -603,5 +603,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  addPrimaryButton: {
+    backgroundColor: '#4caf50',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPrimaryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
