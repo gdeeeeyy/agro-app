@@ -10,10 +10,11 @@ import {
   TouchableOpacity,
   View,
   Image,
+  Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
-import LanguageSelector from '../../components/LanguageSelector';
 import { signIn } from '../../lib/auth';
 
 export default function Login() {
@@ -22,7 +23,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { setUser } = useContext(UserContext);
-  const { t } = useLanguage();
+  const { t, currentLanguage, setLanguage } = useLanguage();
+  const [langVisible, setLangVisible] = useState(false);
+
+  const changeLang = async (lang: 'en' | 'ta') => {
+    await setLanguage(lang);
+    setLangVisible(false);
+  };
 
   const handleLogin = async () => {
     if (!number || !password) {
@@ -55,7 +62,11 @@ export default function Login() {
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
         <Text style={styles.title}>Agriismart - Faith of the Farmers</Text>
 
-        <LanguageSelector />
+        <View style={styles.langRow}>
+          <TouchableOpacity onPress={() => setLangVisible(true)} accessibilityLabel="Change Language" style={styles.actionBtn}>
+            <Ionicons name="globe-outline" size={22} color="#4caf50" />
+          </TouchableOpacity>
+        </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -101,6 +112,30 @@ export default function Login() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Language modal */}
+      <Modal visible={langVisible} transparent animationType="fade" onRequestClose={() => setLangVisible(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ width: '80%', backgroundColor:'#fff', borderRadius: 12, overflow:'hidden' }}>
+            <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>{t('language.selectLanguageTitle')}</Text>
+              <TouchableOpacity onPress={() => setLangVisible(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 10 }}>
+              <TouchableOpacity onPress={() => changeLang('en')} style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='en'?'#4caf50':'#eee', backgroundColor: currentLanguage==='en'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+                <Text style={{ color:'#333', fontWeight:'600' }}>English</Text>
+                {currentLanguage==='en' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => changeLang('ta')} style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='ta'?'#4caf50':'#eee', backgroundColor: currentLanguage==='ta'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                <Text style={{ color:'#333', fontWeight:'600' }}>தமிழ்</Text>
+                {currentLanguage==='ta' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -127,6 +162,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111',
     marginBottom: 8,
+  },
+  langRow: {
+    width: '100%',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  actionBtn: {
+    padding: 6,
   },
   subtitle: {
     fontSize: 16,

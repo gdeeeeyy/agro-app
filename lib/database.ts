@@ -260,6 +260,20 @@ if (Platform.OS !== 'web') (async () => {
   } catch (e) {
     console.warn('Migration check failed:', e);
   }
+
+  // Seed default crops locally if absent (for offline mode)
+  try {
+    const rows = await db.getAllAsync("SELECT lower(name) as name FROM crops");
+    const names = (rows as any[]).map(r => String(r.name));
+    if (!names.includes('tomato')) {
+      await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Tomato', 'தக்காளி');
+    }
+    if (!(names.includes('brinjal') || names.includes('eggplant') || names.includes('aubergine'))) {
+      await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Brinjal', 'கத்தரிக்காய்');
+    }
+  } catch (se) {
+    console.warn('Seed crops skipped:', se);
+  }
 })();
 
 export async function savePlant(userId: number, name: string, imageUri: string, result: string) {

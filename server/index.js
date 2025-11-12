@@ -14,7 +14,8 @@ const isNeon = /neon\.tech|sslmode=require|render|railway/.test(DATABASE_URL);
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUnauthorized: false } : undefined });
 
 // Ensure runtime migrations (idempotent)
-(async () => {
+let isReady = false;
+async function runMigrations() {
   try {
     // Columns that might be missing on older deploys
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT");
@@ -64,6 +65,19 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUn
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
+    // Seed default crops if missing (idempotent)
+    await pool.query(`
+      INSERT INTO crops (name, name_ta)
+      SELECT 'Tomato', 'தக்காளி'
+      WHERE NOT EXISTS (SELECT 1 FROM crops WHERE lower(name) = 'tomato')
+    `);
+    await pool.query(`
+      INSERT INTO crops (name, name_ta)
+      SELECT 'Brinjal', 'கத்தரிக்காய்'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM crops WHERE lower(name) IN ('brinjal','eggplant','aubergine')
+      )
+    `);
 
     await pool.query(`CREATE TABLE IF NOT EXISTS crop_guides (
       id BIGSERIAL PRIMARY KEY,
@@ -184,6 +198,10 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUn
       updated_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(product_id, label)
     )`);
+    // Backfill columns for existing installations
+    await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS label TEXT");
+    await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS price DOUBLE PRECISION");
+    await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_available INTEGER DEFAULT 0");
 
     // Cart variants support
     await pool.query(`ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id)`);
@@ -194,8 +212,13 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUn
     // Order items capture variant
     await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id BIGINT');
     await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label TEXT');
-  } catch (e) { console.warn('Startup migration warning:', e.message); }
-})();
+  } catch (e) {
+    console.warn('Startup migration warning:', e.message);
+  } finally {
+    isReady = true;
+  }
+}
+runMigrations();
 
 const app = express();
 app.use(cors());
@@ -203,6 +226,12 @@ app.use(express.json());
 
 app.get('/health', async (req, res) => {
   try { await pool.query('select 1'); res.json({ ok: true }); } catch (e) { res.status(500).json({ ok: false }); }
+});
+
+// Block requests until migrations are done (prevents 502s from missing columns)
+app.use((req, res, next) => {
+  if (!isReady) return res.status(503).json({ error: 'starting' });
+  next();
 });
 
 // Helpers
