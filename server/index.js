@@ -201,6 +201,25 @@ async function runMigrations() {
     )`);
     await pool.query("CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id, created_at)");
 
+    // Messaging tables
+    await pool.query(`CREATE TABLE IF NOT EXISTS conversations (
+      id BIGSERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS conversation_participants (
+      conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (conversation_id, user_id)
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS messages (
+      id BIGSERIAL PRIMARY KEY,
+      conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      text TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+    await pool.query("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at)");
+
     // In-app notifications (system or per-user)
     await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
       id BIGSERIAL PRIMARY KEY,
@@ -919,6 +938,53 @@ app.patch('/orders/:id', async (req, res) => {
 app.delete('/orders/:id', async (req, res) => {
   await pool.query('DELETE FROM orders WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
+});
+
+// Messaging APIs
+app.post('/conversations', async (req, res) => {
+  const { userIds, initialText, senderId } = req.body || {};
+  const ids = Array.isArray(userIds) ? userIds.map(Number).filter(Boolean) : [];
+  if (ids.length < 2) return res.status(400).json({ error: 'need at least two participants' });
+  const conv = await one('INSERT INTO conversations DEFAULT VALUES RETURNING id', []);
+  for (const uid of ids) await pool.query('INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1,$2)', [conv.id, uid]);
+  if (initialText && senderId) await pool.query('INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1,$2,$3)', [conv.id, Number(senderId), String(initialText)]);
+  res.json({ id: conv.id });
+});
+app.get('/conversations', async (req, res) => {
+  const userId = Number(req.query.userId);
+  const rows = await all(`
+    SELECT c.id,
+           (SELECT text FROM messages m WHERE m.conversation_id=c.id ORDER BY created_at DESC LIMIT 1) AS last_text,
+           (SELECT created_at FROM messages m2 WHERE m2.conversation_id=c.id ORDER BY created_at DESC LIMIT 1) AS last_at,
+           ARRAY(SELECT user_id FROM conversation_participants cp WHERE cp.conversation_id=c.id) AS participant_ids
+    FROM conversations c
+    WHERE EXISTS (SELECT 1 FROM conversation_participants cp WHERE cp.conversation_id=c.id AND cp.user_id=$1)
+    ORDER BY last_at DESC NULLS LAST, c.id DESC`, [userId]);
+  res.json(rows);
+});
+app.get('/conversations/:id/messages', async (req, res) => {
+  const rows = await all('SELECT id, conversation_id, sender_id, text, created_at FROM messages WHERE conversation_id=$1 ORDER BY created_at ASC', [req.params.id]);
+  res.json(rows);
+});
+app.post('/conversations/:id/messages', async (req, res) => {
+  const { senderId, text } = req.body || {};
+  if (!text || !senderId) return res.status(400).json({ error: 'text and senderId required' });
+  const m = await one('INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1,$2,$3) RETURNING id, created_at', [req.params.id, Number(senderId), String(text)]);
+  // Notify other participants
+  try {
+    const parts = await all('SELECT user_id FROM conversation_participants WHERE conversation_id=$1 AND user_id<>$2', [req.params.id, Number(senderId)]);
+    for (const p of parts) {
+      await pool.query('INSERT INTO notifications (title, message, user_id) VALUES ($1,$2,$3)', ['New Message', text.slice(0,140), p.user_id]);
+      try {
+        const toks = await all('SELECT token FROM push_tokens WHERE user_id=$1', [p.user_id]);
+        if (toks.length) {
+          const msgs = toks.map(t => ({ to: t.token, sound: 'default', title: 'New Message', body: text.slice(0,140) }));
+          await fetch('https://exp.host/--/api/v2/push/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(msgs) }).catch(()=>{});
+        }
+      } catch {}
+    }
+  } catch {}
+  res.json({ id: m.id, created_at: m.created_at });
 });
 
 // Register push token

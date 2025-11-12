@@ -1,3 +1,21 @@
+// Messaging (remote-only)
+export async function createConversation(userIds: number[], initialText?: string, senderId?: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.post('/conversations', { userIds, initialText, senderId });
+}
+export async function listConversations(userId: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/conversations?userId=${userId}`);
+}
+export async function listMessages(conversationId: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/conversations/${conversationId}/messages`);
+}
+export async function sendMessage(conversationId: number, senderId: number, text: string) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.post(`/conversations/${conversationId}/messages`, { senderId, text });
+}
+
 import { Platform } from 'react-native';
 import { api, API_URL } from './api';
 

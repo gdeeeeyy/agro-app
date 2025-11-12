@@ -40,6 +40,12 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const { user } = useContext(UserContext);
 
+  // Assistance state
+  const [assistanceOpen, setAssistanceOpen] = useState(false);
+  const [assistanceAdminId, setAssistanceAdminId] = useState<number | null>(null);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [sending, setSending] = useState(false);
+
   // Function to extract relevant keywords from analysis
   const extractKeywordsFromAnalysis = (analysis: any, plantName: string): string[] => {
     const keywords: string[] = [];
@@ -194,6 +200,11 @@ mediaTypes: ['images'] as any,
         const rows = await getAllCrops() as any[];
         setPickerCrops(rows);
       } catch {}
+      try {
+        const db = await import('../../lib/database');
+        const list = await db.listAdmins();
+        setAdmins(list as any[]);
+      } catch {}
     })();
   }, []);
 
@@ -258,6 +269,15 @@ mediaTypes: ['images'] as any,
 
         {result && !result.error && <PlantAnalysis data={result} />}
 
+        {/* Further assistance CTA */}
+        {result && !result.error && (
+          <View style={{ marginTop: 12 }}>
+            <TouchableOpacity style={[styles.analyzeButton, { backgroundColor:'#1e88e5' }]} onPress={()=> setAssistanceOpen(true)}>
+              <Text style={styles.analyzeButtonText}>{currentLanguage==='ta' ? 'மேலும் விவரங்கள் வேண்டுமா? மேலும் உதவிக்கு இங்கே கிளிக் செய்யவும்' : 'Need more details? Click here for further assistance'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {recommendedProducts.length > 0 && (
           <View style={styles.recommendationsSection}>
             <Text style={styles.recommendationsTitle}>{t('scan.recommendations')}</Text>
@@ -272,6 +292,56 @@ mediaTypes: ['images'] as any,
       </ScrollView>
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+      {/* Assistance modal */}
+      <Modal visible={assistanceOpen} transparent animationType="fade" onRequestClose={()=> setAssistanceOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>{currentLanguage==='ta' ? 'மேலும் உதவி' : 'Further Assistance'}</Text>
+            <Text style={{ color:'#666', marginBottom: 8 }}>{currentLanguage==='ta' ? 'ஒரு நிர்வாகரைத் தேர்ந்தெடுத்து, பகிர வேண்டிய விவரங்களை அனுப்பவும்.' : 'Select an admin to send the scan details.'}</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {admins.map((a:any)=> (
+                <TouchableOpacity key={a.id} style={[styles.sheetRow, { justifyContent:'space-between' }]} onPress={()=> setAssistanceAdminId(Number(a.id))}>
+                  <View style={{ flexDirection:'row', alignItems:'center', gap: 10 }}>
+                    <Ionicons name="person" size={18} color="#4caf50" />
+                    <Text style={styles.sheetText}>{a.full_name || a.number}</Text>
+                  </View>
+                  {assistanceAdminId === Number(a.id) ? <Ionicons name="checkmark-circle" size={18} color="#4caf50" /> : null}
+                </TouchableOpacity>
+              ))}
+              <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+                <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>{currentLanguage==='ta' ? 'செய்தி' : 'Message'}</Text>
+                <View style={{ borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff' }}>
+                  <Text style={{ padding: 10, color:'#333' }}>
+                    {JSON.stringify(result, null, 2)}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+            <View style={{ flexDirection:'row', gap: 10, marginTop: 12 }}>
+              <TouchableOpacity style={[styles.sheetRow, { flex:1, justifyContent:'center', backgroundColor:'#eaf6ef', borderRadius: 10 }]} onPress={()=> setAssistanceOpen(false)}>
+                <Text style={{ color:'#2d5016', fontWeight:'700' }}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity disabled={!assistanceAdminId || sending} style={[styles.sheetRow, { flex:1, justifyContent:'center', backgroundColor:'#4caf50', borderRadius: 10 }]} onPress={async ()=>{
+                if (!user || !assistanceAdminId) return;
+                setSending(true);
+                try {
+                  const db = await import('../../lib/database');
+                  // create conversation with user and selected admin
+                  const conv = await db.createConversation([Number(user.id), Number(assistanceAdminId)], JSON.stringify(result), Number(user.id));
+                  Alert.alert(currentLanguage==='ta' ? 'அனுப்பப்பட்டது' : 'Sent', currentLanguage==='ta' ? 'செய்தி நிர்வாகருக்கு அனுப்பப்பட்டது' : 'Message sent to admin');
+                } catch {
+                  Alert.alert('Error','Failed to send');
+                }
+                setSending(false);
+                setAssistanceOpen(false);
+              }}>
+                <Text style={{ color:'#fff', fontWeight:'700' }}>{sending ? (currentLanguage==='ta'?'அனுப்புகிறது...':'Sending...') : (currentLanguage==='ta'?'அனுப்பு':'Send')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Plant picker modal */}
       <Modal
         visible={pickerVisible}
@@ -428,6 +498,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
+    maxHeight: '85%'
+  },
   },
   sheetTitle: {
     fontSize: 16,
