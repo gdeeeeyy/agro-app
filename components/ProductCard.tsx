@@ -50,6 +50,13 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   const placeholderImage = 'https://via.placeholder.com/800x600?text=Agri+Product';
   const productImage = product.image || placeholderImage;
 
+  const parseVariantLabel = (label?: string): { quantity?: string; unit?: string } => {
+    if (!label || typeof label !== 'string') return {};
+    const m = label.trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)/);
+    if (!m) return {};
+    return { quantity: m[1], unit: m[2] };
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -60,8 +67,9 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
     })();
   }, [product.id]);
 
-  const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
+const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
   const displayPrice = selectedVariant ? Number(selectedVariant.price) : Number(product.cost_per_unit);
+  const selParsed = parseVariantLabel(selectedVariant?.label);
 
   const handleAddToCart = async () => {
     if (product.stock_available <= 0) {
@@ -151,22 +159,28 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
-            <Text style={[styles.price, compact && styles.priceCompact]}>Rs. {displayPrice}{selectedVariant ? ` / ${selectedVariant.label}` : ''}</Text>
+            <Text style={[styles.price, compact && styles.priceCompact]}>
+              Rs. {displayPrice}{selectedVariant && selParsed.quantity && selParsed.unit ? ` / ${selParsed.quantity} ${selParsed.unit}` : ''}
+            </Text>
             {variants.length > 0 && (
               <View style={{ marginTop: 6 }}>
                 <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
                   <Text style={styles.unitSelectorText}>
-                    {selectedVariant ? selectedVariant.label : 'Select unit'}
+                    {selectedVariant && selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : 'Select unit'}
                   </Text>
                   <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
                 </TouchableOpacity>
                 {unitOpen && (
                   <View style={styles.unitDropdown}>
-                    {variants.map(v => (
-                      <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
-                        <Text style={styles.unitItemText}>{v.label} — Rs. {v.price}</Text>
-                      </TouchableOpacity>
-                    ))}
+                    {variants.map(v => {
+                      const p = parseVariantLabel(v.label);
+                      const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                      return (
+                        <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
+                          <Text style={styles.unitItemText}>{qtyUnit} — Rs. {v.price}{typeof v.stock_available === 'number' ? ` (Stock: ${v.stock_available})` : ''}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -215,7 +229,9 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
           {/* Price row */}
           <View style={{ paddingTop: 10, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-            <Text style={{ color:'#2d5016', fontWeight:'700' }}>Rs. {displayPrice}{selectedVariant ? ` / ${selectedVariant.label}` : ''}</Text>
+            <Text style={{ color:'#2d5016', fontWeight:'700' }}>
+              Rs. {displayPrice}{selectedVariant && selParsed.quantity && selParsed.unit ? ` / ${selParsed.quantity} ${selParsed.unit}` : ''}
+            </Text>
             {(product as any).seller_name ? (
               <Text style={{ color:'#666' }}>Seller: {(product as any).seller_name}</Text>
             ) : null}
@@ -235,17 +251,21 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               <View style={{ height: 10 }} />
               <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
                 <Text style={styles.unitSelectorText}>
-                  {selectedVariant ? `${selectedVariant.label} — Rs. ${selectedVariant.price}` : 'Select unit'}
+                  {selectedVariant && selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit} — Rs. ${selectedVariant.price}` : 'Select unit'}
                 </Text>
                 <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
               </TouchableOpacity>
               {unitOpen && (
                 <View style={styles.unitDropdown}>
-                  {variants.map(v => (
-                    <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
-                      <Text style={styles.unitItemText}>{v.label} — Rs. {v.price}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {variants.map(v => {
+                    const p = parseVariantLabel(v.label);
+                    const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                    return (
+                      <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
+                        <Text style={styles.unitItemText}>{qtyUnit} — Rs. {v.price}{typeof v.stock_available === 'number' ? ` (Stock: ${v.stock_available})` : ''}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             </>
@@ -302,6 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     marginBottom: 16,
+    minHeight: 120,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -313,6 +334,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 12,
+    minHeight: 112,
   },
   image: {
     width: '100%',
@@ -359,7 +381,7 @@ const styles = StyleSheet.create({
   },
   cardCompact: {
     width: '48%',
-    minHeight: 0,
+    minHeight: 240,
   },
   plantUsed: {
     fontSize: 14,
