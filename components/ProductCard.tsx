@@ -57,35 +57,56 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
     return { quantity: m[1], unit: m[2] };
   };
 
+  const fetchVariants = async () => {
+    try {
+      const vs = await getProductVariants(product.id) as any[];
+      setVariants(vs);
+      if (vs && vs.length) {
+        // Keep current selection if still valid; otherwise select first
+        const stillExists = vs.find(v => Number(v.id) === Number(selectedVariantId));
+        if (!stillExists) setSelectedVariantId(Number(vs[0].id));
+      } else {
+        setSelectedVariantId(undefined);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const vs = await getProductVariants(product.id) as any[];
-        setVariants(vs);
-        if (vs && vs[0]) setSelectedVariantId(Number(vs[0].id));
-      } catch {}
-    })();
+    fetchVariants();
   }, [product.id]);
 
-const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
-  const displayPrice = selectedVariant ? Number(selectedVariant.price) : Number(product.cost_per_unit);
+  // Ensure latest variants are visible when opening the product details
+  useEffect(() => {
+    if (detailsVisible) fetchVariants();
+  }, [detailsVisible]);
+
+  const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
+  const minVariant = variants.reduce((acc: any, v: any) => acc && acc.price <= v.price ? acc : v, variants[0]);
+  const serverMinPrice = (product as any).min_price != null ? Number((product as any).min_price) : undefined;
+  const serverMinLabel = (product as any).min_label as string | undefined;
   const selParsed = parseVariantLabel(selectedVariant?.label);
+  const minParsed = parseVariantLabel(minVariant?.label);
+  const serverParsed = parseVariantLabel(serverMinLabel);
+  const displayPrice = selectedVariant ? Number(selectedVariant.price)
+    : (variants.length ? Number(minVariant?.price) : (serverMinPrice ?? Number(product.cost_per_unit)));
+  const displayLabel = selectedVariant ? (selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant?.label || ''))
+    : (variants.length ? (minParsed.quantity && minParsed.unit ? `${minParsed.quantity} ${minParsed.unit}` : (minVariant?.label || ''))
+       : (serverParsed.quantity && serverParsed.unit ? `${serverParsed.quantity} ${serverParsed.unit}` : (serverMinLabel || '')));
+
+  const [chooserVisible, setChooserVisible] = useState(false);
+
+  const doAddToCart = async (qty: number, variantId?: number) => {
+    const success = await addItem(product.id, qty, variantId);
+    if (success) Alert.alert(t('common.success'), t('store.addedToCart'));
+    else Alert.alert(t('common.error'), t('store.addToCartError'));
+  };
 
   const handleAddToCart = async () => {
-    if (product.stock_available <= 0) {
-      Alert.alert(t('store.outOfStock'), t('store.outOfStock'));
-      return;
-    }
-    if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) {
-      Alert.alert(t('common.error'), t('cart.invalidQuantity'));
-      return;
-    }
-    const success = await addItem(product.id, selectedQuantity, selectedVariantId);
-    if (success) {
-      Alert.alert(t('common.success'), t('store.addedToCart'));
-    } else {
-      Alert.alert(t('common.error'), t('store.addToCartError'));
-    }
+    // If variants exist, show chooser modal to select variant and quantity
+    if (variants.length > 0) { setChooserVisible(true); return; }
+    if (product.stock_available <= 0) { Alert.alert(t('store.outOfStock'), t('store.outOfStock')); return; }
+    if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) { Alert.alert(t('common.error'), t('cart.invalidQuantity')); return; }
+    await doAddToCart(selectedQuantity, undefined);
   };
 
   const [detailsVisible, setDetailsVisible] = useState(false);
@@ -160,7 +181,7 @@ const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVaria
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
             <Text style={[styles.price, compact && styles.priceCompact]}>
-              Rs. {displayPrice}{selectedVariant && selParsed.quantity && selParsed.unit ? ` / ${selParsed.quantity} ${selParsed.unit}` : ''}
+              Rs. {displayPrice}{displayLabel ? ` / ${displayLabel}` : ''}
             </Text>
             {variants.length > 0 && (
               <View style={{ marginTop: 6 }}>
@@ -311,6 +332,49 @@ const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVaria
           </View>
         </ScrollView>
         <SafeAreaView style={{ backgroundColor:'#fff' }} />
+      </Modal>
+
+      {/* Variant chooser on + button */}
+      <Modal visible={chooserVisible} transparent animationType="fade" onRequestClose={()=> setChooserVisible(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ width:'92%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+              <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Select Variant</Text>
+              <TouchableOpacity onPress={()=> setChooserVisible(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding:16 }}>
+              {variants.length === 0 ? (
+                <Text style={{ color:'#666' }}>No variants available</Text>
+              ) : variants.map(v => {
+                const p = parseVariantLabel(v.label);
+                const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                const active = Number(v.id) === Number(selectedVariantId);
+                return (
+                  <TouchableOpacity key={v.id} style={{ paddingVertical:10, borderBottomWidth:1, borderBottomColor:'#f0f0f0', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }} onPress={()=> setSelectedVariantId(Number(v.id))}>
+                    <Text style={{ color: active? '#4caf50':'#333', fontWeight: active? '700':'600' }}>{qtyUnit} — Rs. {v.price} {typeof v.stock_available==='number'? `(Stock: ${v.stock_available})`: ''}</Text>
+                    {active ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop: 12 }}>
+                <View style={[styles.qtyPill, { paddingHorizontal: 16, height: 40, borderRadius: 12 }] }>
+                  <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}>
+                    <Ionicons name="remove" size={18} color="#2d5016" />
+                  </TouchableOpacity>
+                  <Text style={[styles.qtyText, { fontSize: 16 }]}>{selectedQuantity}</Text>
+                  <TouchableOpacity onPress={() => setSelectedQuantity(q => q + 1)}>
+                    <Ionicons name="add" size={18} color="#2d5016" />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={[styles.fabAdd, { paddingHorizontal: 18, borderRadius: 10 }]} onPress={async ()=> { await doAddToCart(selectedQuantity, selectedVariantId); setChooserVisible(false); }}>
+                  <Text style={{ color:'#fff', fontWeight:'700' }}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
     </TouchableOpacity>

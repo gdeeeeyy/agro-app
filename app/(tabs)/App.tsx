@@ -398,6 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    width: '100%',
   },
   actionButtonText: {
     color: '#fff',

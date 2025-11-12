@@ -98,9 +98,11 @@ export default function AdminDashboard() {
   const [variantsVisible, setVariantsVisible] = useState(false);
   const [variantsProductId, setVariantsProductId] = useState<number | null>(null);
   const [variants, setVariants] = useState<any[]>([]);
-  const [newVarLabel, setNewVarLabel] = useState('');
+  const [newVarQty, setNewVarQty] = useState('');
+  const [newVarUnit, setNewVarUnit] = useState('g');
   const [newVarPrice, setNewVarPrice] = useState('');
   const [newVarStock, setNewVarStock] = useState('');
+  const unitsList = ['g','kg','mL','Litres','Nos','Pieces'];
   // Draft variants when adding a new product
   const [draftVariants, setDraftVariants] = useState<{ label: string; price: number; stock_available: number; }[]>([]);
 
@@ -149,7 +151,7 @@ export default function AdminDashboard() {
   const openAddModal = () => {
     resetForm();
     setDraftVariants([]);
-    setNewVarLabel(''); setNewVarPrice(''); setNewVarStock('');
+    setNewVarQty(''); setNewVarUnit('g'); setNewVarPrice(''); setNewVarStock('');
     setModalVisible(true);
   };
 
@@ -268,10 +270,12 @@ const pickImage = async () => {
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim() ||
-        !formData.details.trim() ||
-        !formData.stock_available.trim() || !formData.cost_per_unit.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields and select at least one keyword');
+    if (!formData.name.trim() || !formData.details.trim()) {
+      Alert.alert('Error', 'Please fill in product name and description');
+      return;
+    }
+    if (!editingProduct && draftVariants.length === 0) {
+      Alert.alert('Error', 'Add at least one variant');
       return;
     }
 
@@ -283,10 +287,10 @@ const pickImage = async () => {
       name_ta: formData.name_ta?.trim() || undefined,
       details_ta: formData.details_ta?.trim() || undefined,
       image: formData.image || undefined,
-      stock_available: formData.stock_available ? parseInt(formData.stock_available) : 0,
-      cost_per_unit: formData.cost_per_unit ? parseFloat(formData.cost_per_unit) : 0,
-      unit: formData.unit?.trim() || undefined,
       seller_name: formData.seller_name?.trim() || undefined,
+      // Required by server schema (NOT NULL); will be corrected after variants are added
+      stock_available: 0,
+      cost_per_unit: 0,
     };
 
     try {
@@ -308,6 +312,12 @@ const pickImage = async () => {
               const db = await import('../../lib/database');
               for (const v of draftVariants) {
                 await db.addProductVariant(Number(productId), v);
+              }
+              // Compute fallback stock/price for compatibility
+              const totalStock = draftVariants.reduce((s, v) => s + (Number(v.stock_available)||0), 0);
+              const minPrice = draftVariants.reduce((m, v) => Math.min(m, Number(v.price)||0), Number.POSITIVE_INFINITY);
+              if (isFinite(minPrice)) {
+                await updateProduct(Number(productId), { stock_available: totalStock, cost_per_unit: minPrice });
               }
             } catch {}
           }
@@ -400,12 +410,21 @@ const pickImage = async () => {
 
       <View style={styles.productActions}>
         {isMaster && (
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => openEditModal(item)}
-          >
-            <Ionicons name="pencil" size={20} color="#4caf50" />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => openEditModal(item)}
+            >
+              <Ionicons name="pencil" size={20} color="#4caf50" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.variantButton}
+              onPress={() => openEditModal(item)}
+              accessibilityLabel="Manage Variants"
+            >
+              <Ionicons name="options" size={20} color="#00bcd4" />
+            </TouchableOpacity>
+          </>
         )}
         
         <TouchableOpacity
@@ -555,7 +574,7 @@ const pickImage = async () => {
               numberOfLines={4}
             />
 
-            {/* Variants (log details) */}
+            {/* Variants (define all product units/pricing here) */}
             {!editingProduct ? (
               <View style={{ marginTop: 8, marginBottom: 12 }}>
                 <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 6 }}>Variants</Text>
@@ -567,15 +586,22 @@ const pickImage = async () => {
                     </TouchableOpacity>
                   </View>
                 ))}
-                <TextInput style={styles.input} placeholder="Label (e.g., 500 g)" placeholderTextColor="#666" value={newVarLabel} onChangeText={setNewVarLabel} />
                 <View style={{ flexDirection:'row', gap:8 }}>
+                  <TextInput style={[styles.input, { flex:1 }]} placeholder="Qty" placeholderTextColor="#666" keyboardType="numeric" value={newVarQty} onChangeText={setNewVarQty} />
+                  <TouchableOpacity style={[styles.input, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> { /* simple cycle through units for now */ const idx = unitsList.indexOf(newVarUnit); setNewVarUnit(unitsList[(idx+1) % unitsList.length]); }}>
+                    <Text style={{ color:'#333' }}>{newVarUnit}</Text>
+                    <Ionicons name="swap-vertical" size={18} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection:'row', gap:8, marginTop: 8 }}>
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={newVarPrice} onChangeText={setNewVarPrice} />
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Stock" placeholderTextColor="#666" keyboardType="numeric" value={newVarStock} onChangeText={setNewVarStock} />
                 </View>
                 <TouchableOpacity style={[styles.saveButton, { marginTop: 8 }]} onPress={() => {
-                  if (!newVarLabel.trim() || !newVarPrice.trim()) return;
-                  setDraftVariants(prev => [...prev, { label: newVarLabel.trim(), price: Number(newVarPrice), stock_available: Number(newVarStock||0) }]);
-                  setNewVarLabel(''); setNewVarPrice(''); setNewVarStock('');
+                  if (!newVarQty.trim() || !newVarPrice.trim()) return;
+                  const label = `${newVarQty.trim()} ${newVarUnit}`;
+                  setDraftVariants(prev => [...prev, { label, price: Number(newVarPrice), stock_available: Number(newVarStock||0) }]);
+                  setNewVarQty(''); setNewVarPrice(''); setNewVarStock('');
                 }}>
                   <Text style={styles.saveButtonText}>Add Variant</Text>
                 </TouchableOpacity>
@@ -589,23 +615,32 @@ const pickImage = async () => {
                 {variants.map(v => (
                   <View key={v.id} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:8, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}>
                     <Text style={{ color:'#333' }}>{v.label} — Rs. {v.price} • Stock: {v.stock_available}</Text>
-                    <TouchableOpacity onPress={async ()=> { await (await import('../../lib/database')).deleteProductVariant(Number(v.id)); const list = await (await import('../../lib/database')).getProductVariants(Number(variantsProductId)); setVariants(list as any[]); }}>
+                    <TouchableOpacity onPress={async ()=> { await (await import('../../lib/database')).deleteProductVariant(Number(v.id)); const db = await import('../../lib/database'); const list = await db.getProductVariants(Number(variantsProductId)); setVariants(list as any[]); try { const totalStock = (list as any[]).reduce((s, it:any)=> s + (Number(it.stock_available)||0), 0); const minPrice = (list as any[]).reduce((m, it:any)=> Math.min(m, Number(it.price)||0), Number.POSITIVE_INFINITY); if (isFinite(minPrice as any)) { await updateProduct(Number(variantsProductId), { stock_available: totalStock, cost_per_unit: minPrice }); } } catch {} }}>
                       <Ionicons name="trash" size={18} color="#d32f2f" />
                     </TouchableOpacity>
                   </View>
                 ))}
-                <TextInput style={styles.input} placeholder="Label (e.g., 500 g)" placeholderTextColor="#666" value={newVarLabel} onChangeText={setNewVarLabel} />
                 <View style={{ flexDirection:'row', gap:8 }}>
+                  <TextInput style={[styles.input, { flex:1 }]} placeholder="Qty" placeholderTextColor="#666" keyboardType="numeric" value={newVarQty} onChangeText={setNewVarQty} />
+                  <TouchableOpacity style={[styles.input, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> { const idx = unitsList.indexOf(newVarUnit); setNewVarUnit(unitsList[(idx+1) % unitsList.length]); }}>
+                    <Text style={{ color:'#333' }}>{newVarUnit}</Text>
+                    <Ionicons name="swap-vertical" size={18} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection:'row', gap:8, marginTop: 8 }}>
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={newVarPrice} onChangeText={setNewVarPrice} />
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Stock" placeholderTextColor="#666" keyboardType="numeric" value={newVarStock} onChangeText={setNewVarStock} />
                 </View>
                 <TouchableOpacity style={[styles.saveButton, { marginTop: 8 }]} onPress={async ()=>{
-                  if (!variantsProductId || !newVarLabel.trim() || !newVarPrice.trim()) return;
-                  const ok = await (await import('../../lib/database')).addProductVariant(Number(variantsProductId), { label: newVarLabel.trim(), price: Number(newVarPrice), stock_available: Number(newVarStock||0) });
+                  if (!variantsProductId || !newVarQty.trim() || !newVarPrice.trim()) return;
+                  const label = `${newVarQty.trim()} ${newVarUnit}`;
+                  const ok = await (await import('../../lib/database')).addProductVariant(Number(variantsProductId), { label, price: Number(newVarPrice), stock_available: Number(newVarStock||0) });
                   if (ok) {
-                    const list = await (await import('../../lib/database')).getProductVariants(Number(variantsProductId));
+                    const db = await import('../../lib/database');
+                    const list = await db.getProductVariants(Number(variantsProductId));
                     setVariants(list as any[]);
-                    setNewVarLabel(''); setNewVarPrice(''); setNewVarStock('');
+                    try { const totalStock = (list as any[]).reduce((s, it:any)=> s + (Number(it.stock_available)||0), 0); const minPrice = (list as any[]).reduce((m, it:any)=> Math.min(m, Number(it.price)||0), Number.POSITIVE_INFINITY); if (isFinite(minPrice as any)) { await updateProduct(Number(variantsProductId), { stock_available: totalStock, cost_per_unit: minPrice }); } } catch {}
+                    setNewVarQty(''); setNewVarPrice(''); setNewVarStock('');
                   }
                 }}>
                   <Text style={styles.saveButtonText}>Add Variant</Text>
@@ -623,44 +658,6 @@ const pickImage = async () => {
             {formData.image && (
               <Image source={{ uri: formData.image }} style={styles.previewImage} />
             )}
-
-            <TextInput
-              style={styles.input}
-              placeholder="Stock Available"
-              placeholderTextColor="#999"
-              value={formData.stock_available}
-              onChangeText={(text) => setFormData({ ...formData, stock_available: text })}
-              keyboardType="numeric"
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Cost per Unit"
-              placeholderTextColor="#999"
-              value={formData.cost_per_unit}
-              onChangeText={(text) => setFormData({ ...formData, cost_per_unit: text })}
-              keyboardType="numeric"
-            />
-
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ marginBottom: 6, color: '#666', fontSize: 14, fontWeight: '600' }}>Unit</Text>
-              <TouchableOpacity
-                style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-                onPress={() => setUnitPickerOpen(prev => !prev)}
-              >
-                <Text style={{ color: '#333' }}>{formData.unit || 'Select unit'}</Text>
-                <Ionicons name="chevron-down" size={18} color="#666" />
-              </TouchableOpacity>
-              {unitPickerOpen && (
-                <View style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, backgroundColor: '#fff', marginTop: 6, overflow: 'hidden' }}>
-                  {['kg','grams','Litres','mL','Nos','Pieces'].map(u => (
-                    <TouchableOpacity key={u} onPress={() => { setFormData({ ...formData, unit: u }); setUnitPickerOpen(false); }} style={{ paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}>
-                      <Text style={{ color: '#333' }}>{u}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
           </ScrollView>
 
           <View style={styles.modalFooter}>
@@ -900,6 +897,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   editButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  variantButton: {
     padding: 8,
     marginRight: 8,
   },

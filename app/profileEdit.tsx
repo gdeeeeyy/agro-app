@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../context/UserContext';
 import { router } from 'expo-router';
 import TopBar from '../components/TopBar';

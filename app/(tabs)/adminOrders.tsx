@@ -46,15 +46,14 @@ const ORDER_STATUSES = [
   { value: 'pending', label: 'Pending', icon: 'time', color: '#ff9800' },
   { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle', color: '#2196f3' },
   { value: 'processing', label: 'Processing', icon: 'sync', color: '#9c27b0' },
-  { value: 'shipped', label: 'Shipped', icon: 'airplane', color: '#00bcd4' },
-  { value: 'delivered', label: 'Delivered', icon: 'checkmark-done-circle', color: '#4caf50' },
+  { value: 'dispatched', label: 'Dispatched', icon: 'airplane', color: '#00bcd4' },
   { value: 'cancelled', label: 'Cancelled', icon: 'close-circle', color: '#f44336' },
 ];
 
 const PRE_CONFIRM_OPTIONS = ['confirmed', 'cancelled'] as const;
-const POST_CONFIRM_OPTIONS = ['processing', 'shipped', 'delivered'] as const;
+const POST_CONFIRM_OPTIONS = ['processing', 'dispatched'] as const;
 
-const getStatusMeta = (value: string) => ORDER_STATUSES.find(s => s.value === value);
+const getStatusMeta = (value: string) => ORDER_STATUSES.find(s => s.value === (value==='shipped'||value==='delivered'?'dispatched':value));
 
 export default function AdminOrders() {
   const { user } = useContext(UserContext);
@@ -183,7 +182,9 @@ export default function AdminOrders() {
 
 
   const getStatusColor = (status: string) => {
-    const statusObj = ORDER_STATUSES.find(s => s.value === status.toLowerCase());
+    const s = status.toLowerCase();
+    const norm = (s==='shipped' || s==='delivered') ? 'dispatched' : s;
+    const statusObj = ORDER_STATUSES.find(st => st.value === norm);
     return statusObj?.color || '#666';
   };
 
@@ -400,9 +401,10 @@ export default function AdminOrders() {
                       {(() => {
                         const s = (newStatus || selectedOrder?.status || '').toLowerCase();
                         if (stage1Choice !== 'confirmed') return 'Step 2: Available after confirmation';
-                        const isPost = POST_CONFIRM_OPTIONS.includes(s as any);
+                        const norm = (s==='shipped'||s==='delivered') ? 'dispatched' : s;
+                        const isPost = POST_CONFIRM_OPTIONS.includes(norm as any);
                         if (!isPost) return 'Step 2: Select next status';
-                        const meta = getStatusMeta(s);
+                        const meta = getStatusMeta(norm);
                         return `Step 2: ${meta?.label || 'Select next status'}`;
                       })()}
                     </Text>

@@ -16,8 +16,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
-import { getAllCrops, addScanPlant, getCropGuide, listCropPests, listCropDiseases, listCropPestImages, listCropDiseaseImages } from '../../lib/database';
+import { getAllCrops, addScanPlant, getCropGuide, listCropPests, listCropDiseases, listCropPestImages, listCropDiseaseImages, getNotifications } from '../../lib/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useContext } from 'react';
+import { UserContext } from '../../context/UserContext';
 // import { resetDatabase } from '../../lib/resetDatabase';
 
 // (async () => {
@@ -50,6 +52,7 @@ function getWeatherIconFromCode(code?: number): keyof typeof Ionicons.glyphMap {
 
 export default function Home() {
   const { t, currentLanguage } = useLanguage();
+  const { user } = useContext(UserContext);
 
   // Crop Doctor selection
   const [cropModalVisible, setCropModalVisible] = useState(false);
@@ -60,6 +63,12 @@ export default function Home() {
 
   // Weather state
   const [weather, setWeather] = useState<{ temperature: number; humidity?: number; wind?: number } | null>(null);
+  // Notifications
+  const [notifVisible, setNotifVisible] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const loadNotifications = async () => {
+    try { const rows = await getNotifications(user?.id || undefined); setNotifications(rows as any[]); } catch {}
+  };
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [locationLabel, setLocationLabel] = useState<string>('');
   const [hourly, setHourly] = useState<Array<{ time: string; temperature: number; code?: number }>>([]);
@@ -177,9 +186,14 @@ export default function Home() {
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{t('home.weatherTitle')}</Text>
-          <TouchableOpacity onPress={fetchWeather} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 }}>
-            <Ionicons name="refresh" size={18} color="#2d5016" />
-          </TouchableOpacity>
+          <View style={{ flexDirection:'row', alignItems:'center' }}>
+            <TouchableOpacity onPress={() => setNotifVisible(true)} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 }}>
+              <Ionicons name="notifications" size={18} color="#2d5016" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={fetchWeather} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 }}>
+              <Ionicons name="refresh" size={18} color="#2d5016" />
+            </TouchableOpacity>
+          </View>
         </View>
         {weatherLoading ? (
           <Text style={{ color: '#666', marginTop: 8 }}>{t('common.loading')}</Text>
@@ -444,6 +458,31 @@ export default function Home() {
               </View>
             </View>
           )}
+        </View>
+      </Modal>
+
+      {/* Notifications modal */}
+      <Modal visible={notifVisible} transparent animationType="fade" onShow={loadNotifications} onRequestClose={() => setNotifVisible(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ width:'92%', maxHeight:'70%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
+            <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+              <Text style={{ fontSize: 18, fontWeight:'700', color:'#333' }}>Notifications</Text>
+              <TouchableOpacity onPress={() => setNotifVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding:16 }}>
+              {notifications.length === 0 ? (
+                <Text style={{ color:'#666' }}>No notifications yet</Text>
+              ) : notifications.map((n:any)=> (
+                <View key={n.id} style={{ paddingVertical:10, borderBottomWidth:1, borderBottomColor:'#f0f0f0' }}>
+                  <Text style={{ fontWeight:'700', color:'#2d5016' }}>{n.title}</Text>
+                  <Text style={{ color:'#333', marginTop:4 }}>{n.message}</Text>
+                  <Text style={{ color:'#999', fontSize:12, marginTop:2 }}>{new Date(n.created_at || Date.now()).toLocaleString()}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>

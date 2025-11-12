@@ -164,6 +164,14 @@ if (Platform.OS !== 'web') (async () => {
       name TEXT NOT NULL UNIQUE,
       name_ta TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      user_id INTEGER NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   try {
@@ -302,24 +310,59 @@ export async function getAllPlants(userId: number) {
 }
 
 // Product functions
+export async function listUsersBasic() {
+  try {
+    if (API_URL) {
+      try { return await api.get('/users-basic'); }
+      catch (e) { /* fall back to local if endpoint missing */ }
+    }
+    const rows = await db.getAllAsync('SELECT id, full_name, number FROM users ORDER BY created_at ASC');
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
+export async function getNotifications(userId?: number) {
+  try {
+    if (API_URL) {
+      const path = userId ? `/notifications?userId=${userId}` : '/notifications';
+      return await api.get(path);
+    }
+    if (userId) return await db.getAllAsync('SELECT * FROM notifications WHERE user_id IS NULL OR user_id = ? ORDER BY created_at DESC', userId);
+    return await db.getAllAsync('SELECT * FROM notifications WHERE user_id IS NULL ORDER BY created_at DESC');
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+}
+
+export async function publishSystemNotification(title: string, message: string) {
+  try {
+    if (API_URL) {
+      const res = await api.post('/notifications', { title, message });
+      return (res as any)?.id || null;
+    }
+    const r = await db.runAsync('INSERT INTO notifications (title, message, user_id) VALUES (?, ?, NULL)', title, message);
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+
 export async function getAllProducts() {
   try {
-    if (API_URL) return await api.get('/products');
+    if (API_URL) {
+      try { return await api.get('/products'); } catch (e) { /* fall through to local */ }
+    }
     const rows = await db.getAllAsync("SELECT * FROM products ORDER BY created_at DESC");
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Local fetch error:", err);
     return [];
   }
 }
 
 export async function getProductById(id: number) {
   try {
-    if (API_URL) return await api.get(`/products/${id}`);
+    if (API_URL) { try { return await api.get(`/products/${id}`); } catch (e) { /* fall back */ } }
     const rows = await db.getAllAsync("SELECT * FROM products WHERE id = ?", id);
     return rows[0] || null;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Local fetch error:", err);
     return null;
   }
 }
@@ -424,7 +467,7 @@ export async function deleteProduct(id: number) {
 
 export async function searchProducts(keywords: string) {
   try {
-    if (API_URL) return await api.get(`/products/search?q=${encodeURIComponent(keywords)}`);
+    if (API_URL) { try { return await api.get(`/products/search?q=${encodeURIComponent(keywords)}`); } catch (e) { /* fall back */ } }
     const searchTerm = `%${keywords.toLowerCase()}%`;
     const rows = await db.getAllAsync(
       "SELECT * FROM products WHERE LOWER(name) LIKE ? OR LOWER(plant_used) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(details) LIKE ? OR LOWER(name_ta) LIKE ? OR LOWER(plant_used_ta) LIKE ? OR LOWER(details_ta) LIKE ? ORDER BY created_at DESC",
@@ -1163,8 +1206,16 @@ export async function addProductVariant(productId: number, input: { label: strin
       try { const r = await api.post(`/products/${productId}/variants`, input); return (r as any).id || null; }
       catch { /* fall back to local */ }
     }
-    const r = await db.runAsync("INSERT INTO product_variants (product_id, label, price, stock_available) VALUES (?, ?, ?, ?)", productId, input.label, input.price, input.stock_available ?? 0);
-    return r.lastInsertRowId;
+    // UPSERT in SQLite to avoid UNIQUE(product_id,label) failures
+    await db.runAsync(
+      `INSERT INTO product_variants (product_id, label, price, stock_available)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(product_id, label)
+       DO UPDATE SET price=excluded.price, stock_available=excluded.stock_available, updated_at=CURRENT_TIMESTAMP`,
+      productId, input.label, input.price, input.stock_available ?? 0
+    );
+    const row = await db.getFirstAsync?.("SELECT id FROM product_variants WHERE product_id = ? AND label = ?", productId, input.label);
+    return row?.id ?? null;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
 export async function updateProductVariant(variantId: number, fields: { label?: string; price?: number; stock_available?: number; }) {

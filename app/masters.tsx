@@ -3,15 +3,18 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic } from '../lib/database';
+import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification } from '../lib/database';
 import { uploadImage } from '../lib/upload';
 import { UserContext } from '../context/UserContext';
 
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 export default function Masters() {
   const { user } = useContext(UserContext);
-  const isAdmin = user?.is_admin === 1;
+  const isAdmin = (user?.is_admin ?? 0) === 1;
+  const isMaster = (user?.is_admin ?? 0) === 2;
 
   // Crop Doctor Manager state
   const [guideModalVisible, setGuideModalVisible] = useState(false);
@@ -90,6 +93,10 @@ export default function Masters() {
   const [adminsLoading, setAdminsLoading] = useState(false);
   const [adminsFilter, setAdminsFilter] = useState('');
   const [adminCount, setAdminCount] = useState<number | null>(null);
+  // Notifications compose
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
 
   useEffect(() => { (async ()=>{ const all = await getAllCrops() as any[]; setCrops(all); if (all[0]) setSelectedCropId(Number(all[0].id)); })(); }, []);
   const [cropPickerOpen, setCropPickerOpen] = useState(false);
@@ -136,6 +143,23 @@ export default function Masters() {
       <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
         <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Masters</Text>
         <View style={{ gap: 10 }}>
+          {(isAdmin || isMaster) && (
+            <TouchableOpacity style={styles.masterBtn} onPress={async ()=>{
+              try {
+                const users = await listUsersBasic() as any[];
+                const rows = Array.isArray(users) ? users : [];
+                const html = `<!doctype html><html><head><meta charset='utf-8'><title>Users</title></head><body><h1>Users</h1><table border='1' cellspacing='0' cellpadding='6'><tr><th>ID</th><th>Name</th><th>Phone</th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.full_name||''}</td><td>${u.number||''}</td></tr>`).join('')}</table></body></html>`;
+                const file = await Print.printToFileAsync({ html });
+                if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Export Users PDF' });
+                else Alert.alert('Exported', file.uri);
+              } catch (e) {
+                Alert.alert('Error', 'Failed to export users');
+              }
+            }}>
+              <Ionicons name="download" size={18} color="#4caf50" />
+              <Text style={styles.masterBtnText}>Export Users PDF</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.masterBtn} onPress={() => setGuideModalVisible(true)}>
             <Ionicons name="book" size={18} color="#4caf50" />
             <Text style={styles.masterBtnText}>Crop Doctor Manager</Text>
@@ -176,6 +200,14 @@ export default function Masters() {
             <Ionicons name="receipt" size={18} color="#4caf50" />
             <Text style={styles.masterBtnText}>Manage Orders</Text>
           </TouchableOpacity>
+
+          {/* System Notifications */}
+          {isMaster && (
+            <TouchableOpacity style={styles.masterBtn} onPress={()=> setNotifModalVisible(true)}>
+              <Ionicons name="notifications" size={18} color="#4caf50" />
+              <Text style={styles.masterBtnText}>System Notifications</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -829,6 +861,31 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           </TouchableOpacity>
         </ScrollView>
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
+      </Modal>
+      {/* Notification compose modal */}
+      <Modal visible={notifModalVisible} transparent animationType="fade" onRequestClose={()=> setNotifModalVisible(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ width:'92%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+              <Text style={{ fontSize:18, fontWeight:'700' }}>Publish Notification</Text>
+              <TouchableOpacity onPress={()=> setNotifModalVisible(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding:16 }}>
+              <TextInput style={[styles.input,{ marginBottom:8 }]} placeholder="Title" placeholderTextColor="#999" value={notifTitle} onChangeText={setNotifTitle} />
+              <TextInput style={[styles.input,{ minHeight:100, textAlignVertical:'top' }]} placeholder="Message" placeholderTextColor="#999" value={notifMessage} onChangeText={setNotifMessage} multiline />
+              <TouchableOpacity style={[styles.masterBtn, { marginTop: 12 }]} onPress={async ()=>{
+                if (!notifTitle.trim() || !notifMessage.trim()) { Alert.alert('Error','Enter title and message'); return; }
+                const id = await publishSystemNotification(notifTitle.trim(), notifMessage.trim());
+                if (id) { Alert.alert('Sent','Notification published'); setNotifTitle(''); setNotifMessage(''); setNotifModalVisible(false); } else { Alert.alert('Error','Failed to publish'); }
+              }}>
+                <Ionicons name="send" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Publish</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );

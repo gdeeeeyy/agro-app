@@ -181,6 +181,15 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
+    // In-app notifications (system or per-user)
+    await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
+      id BIGSERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+
     // scan_plants table for mobile Scanner Plants
     await pool.query(`CREATE TABLE IF NOT EXISTS scan_plants (
       id BIGSERIAL PRIMARY KEY,
@@ -228,9 +237,11 @@ app.get('/health', async (req, res) => {
   try { await pool.query('select 1'); res.json({ ok: true }); } catch (e) { res.status(500).json({ ok: false }); }
 });
 
-// Block requests until migrations are done (prevents 502s from missing columns)
+// Block writes until migrations are done (reads allowed to avoid 503s on initial load)
 app.use((req, res, next) => {
-  if (!isReady) return res.status(503).json({ error: 'starting' });
+  if (!isReady && req.method !== 'GET' && req.path !== '/health') {
+    return res.status(503).json({ error: 'starting' });
+  }
   next();
 });
 
@@ -324,7 +335,12 @@ app.delete('/admins/:id', async (req, res) => {
 
 // Products
 app.get('/products', async (req, res) => {
-  res.json(await all('SELECT * FROM products ORDER BY created_at DESC'));
+  res.json(await all(`
+    SELECT p.*,
+           (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
+           (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
+    FROM products p
+    ORDER BY p.created_at DESC`));
 });
 
 // Place search routes BEFORE ":id" to avoid route shadowing
@@ -332,16 +348,25 @@ app.get('/products/search', async (req, res) => {
   const q = String(req.query.q || '').toLowerCase();
   const like = `%${q}%`;
   res.json(await all(
-    `SELECT * FROM products WHERE 
-      lower(name) LIKE $1 OR lower(plant_used) LIKE $1 OR lower(keywords) LIKE $1 OR lower(details) LIKE $1 OR
-      lower(name_ta) LIKE $1 OR lower(plant_used_ta) LIKE $1 OR lower(details_ta) LIKE $1
-     ORDER BY created_at DESC`, [like]
+    `SELECT p.*,
+            (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
+            (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
+     FROM products p WHERE 
+      lower(p.name) LIKE $1 OR lower(p.plant_used) LIKE $1 OR lower(p.keywords) LIKE $1 OR lower(p.details) LIKE $1 OR
+      lower(p.name_ta) LIKE $1 OR lower(p.plant_used_ta) LIKE $1 OR lower(p.details_ta) LIKE $1
+     ORDER BY p.created_at DESC`, [like]
   ));
 });
 
 app.get('/products/by-keyword', async (req, res) => {
   const like = `%${String(req.query.name || '').toLowerCase()}%`;
-  res.json(await all('SELECT * FROM products WHERE lower(keywords) LIKE $1 ORDER BY created_at DESC', [like]));
+  res.json(await all(`
+    SELECT p.*,
+           (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
+           (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
+    FROM products p
+    WHERE lower(p.keywords) LIKE $1
+    ORDER BY p.created_at DESC`, [like]));
 });
 
 app.get('/products/:id', async (req, res) => {
@@ -355,7 +380,7 @@ app.post('/products', async (req, res) => {
   const r = await one(
     `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.stock_available, p.cost_per_unit]
+    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0)]
   );
   res.json(r);
 });
@@ -385,7 +410,12 @@ app.get('/products/:id/variants', async (req, res) => {
 });
 app.post('/products/:id/variants', async (req, res) => {
   const { label, price, stock_available } = req.body || {};
-  const v = await one('INSERT INTO product_variants (product_id, label, price, stock_available) VALUES ($1,$2,$3,$4) RETURNING id', [req.params.id, label, Number(price), Number(stock_available||0)]);
+  const v = await one(`
+    INSERT INTO product_variants (product_id, label, price, stock_available)
+    VALUES ($1,$2,$3,$4)
+    ON CONFLICT (product_id, label)
+    DO UPDATE SET price=EXCLUDED.price, stock_available=EXCLUDED.stock_available, updated_at=now()
+    RETURNING id`, [req.params.id, label, Number(price), Number(stock_available||0)]);
   res.json(v);
 });
 app.patch('/variants/:id', async (req, res) => {
@@ -720,6 +750,27 @@ app.get('/orders/all', async (req, res) => {
   res.json(await all('SELECT o.*, u.full_name, u.number FROM orders o JOIN users u ON o.user_id=u.id ORDER BY o.created_at DESC'));
 });
 
+// Users basic export (name, number)
+app.get('/users-basic', async (req, res) => {
+  res.json(await all('SELECT id, full_name, number FROM users ORDER BY created_at ASC'));
+});
+
+// Notifications APIs
+app.get('/notifications', async (req, res) => {
+  const userId = req.query.userId ? Number(req.query.userId) : null;
+  if (userId) {
+    res.json(await all('SELECT * FROM notifications WHERE user_id IS NULL OR user_id=$1 ORDER BY created_at DESC', [userId]));
+  } else {
+    res.json(await all('SELECT * FROM notifications WHERE user_id IS NULL ORDER BY created_at DESC'));
+  }
+});
+app.post('/notifications', async (req, res) => {
+  const { title, message } = req.body || {};
+  if (!title || !message) return res.status(400).json({ error: 'title and message required' });
+  const r = await one('INSERT INTO notifications (title, message) VALUES ($1,$2) RETURNING id', [title, message]);
+  res.json(r);
+});
+
 app.patch('/orders/:id', async (req, res) => {
   const { status, statusNote, deliveryDate, logisticsName, trackingNumber, trackingUrl } = req.body || {};
   const set = []; const vals=[]; let i=1;
@@ -732,6 +783,16 @@ app.patch('/orders/:id', async (req, res) => {
   if (trackingUrl !== undefined) { set.push(`tracking_url=$${i++}`); vals.push(trackingUrl); }
   vals.push(req.params.id);
   await pool.query(`UPDATE orders SET ${set.join(', ')} WHERE id=$${i}`, vals);
+  // Send notification to the order owner (user-specific)
+  try {
+    const o = await one('SELECT user_id FROM orders WHERE id=$1', [req.params.id]);
+    if (o && o.user_id) {
+      const s = (status || '').toString();
+      const title = `Order #${req.params.id} Updated`;
+      const msg = `Status: ${s || 'updated'}${statusNote ? ` - ${statusNote}` : ''}`;
+      await pool.query('INSERT INTO notifications (title, message, user_id) VALUES ($1,$2,$3)', [title, msg, o.user_id]);
+    }
+  } catch {}
   res.json({ ok: true });
 });
 

@@ -25,7 +25,7 @@ export default function Profile() {
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
 
-        {user?.is_admin === 2 && (
+        {(user?.is_admin ?? 0) >= 1 && (
           <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/masters')}>
             <View style={styles.tileLeft}>
               <Ionicons name="construct" size={20} color="#4caf50" />

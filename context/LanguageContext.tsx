@@ -229,8 +229,7 @@ const translations = {
     'status.pending': 'Pending',
     'status.confirmed': 'Confirmed',
     'status.processing': 'Processing',
-    'status.shipped': 'Shipped',
-    'status.delivered': 'Delivered',
+'status.dispatched': 'Dispatched',
 'status.cancelled': 'Cancelled',
 
     // Scanner / Analysis UI
@@ -491,8 +490,7 @@ const translations = {
     'status.pending': 'நிலுவையில்',
     'status.confirmed': 'உறுதிப்படுத்தப்பட்டது',
     'status.processing': 'செயலாக்கத்தில்',
-    'status.shipped': 'அனுப்பப்பட்டது',
-    'status.delivered': 'வழங்கப்பட்டது',
+'status.dispatched': 'அனுப்பப்பட்டது',
 'status.cancelled': 'ரத்து செய்யப்பட்டது',
 
     // Scanner / Analysis UI

@@ -86,9 +86,9 @@ export default function Orders() {
       case 'processing':
         return '#9c27b0';
       case 'shipped':
-        return '#00bcd4';
       case 'delivered':
-        return '#4caf50';
+      case 'dispatched':
+        return '#00bcd4';
       case 'cancelled':
         return '#f44336';
       default:
@@ -117,9 +117,9 @@ export default function Orders() {
       case 'processing':
         return 'sync';
       case 'shipped':
-        return 'airplane';
       case 'delivered':
-        return 'checkmark-done-circle';
+      case 'dispatched':
+        return 'airplane';
       case 'cancelled':
         return 'close-circle';
       default:
@@ -141,7 +141,7 @@ export default function Orders() {
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Ionicons name={getStatusIcon(item.status) as any} size={16} color="#fff" />
-          <Text style={styles.statusText}>{t(`status.${item.status.toLowerCase()}`)}</Text>
+          <Text style={styles.statusText}>{t(`status.${(['shipped','delivered'].includes(item.status.toLowerCase())?'dispatched':item.status.toLowerCase())}`)}</Text>
         </View>
       </View>
 
