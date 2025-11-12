@@ -211,6 +211,10 @@ async function runMigrations() {
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       PRIMARY KEY (conversation_id, user_id)
     )`);
+    // Backfill columns if table exists with older schema
+    await pool.query("ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS conversation_id BIGINT");
+    await pool.query("ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS user_id BIGINT");
+
     await pool.query(`CREATE TABLE IF NOT EXISTS messages (
       id BIGSERIAL PRIMARY KEY,
       conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -218,7 +222,13 @@ async function runMigrations() {
       text TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at)");
+    // Backfill messages columns if missing
+    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS conversation_id BIGINT");
+    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id BIGINT");
+    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS text TEXT");
+    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()");
+    // Safe index creation
+    try { await pool.query("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at)"); } catch (ie) { console.warn('Index create warn:', ie.message); }
 
     // In-app notifications (system or per-user)
     await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
