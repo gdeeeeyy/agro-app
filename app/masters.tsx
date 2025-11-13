@@ -16,7 +16,6 @@ export default function Masters() {
   const { user } = useContext(UserContext);
   const isAdmin = (user?.is_admin ?? 0) === 1;
   const isMaster = (user?.is_admin ?? 0) === 2;
-  const isSupport = (user?.is_admin ?? 0) === 3;
 
 
   // Crop Doctor Manager state
@@ -149,22 +148,10 @@ export default function Masters() {
         <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Masters</Text>
         <View style={{ gap: 10 }}>
           {/* Vendors: show only Products */}
-          {isAdmin && !isMaster && !isSupport ? (
+          {isAdmin && !isMaster ? (
             <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
               <Ionicons name="pricetags" size={18} color="#4caf50" />
               <Text style={styles.masterBtnText}>Products</Text>
-            </TouchableOpacity>
-          ) : isSupport ? (
-            <TouchableOpacity style={[styles.masterBtn, { justifyContent:'space-between' }]} onPress={() => router.push('/scan-messages')}>
-              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                <Ionicons name="chatbubble-ellipses" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Support Messages</Text>
-              </View>
-              {typeof (global as any).__supportUnread === 'number' && (global as any).__supportUnread > 0 ? (
-                <View style={{ minWidth:22, height:22, borderRadius:11, backgroundColor:'#e53935', alignItems:'center', justifyContent:'center', paddingHorizontal:6 }}>
-                  <Text style={{ color:'#fff', fontWeight:'800', fontSize:12 }}>{(global as any).__supportUnread}</Text>
-                </View>
-              ) : null}
             </TouchableOpacity>
           ) : (
             <>

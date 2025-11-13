@@ -13,6 +13,7 @@ import {
   ScrollView,
   TextInput,
   InteractionManager,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
@@ -203,8 +204,59 @@ export default function Home() {
   const [sheetLoading, setSheetLoading] = useState(false);
   const [viewImg, setViewImg] = useState<{ uri: string; caption?: string } | null>(null);
 
+  // Agricultural News (India)
+  const [news, setNews] = useState<Array<{ title: string; link: string; pubDate?: string }>>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
+  const decodeHtml = (input: string) => {
+    if (!input) return '';
+    return input
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+  };
+
+
+  const fetchNews = async () => {
+    try {
+      setNewsLoading(true);
+      // Google News RSS for agriculture
+      const url = 'https://news.google.com/rss/search?q=agriculture&hl=en-IN&gl=IN&ceid=IN:en';
+      const res = await fetch(url);
+      const xml = await res.text();
+      const items: Array<{ title: string; link: string; pubDate?: string; image?: string }> = [];
+      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+      let m: RegExpExecArray | null;
+      while ((m = itemRegex.exec(xml)) !== null) {
+        const block = m[1];
+        const get = (tag: string) => {
+          const r = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i');
+          const mm = r.exec(block);
+          const raw = mm ? mm[1] : '';
+          const unCdata = raw.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1');
+          return decodeHtml(unCdata);
+        };
+        const title = get('title');
+        const link = get('link');
+        const pubDate = get('pubDate');
+        if (title && link) items.push({ title, link, pubDate });
+        if (items.length >= 12) break;
+      }
+      setNews(items);
+    } catch {
+      setNews([]);
+    } finally {
+      setNewsLoading(false);
+    }
+  };
+  useEffect(() => { fetchNews(); }, []);
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 16 }}>
       <AppHeader />
 
       {/* Weather */}
@@ -317,6 +369,33 @@ export default function Home() {
             <Text style={{ color: '#666' }}>{t('home.tapManage')}</Text>
           )}
         </ScrollView>
+      </View>
+
+      {/* Agricultural News */}
+      <View style={{ backgroundColor:'#fff', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+        <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+          <Text style={{ fontSize:20, fontWeight:'700', color:'#2d5016' }}>Agricultural News</Text>
+          <TouchableOpacity onPress={fetchNews} style={{ paddingHorizontal:8, paddingVertical:6, borderRadius:8 }}>
+            <Ionicons name="refresh" size={18} color="#2d5016" />
+          </TouchableOpacity>
+        </View>
+        {newsLoading ? (
+          <Text style={{ color:'#666', marginTop:8 }}>Loading...</Text>
+        ) : news.length === 0 ? (
+          <Text style={{ color:'#666', marginTop:8 }}>No news available</Text>
+        ) : (
+          <View style={{ marginTop: 12 }}>
+            {news.slice(0,10).map((n, idx) => (
+              <TouchableOpacity key={idx} onPress={()=> Linking.openURL(n.link)} style={{ marginBottom: 12, borderWidth:1, borderColor:'#e0e0e0', borderRadius:12, backgroundColor:'#fff', overflow:'hidden' }}>
+                <View style={{ padding: 12 }}>
+                  <Text style={{ color:'#2d5016', fontWeight:'800', fontSize: 16 }} numberOfLines={3}>{n.title}</Text>
+                  {n.pubDate ? <Text style={{ color:'#999', fontSize:12, marginTop:4 }}>{new Date(n.pubDate).toLocaleString()}</Text> : null}
+                  <Text style={{ color:'#1e88e5', fontSize:12, marginTop:6 }}>Read full story</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Crop selection modal */}
@@ -507,7 +586,7 @@ export default function Home() {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 

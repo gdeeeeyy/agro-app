@@ -40,12 +40,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const { user } = useContext(UserContext);
 
-  // Assistance state
-  const [assistanceOpen, setAssistanceOpen] = useState(false);
-  const [assistanceAdminId, setAssistanceAdminId] = useState<number | null>(null);
-  const [admins, setAdmins] = useState<any[]>([]);
-  const [sending, setSending] = useState(false);
-
   // Function to extract relevant keywords from analysis
   const extractKeywordsFromAnalysis = (analysis: any, plantName: string): string[] => {
     const keywords: string[] = [];
@@ -200,11 +194,6 @@ mediaTypes: ['images'] as any,
         const rows = await getAllCrops() as any[];
         setPickerCrops(rows);
       } catch {}
-      try {
-        const db = await import('../../lib/database');
-        const list = await db.listAdmins();
-        setAdmins(list as any[]);
-      } catch {}
     })();
   }, []);
 
@@ -269,14 +258,6 @@ mediaTypes: ['images'] as any,
 
         {result && !result.error && <PlantAnalysis data={result} />}
 
-        {/* Further assistance CTA */}
-        {result && !result.error && (
-          <View style={{ marginTop: 12 }}>
-            <TouchableOpacity style={[styles.analyzeButton, { backgroundColor:'#1e88e5' }]} onPress={()=> setAssistanceOpen(true)}>
-              <Text style={styles.analyzeButtonText}>{currentLanguage==='ta' ? 'மேலும் விவரங்கள் வேண்டுமா? மேலும் உதவிக்கு இங்கே கிளிக் செய்யவும்' : 'Need more details? Click here for further assistance'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {recommendedProducts.length > 0 && (
           <View style={styles.recommendationsSection}>
@@ -289,89 +270,9 @@ mediaTypes: ['images'] as any,
             ))}
           </View>
         )}
-        {/* Always-visible Further Assistance button to open messaging area */}
-        <TouchableOpacity style={[styles.analyzeButton, { backgroundColor:'#1e88e5' }]} onPress={async ()=> {
-          try {
-            if (!user) { Alert.alert(t('scanner.error'), t('scanner.loginRequired')); return; }
-            const db = await import('../../lib/database');
-            const allAdmins = await db.listAdmins();
-            const supportIds = (Array.isArray(allAdmins)? allAdmins: []).filter((a:any)=> Number(a.is_admin)===3).map((a:any)=> Number(a.id));
-            const convs = await db.listConversations(Number(user.id)) as any[];
-            const hasSupportMember = (ids:number[]) => ids.some(id => supportIds.includes(Number(id)));
-            let targetId: number | null = null;
-            for (const c of (convs||[])) {
-              const ids = (c.participant_ids||[]).map((x:any)=> Number(x));
-              if (hasSupportMember(ids)) { targetId = Number(c.id); break; }
-            }
-            if (!targetId) {
-              const participants = supportIds.length ? [Number(user.id), ...supportIds] : [Number(user.id)];
-              const created = await db.createConversation(participants, undefined, Number(user.id));
-              targetId = Number((created as any)?.id || 0);
-              if (!targetId) {
-                const tmpId = `temp-${Date.now()}`;
-                const localId = await db.createPendingConversation(tmpId, Number(user.id), participants);
-                if (localId) {
-                  router.push(`/scan-messages/${tmpId}`);
-                  return;
-                }
-              }
-            }
-            if (targetId) router.push(`/scan-messages/${targetId}`);
-            else router.push('/scan-messages');
-          } catch (e) {
-            router.push('/scan-messages');
-          }
-        }}>
-          <Text style={styles.analyzeButtonText}>{currentLanguage==='ta' ? 'மேலும் உதவி' : 'Further Assistance'}</Text>
-        </TouchableOpacity>
       </ScrollView>
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
-      {/* Assistance modal */}
-      <Modal visible={assistanceOpen} transparent animationType="fade" onRequestClose={()=> setAssistanceOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{currentLanguage==='ta' ? 'மேலும் உதவி' : 'Further Assistance'}</Text>
-            <Text style={{ color:'#666', marginBottom: 8 }}>{currentLanguage==='ta' ? 'ஒரு நிர்வாகரைத் தேர்ந்தெடுத்து, பகிர வேண்டிய விவரங்களை அனுப்பவும்.' : 'Select an admin to send the scan details.'}</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
-                <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>{currentLanguage==='ta' ? 'செய்தி' : 'Message'}</Text>
-                <View style={{ borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff' }}>
-                  <Text style={{ padding: 10, color:'#333' }}>
-                    {JSON.stringify(result, null, 2)}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
-                <Text style={{ color:'#4e7c35', fontWeight:'600' }}>{currentLanguage==='ta' ? 'இது ஆதரவு குழுவிற்கு அனுப்பப்படும். எந்த ஆதரவு உறுப்பினரும் பதில் அளிக்கலாம்.' : 'This will be sent to the Support team. Any support member can respond.'}</Text>
-              </View>
-            </ScrollView>
-            <View style={{ flexDirection:'row', gap: 10, marginTop: 12 }}>
-              <TouchableOpacity style={[styles.sheetRow, { flex:1, justifyContent:'center', backgroundColor:'#eaf6ef', borderRadius: 10 }]} onPress={()=> setAssistanceOpen(false)}>
-                <Text style={{ color:'#2d5016', fontWeight:'700' }}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity disabled={sending} style={[styles.sheetRow, { flex:1, justifyContent:'center', backgroundColor:'#4caf50', borderRadius: 10 }]} onPress={async ()=>{
-                if (!user) return;
-                setSending(true);
-                try {
-                  const db = await import('../../lib/database');
-                  const allAdmins = await db.listAdmins();
-                  const supportIds = (Array.isArray(allAdmins)? allAdmins: []).filter((a:any)=> Number(a.is_admin)===3).map((a:any)=> Number(a.id));
-                  const participantIds = supportIds.length ? [Number(user.id), ...supportIds] : [Number(user.id)];
-                  await db.createConversation(participantIds, JSON.stringify(result), Number(user.id));
-                  Alert.alert(currentLanguage==='ta' ? 'அனுப்பப்பட்டது' : 'Sent', currentLanguage==='ta' ? 'செய்தி ஆதரவு குழுவிற்கு அனுப்பப்பட்டது' : 'Message sent to Support');
-                } catch {
-                  Alert.alert('Error','Failed to send');
-                }
-                setSending(false);
-                setAssistanceOpen(false);
-              }}>
-                <Text style={{ color:'#fff', fontWeight:'700' }}>{sending ? (currentLanguage==='ta'?'அனுப்புகிறது...':'Sending...') : (currentLanguage==='ta'?'அனுப்பு':'Send')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Plant picker modal */}
       <Modal
