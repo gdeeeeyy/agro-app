@@ -31,14 +31,14 @@ export default function PendingProducts() {
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.card} onPress={() => openDetails(item)}>
-      <View style={{ flexDirection:'row', gap: 12 }}>
-        {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : null}
+      <View style={{ flexDirection:'row', alignItems:'center' }}>
+        {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : <View style={[styles.thumb,{ backgroundColor:'#eaf6ec' }]} />}
         <View style={{ flex:1 }}>
-          <Text style={styles.title} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.meta} numberOfLines={1}>{item.keywords}</Text>
-          <Text style={styles.meta}>Stock: {item.stock_available} • ₹{item.cost_per_unit}</Text>
+          <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.subline} numberOfLines={1}>Pending approval • Stock: {item.stock_available} • ₹{item.cost_per_unit}</Text>
+          {item.keywords ? <Text style={styles.subline} numberOfLines={1}>{item.keywords}</Text> : null}
         </View>
-        <View style={styles.statusPill}><Text style={styles.statusText}>PENDING</Text></View>
+        <Ionicons name="chevron-forward" size={18} color="#2d5016" />
       </View>
     </TouchableOpacity>
   );
@@ -112,12 +112,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 10, flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight:'700' },
-  card: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e0e0e0', backgroundColor: '#fff', marginBottom: 12 },
-  thumb: { width: 64, height: 64, borderRadius: 8, backgroundColor:'#f1f1f1' },
-  title: { fontWeight:'700', color:'#2d5016' },
-  meta: { color:'#666', marginTop: 2 },
-  statusPill: { alignSelf:'flex-start', backgroundColor:'#fff8e1', borderWidth:1, borderColor:'#ffe0b2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  statusText: { color:'#ff8f00', fontSize: 12, fontWeight:'700' },
+  card: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#c8e6c9', backgroundColor: '#f1f8f4', marginBottom: 12, minHeight: 84, justifyContent:'center' },
+  thumb: { width: 64, height: 64, borderRadius: 8, backgroundColor:'#eef2e6', marginRight: 12 },
+  title: { fontWeight:'800', color:'#2d5016' },
+  subline: { color:'#4e7c35', marginTop: 2, fontWeight:'600', fontSize: 12 },
   input: { borderWidth:1, borderColor:'#e0e0e0', borderRadius: 8, padding: 10, minHeight: 80, textAlignVertical:'top', backgroundColor:'#f9f9f9' },
   btn: { flexDirection:'row', alignItems:'center', gap:8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
   btnText: { fontWeight:'700' },

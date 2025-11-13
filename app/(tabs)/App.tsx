@@ -500,7 +500,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     maxHeight: '85%'
   },
-  },
   sheetTitle: {
     fontSize: 16,
     fontWeight: '700',

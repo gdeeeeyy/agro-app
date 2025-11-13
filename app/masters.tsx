@@ -17,6 +17,7 @@ export default function Masters() {
   const isAdmin = (user?.is_admin ?? 0) === 1;
   const isMaster = (user?.is_admin ?? 0) === 2;
 
+
   // Crop Doctor Manager state
   const [guideModalVisible, setGuideModalVisible] = useState(false);
   const [crops, setCrops] = useState<any[]>([]);
@@ -146,37 +147,46 @@ export default function Masters() {
       <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
         <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Masters</Text>
         <View style={{ gap: 10 }}>
-          {(isAdmin || isMaster) && (
-            <TouchableOpacity style={styles.masterBtn} onPress={async ()=>{
-              try {
-                const users = await listUsersBasic() as any[];
-                const rows = Array.isArray(users) ? users : [];
-                const html = `<!doctype html><html><head><meta charset='utf-8'><title>Users</title></head><body><h1>Users</h1><table border='1' cellspacing='0' cellpadding='6'><tr><th>ID</th><th>Name</th><th>Phone</th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.full_name||''}</td><td>${u.number||''}</td></tr>`).join('')}</table></body></html>`;
-                const file = await Print.printToFileAsync({ html });
-                if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Export Users PDF' });
-                else Alert.alert('Exported', file.uri);
-              } catch (e) {
-                Alert.alert('Error', 'Failed to export users');
-              }
-            }}>
-              <Ionicons name="download" size={18} color="#4caf50" />
-              <Text style={styles.masterBtnText}>Export Users PDF</Text>
+          {/* Vendors: show only Products */}
+          {isAdmin && !isMaster ? (
+            <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
+              <Ionicons name="pricetags" size={18} color="#4caf50" />
+              <Text style={styles.masterBtnText}>Products</Text>
             </TouchableOpacity>
+          ) : (
+            <>
+              {/* Masters only */}
+              <TouchableOpacity style={styles.masterBtn} onPress={async ()=>{
+                try {
+                  const users = await listUsersBasic() as any[];
+                  const rows = Array.isArray(users) ? users : [];
+                  const html = `<!doctype html><html><head><meta charset='utf-8'><title>Users</title></head><body><h1>Users</h1><table border='1' cellspacing='0' cellpadding='6'><tr><th>ID</th><th>Name</th><th>Phone</th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.full_name||''}</td><td>${u.number||''}</td></tr>`).join('')}</table></body></html>`;
+                  const file = await Print.printToFileAsync({ html });
+                  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Export Users PDF' });
+                  else Alert.alert('Exported', file.uri);
+                } catch (e) {
+                  Alert.alert('Error', 'Failed to export users');
+                }
+              }}>
+                <Ionicons name="download" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Export Users PDF</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.masterBtn} onPress={() => setGuideModalVisible(true)}>
+                <Ionicons name="book" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Crop Doctor Manager</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
+                <Ionicons name="pricetags" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Products</Text>
+              </TouchableOpacity>
+            </>
           )}
-          <TouchableOpacity style={styles.masterBtn} onPress={() => setGuideModalVisible(true)}>
-            <Ionicons name="book" size={18} color="#4caf50" />
-            <Text style={styles.masterBtnText}>Crop Doctor Manager</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
-            <Ionicons name="pricetags" size={18} color="#4caf50" />
-            <Text style={styles.masterBtnText}>Products</Text>
-          </TouchableOpacity>
-          {(isAdmin || isMaster) && (
+          {user?.is_admin === 2 && (
             <>
             <TouchableOpacity style={styles.adminTile} onPress={()=> router.push('/pending-products')}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#fff8e1', alignItems:'center', justifyContent:'center' }}>
-                  <Ionicons name="time" size={20} color="#ff8f00" />
+                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
+                  <Ionicons name="time" size={20} color="#4caf50" />
                 </View>
                 <View>
                   <Text style={styles.adminTileTitle}>Review Product Requests</Text>
@@ -211,13 +221,15 @@ export default function Masters() {
             </TouchableOpacity>
             </>
           )}
-          <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/adminOrders')}>
-            <Ionicons name="receipt" size={18} color="#4caf50" />
-            <Text style={styles.masterBtnText}>Manage Orders</Text>
-          </TouchableOpacity>
+          {isMaster && (
+            <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/adminOrders')}>
+              <Ionicons name="receipt" size={18} color="#4caf50" />
+              <Text style={styles.masterBtnText}>Manage Orders</Text>
+            </TouchableOpacity>
+          )}
 
-          {/* System Notifications */}
-          {(isAdmin || isMaster) && (
+          {/* System Notifications (masters only) */}
+          {isMaster && (
             <TouchableOpacity style={styles.masterBtn} onPress={()=> setNotifModalVisible(true)}>
               <Ionicons name="notifications" size={18} color="#4caf50" />
               <Text style={styles.masterBtnText}>Send Notification</Text>
@@ -919,8 +931,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 12 },
   addBtn: { backgroundColor: '#4caf50', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   plantRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  masterBtn: { backgroundColor: '#f1f8f4', borderWidth: 1, borderColor: '#c8e6c9', padding: 12, borderRadius: 8, flexDirection: 'row', gap: 8, alignItems: 'center' },
-  masterBtnText: { color: '#2d5016', fontWeight: '600' },
+  masterBtn: { backgroundColor: '#f1f8f4', borderWidth: 1, borderColor: '#c8e6c9', padding: 14, borderRadius: 12, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent:'flex-start', minHeight: 72 },
+  masterBtnText: { color: '#2d5016', fontWeight: '700' },
   imagePicker: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 2, borderStyle: 'dashed', borderColor: '#4caf50', padding: 14, borderRadius: 10, justifyContent: 'center' },
   savePrimaryBtn: { backgroundColor: '#4caf50', paddingVertical: 16, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   chip: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, borderColor: '#e0e0e0', backgroundColor: '#f9f9f9' },
@@ -944,7 +956,7 @@ const styles = StyleSheet.create({
   // Saved card box style to match guide boxes
   savedCard: { padding:12, borderWidth:1, borderColor:'#c8e6c9', borderRadius:12, backgroundColor:'#fff', marginBottom:12 },
   textArea: { backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 12, minHeight: 120 },
-  adminTile: { backgroundColor:'#f1f8f4', borderWidth:1, borderColor:'#c8e6c9', padding:14, borderRadius:12, flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
+  adminTile: { backgroundColor:'#f1f8f4', borderWidth:1, borderColor:'#c8e6c9', padding:14, borderRadius:12, flexDirection:'row', alignItems:'center', justifyContent:'space-between', minHeight: 84 },
   adminTileTitle: { color:'#2d5016', fontWeight:'800' },
   adminTileSub: { color:'#4e7c35', fontWeight:'600', fontSize:12 },
   rolePill: { paddingVertical:4, paddingHorizontal:8, borderRadius:10, fontSize:10, fontWeight:'800' },
