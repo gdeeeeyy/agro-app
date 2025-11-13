@@ -1,19 +1,32 @@
 // Messaging (remote-only)
 export async function createConversation(userIds: number[], initialText?: string, senderId?: number) {
   if (!API_URL) throw new Error('API_URL not configured');
-  return await api.post('/conversations', { userIds, initialText, senderId });
+  try { return await api.post('/conversations', { userIds, initialText, senderId }); }
+  catch { return null; }
 }
 export async function listConversations(userId: number) {
   if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/conversations?userId=${userId}`);
+  try { return await api.get(`/conversations?userId=${userId}`); }
+  catch { return []; }
 }
 export async function listMessages(conversationId: number) {
   if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/conversations/${conversationId}/messages`);
+  try { return await api.get(`/conversations/${conversationId}/messages`); }
+  catch { return []; }
+}
+export async function getConversations(userId: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  // alias for listConversations naming symmetry
+  return await api.get(`/conversations?userId=${userId}`);
 }
 export async function sendMessage(conversationId: number, senderId: number, text: string) {
   if (!API_URL) throw new Error('API_URL not configured');
-  return await api.post(`/conversations/${conversationId}/messages`, { senderId, text });
+  try { return await api.post(`/conversations/${conversationId}/messages`, { senderId, text }); }
+  catch (e) {
+    // queue locally for retry
+    try { await queueOutboxMessage(conversationId, senderId, text, String((e as any)?.message || '')); } catch {}
+    return { queued: true } as any;
+  }
 }
 
 import { Platform } from 'react-native';
@@ -197,6 +210,32 @@ if (Platform.OS !== 'web') (async () => {
       title TEXT NOT NULL,
       message TEXT NOT NULL,
       user_id INTEGER NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_seen (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(conversation_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS outbox_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      tries INTEGER DEFAULT 0,
+      last_error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS pending_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      temp_id TEXT UNIQUE NOT NULL,
+      creator_id INTEGER NOT NULL,
+      participant_ids TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -1339,12 +1378,101 @@ export async function listAdmins() {
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 
-export async function setAdminRole(userId: number, role: 1|2) {
+export async function setAdminRole(userId: number, role: 1|2|3) {
   try {
     if (API_URL) { await api.patch(`/users/${userId}`, { is_admin: role }); return true; }
     await db.runAsync("UPDATE users SET is_admin = ? WHERE id = ?", role, userId);
     return true;
   } catch (err) { console.error('SQLite update error:', err); return false; }
+}
+
+// Conversation seen (local-only for unread badges)
+export async function markConversationSeen(conversationId: number, userId: number, whenIso?: string) {
+  try {
+    if (Platform.OS === 'web') return true;
+    const ts = whenIso || new Date().toISOString();
+    await db.runAsync(
+      `INSERT INTO conversation_seen (conversation_id, user_id, last_seen_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(conversation_id, user_id)
+       DO UPDATE SET last_seen_at=excluded.last_seen_at`,
+      conversationId, userId, ts
+    );
+    return true;
+  } catch (e) { console.warn('markConversationSeen failed', e); return false; }
+}
+export async function getConversationSeenAt(conversationId: number, userId: number): Promise<string | null> {
+  try {
+    if (Platform.OS === 'web') return null;
+    const row = await db.getFirstAsync?.("SELECT last_seen_at FROM conversation_seen WHERE conversation_id = ? AND user_id = ?", conversationId, userId);
+    return row?.last_seen_at || null;
+  } catch { return null; }
+}
+
+export async function queueOutboxMessage(conversationId: number, senderId: number, text: string, last_error?: string) {
+  try {
+    if (Platform.OS === 'web') return null;
+    const r = await db.runAsync(
+      "INSERT INTO outbox_messages (conversation_id, sender_id, text, tries, last_error) VALUES (?, ?, ?, 0, ?)",
+      conversationId, senderId, text, last_error || null
+    );
+    return r.lastInsertRowId || null;
+  } catch { return null; }
+}
+export async function createPendingConversation(tempId: string, creatorId: number, participantIds: number[]) {
+  try {
+    if (Platform.OS === 'web') return null;
+    const r = await db.runAsync(
+      "INSERT INTO pending_conversations (temp_id, creator_id, participant_ids) VALUES (?, ?, ?)",
+      tempId, creatorId, JSON.stringify(participantIds || [])
+    );
+    return r.lastInsertRowId || null;
+  } catch { return null; }
+}
+export async function getPendingConversationByTempId(tempId: string) {
+  try {
+    if (Platform.OS === 'web') return null;
+    const row = await db.getFirstAsync?.("SELECT * FROM pending_conversations WHERE temp_id = ?", tempId);
+    return row || null;
+  } catch { return null; }
+}
+export async function flushOutbox(limit: number = 20) {
+  try {
+    if (!API_URL) return 0;
+    if (Platform.OS === 'web') return 0;
+    const pending = await db.getAllAsync("SELECT * FROM outbox_messages ORDER BY id ASC LIMIT ?", limit);
+    let sent = 0;
+    for (const row of (pending as any[])) {
+      try {
+        let targetConversationId = Number(row.conversation_id);
+        if (targetConversationId < 0) {
+          const pendId = Math.abs(targetConversationId);
+          const pend = await db.getFirstAsync?.("SELECT * FROM pending_conversations WHERE id = ?", pendId);
+          if (pend) {
+            const participants = JSON.parse(pend.participant_ids || '[]');
+            const created = await api.post('/conversations', { userIds: participants, initialText: undefined, senderId: Number(pend.creator_id) });
+            const realId = Number((created as any)?.id);
+            if (realId) {
+              await db.runAsync("UPDATE outbox_messages SET conversation_id = ? WHERE conversation_id = ?", realId, row.conversation_id);
+              await db.runAsync("DELETE FROM pending_conversations WHERE id = ?", pendId);
+              targetConversationId = realId;
+            } else {
+              throw new Error('Failed to create conversation');
+            }
+          } else {
+            throw new Error('Pending conversation not found');
+          }
+        }
+        await api.post(`/conversations/${targetConversationId}/messages`, { senderId: row.sender_id, text: row.text });
+        await db.runAsync("DELETE FROM outbox_messages WHERE id = ?", row.id);
+        sent++;
+      } catch (e) {
+        const tries = Number(row.tries || 0) + 1;
+        await db.runAsync("UPDATE outbox_messages SET tries = ?, last_error = ? WHERE id = ?", tries, String((e as any)?.message || ''), row.id);
+      }
+    }
+    return sent;
+  } catch { return 0; }
 }
 
 export async function deleteAdmin(userId: number) {

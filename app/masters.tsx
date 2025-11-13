@@ -16,6 +16,7 @@ export default function Masters() {
   const { user } = useContext(UserContext);
   const isAdmin = (user?.is_admin ?? 0) === 1;
   const isMaster = (user?.is_admin ?? 0) === 2;
+  const isSupport = (user?.is_admin ?? 0) === 3;
 
 
   // Crop Doctor Manager state
@@ -91,7 +92,7 @@ export default function Masters() {
   const [newAdminNumber, setNewAdminNumber] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminFullName, setNewAdminFullName] = useState('');
-  const [newAdminRole, setNewAdminRole] = useState<1|2>(1);
+  const [newAdminRole, setNewAdminRole] = useState<1|2|3>(1);
   const [adminsLoading, setAdminsLoading] = useState(false);
   const [adminsFilter, setAdminsFilter] = useState('');
   const [adminCount, setAdminCount] = useState<number | null>(null);
@@ -148,10 +149,22 @@ export default function Masters() {
         <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Masters</Text>
         <View style={{ gap: 10 }}>
           {/* Vendors: show only Products */}
-          {isAdmin && !isMaster ? (
+          {isAdmin && !isMaster && !isSupport ? (
             <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
               <Ionicons name="pricetags" size={18} color="#4caf50" />
               <Text style={styles.masterBtnText}>Products</Text>
+            </TouchableOpacity>
+          ) : isSupport ? (
+            <TouchableOpacity style={[styles.masterBtn, { justifyContent:'space-between' }]} onPress={() => router.push('/scan-messages')}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
+                <Ionicons name="chatbubble-ellipses" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Support Messages</Text>
+              </View>
+              {typeof (global as any).__supportUnread === 'number' && (global as any).__supportUnread > 0 ? (
+                <View style={{ minWidth:22, height:22, borderRadius:11, backgroundColor:'#e53935', alignItems:'center', justifyContent:'center', paddingHorizontal:6 }}>
+                  <Text style={{ color:'#fff', fontWeight:'800', fontSize:12 }}>{(global as any).__supportUnread}</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           ) : (
             <>
@@ -181,7 +194,7 @@ export default function Masters() {
               </TouchableOpacity>
             </>
           )}
-          {user?.is_admin === 2 && (
+          {isMaster && (
             <>
             <TouchableOpacity style={styles.adminTile} onPress={()=> router.push('/pending-products')}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
@@ -842,7 +855,7 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
                       <Text style={{ color:'#666' }}>{a.number}</Text>
                     </View>
                     <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
-                      <Text style={[styles.rolePill, a.is_admin===2 ? styles.rolePillMaster : styles.rolePillVendor]}>{a.is_admin===2 ? 'MASTER' : 'VENDOR'}</Text>
+                      <Text style={[styles.rolePill, a.is_admin===2 ? styles.rolePillMaster : (a.is_admin===3 ? styles.rolePillSupport : styles.rolePillVendor)]}>{a.is_admin===2 ? 'MASTER' : (a.is_admin===3 ? 'SUPPORT' : 'VENDOR')}</Text>
                       <TouchableOpacity onPress={async ()=>{ const ok = await deleteAdmin(Number(a.id)); if (ok) { setAdmins(prev=> { const n = prev.filter(x=> x.id!==a.id); setAdminCount(n.length); return n; }); Alert.alert('Deleted','Admin removed'); } }} style={{ padding:8, backgroundColor:'#fdecea', borderRadius:8 }}>
                         <Ionicons name="trash" size={18} color="#d32f2f" />
                       </TouchableOpacity>
@@ -854,6 +867,9 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
                   </TouchableOpacity>
                     <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 1); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:1}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===1 && styles.segmentActive]}>
                     <Text style={[styles.segmentText, a.is_admin===1 && styles.segmentTextActive]}>Vendor</Text>
+                  </TouchableOpacity>
+                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 3); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:3}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===3 && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, a.is_admin===3 && styles.segmentTextActive]}>Support</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -875,6 +891,9 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
             </TouchableOpacity>
             <TouchableOpacity onPress={()=> setNewAdminRole(1)} style={[styles.segment, newAdminRole===1 && styles.segmentActive]}>
               <Text style={[styles.segmentText, newAdminRole===1 && styles.segmentTextActive]}>Vendor</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=> setNewAdminRole(3)} style={[styles.segment, newAdminRole===3 && styles.segmentActive]}>
+              <Text style={[styles.segmentText, newAdminRole===3 && styles.segmentTextActive]}>Support</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.savePrimaryBtn} onPress={async ()=> {
@@ -962,6 +981,7 @@ const styles = StyleSheet.create({
   rolePill: { paddingVertical:4, paddingHorizontal:8, borderRadius:10, fontSize:10, fontWeight:'800' },
   rolePillMaster: { backgroundColor:'#eaf6ec', color:'#2d5016' },
   rolePillVendor: { backgroundColor:'#fff3cd', color:'#7a5c00' },
+  rolePillSupport: { backgroundColor:'#e3f2fd', color:'#1565c0' },
   // Image overlay styles
   overlayBackdrop: { position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.5)', justifyContent:'center', alignItems:'center', padding:16, zIndex: 9999 },
   overlayCard: { width:'92%', borderRadius:16, backgroundColor:'#fff', padding:16 },

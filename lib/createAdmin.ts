@@ -57,7 +57,7 @@ export async function createDefaultAdmin() {
   }
 }
 
-export async function createAdminCustom(number: string, password: string, fullName: string, role: 1|2 = 1) {
+export async function createAdminCustom(number: string, password: string, fullName: string, role: 1|2|3 = 1) {
   try {
     const hashed = await hashPassword(password);
     if (API_URL) {

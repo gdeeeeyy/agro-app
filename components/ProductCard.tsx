@@ -177,13 +177,18 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
         
         {listOnlyDescription ? null : (
           <View style={{ flexGrow: 1 }}>
-            <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={2}>
+            <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={horizontal ? 1 : 2}>
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
+            {horizontal && (
+              <Text style={styles.descLine} numberOfLines={1} ellipsizeMode="tail">
+                {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
+              </Text>
+            )}
             <Text style={[styles.price, compact && styles.priceCompact]}>
               Rs. {displayPrice}{displayLabel ? ` / ${displayLabel}` : ''}
             </Text>
-            {variants.length > 0 && (
+            {!horizontal && variants.length > 0 && (
               <View style={{ marginTop: 6 }}>
                 <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
                   <Text style={styles.unitSelectorText}>
@@ -398,7 +403,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 12,
-    minHeight: 112,
+    height: 120,
   },
   image: {
     width: '100%',
@@ -463,6 +468,7 @@ const styles = StyleSheet.create({
   topRow: {},
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   price: { fontSize: 16, fontWeight: '700', color: '#2d5016', marginBottom: 2 },
+  descLine: { fontSize: 12, color: '#4e7c35', fontWeight: '600', marginBottom: 2 },
   priceCompact: { fontSize: 14 },
   stock: { display: 'none' },
   fabAdd: {

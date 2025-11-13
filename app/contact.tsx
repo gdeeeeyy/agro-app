@@ -3,6 +3,7 @@ import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import TopBar from '../components/TopBar';
+import { router } from 'expo-router';
 
 export default function Contact() {
   const num = (process.env.EXPO_PUBLIC_SUPPORT_NUMBER || '').replace(/\s+/g,'');
@@ -18,7 +19,7 @@ export default function Contact() {
 
   return (
     <SafeAreaView style={{ flex:1, backgroundColor:'#fff' }}>
-      <TopBar title="Contact us" showBack onBack={() => history.back?.()} />
+      <TopBar title="Contact us" showBack onBack={() => router.back()} />
 
       <View style={{ padding: 16, gap: 12 }}>
         <Text style={{ color:'#2d5016', fontWeight:'700', fontSize: 16 }}>We’re here to help</Text>
