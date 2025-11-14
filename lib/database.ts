@@ -648,7 +648,10 @@ export async function getRelatedProductsByName(query: string, excludeIds: number
 // Cart functions
 export async function getCartItems(userId: number) {
   try {
-    if (API_URL) return await api.get(`/cart?userId=${userId}`);
+    if (API_URL) {
+      try { return await api.get(`/cart?userId=${userId}`); }
+      catch (e) { console.warn('Remote getCartItems failed, using local DB:', e); }
+    }
     const rows = await db.getAllAsync(
       `SELECT ci.*, p.name, p.name_ta, p.image,
               COALESCE(v.price, p.cost_per_unit) as cost_per_unit,
@@ -759,8 +762,8 @@ export async function clearCart(userId: number) {
 export async function getCartTotal(userId: number) {
   try {
     if (API_URL) {
-      const res = await api.get(`/cart/total?userId=${userId}`);
-      return (res as any)?.total || 0;
+      try { const res = await api.get(`/cart/total?userId=${userId}`); return (res as any)?.total || 0; }
+      catch (e) { console.warn('Remote getCartTotal failed, using local DB:', e); }
     }
     const rows = await db.getAllAsync(
       `SELECT SUM(ci.quantity * COALESCE(v.price, p.cost_per_unit)) as total 
@@ -837,7 +840,10 @@ export async function createOrder(userId: number, paymentMethod: string, deliver
 
 export async function getUserOrders(userId: number) {
   try {
-    if (API_URL) return await api.get(`/orders?userId=${userId}`);
+    if (API_URL) {
+      try { return await api.get(`/orders?userId=${userId}`); }
+      catch (e) { console.warn('Remote getUserOrders failed, using local DB:', e); }
+    }
     const rows = await db.getAllAsync(
       `SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
       userId
@@ -851,7 +857,10 @@ export async function getUserOrders(userId: number) {
 
 export async function getOrderItems(orderId: number) {
   try {
-    if (API_URL) return await api.get(`/orders/${orderId}/items`);
+    if (API_URL) {
+      try { return await api.get(`/orders/${orderId}/items`); }
+      catch (e) { console.warn('Remote getOrderItems failed, using local DB:', e); }
+    }
     const rows = await db.getAllAsync(
       `SELECT * FROM order_items WHERE order_id = ? ORDER BY id`,
       orderId
@@ -865,7 +874,10 @@ export async function getOrderItems(orderId: number) {
 
 export async function getAllOrders() {
   try {
-    if (API_URL) return await api.get('/orders/all');
+    if (API_URL) {
+      try { return await api.get('/orders/all'); }
+      catch (e) { console.warn('Remote getAllOrders failed, using local DB:', e); }
+    }
     const rows = await db.getAllAsync(
       `SELECT o.*, u.full_name, u.number 
        FROM orders o 
@@ -1035,10 +1047,25 @@ export async function deleteCrop(id: number) {
 }
 
 export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
-  if (!API_URL) throw new Error('API_URL not configured');
-  const res = await api.get(`/crops/${cropId}/guide?lang=${language}`);
-  if (res && typeof res === 'object' && 'guide' in (res as any)) return (res as any).guide;
-  return res as any;
+  try {
+    if (API_URL) {
+      try {
+        const res = await api.get(`/crops/${cropId}/guide?lang=${language}`);
+        if (res && typeof res === 'object' && 'guide' in (res as any)) return (res as any).guide;
+        return res as any;
+      } catch (e) {
+        console.warn('Remote getCropGuide failed, using local DB:', e);
+      }
+    }
+    const row = await db.getFirstAsync?.(
+      'SELECT cultivation_guide, pest_management, disease_management FROM crop_guides WHERE crop_id = ? AND language = ?',
+      cropId, language
+    );
+    return row || { cultivation_guide: null, pest_management: null, disease_management: null };
+  } catch (err) {
+    console.error('SQLite fetch error:', err);
+    return { cultivation_guide: null, pest_management: null, disease_management: null } as any;
+  }
 }
 
 export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data: { cultivation_guide?: string; pest_management?: string; disease_management?: string; }) {
@@ -1059,8 +1086,17 @@ export async function upsertCropGuide(cropId: number, language: 'en'|'ta', data:
 }
 
 export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') {
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/crops/${cropId}/pests`);
+  try {
+    if (API_URL) {
+      try { return await api.get(`/crops/${cropId}/pests`); }
+      catch (e) { console.warn('Remote listCropPests failed, using local DB:', e); }
+    }
+    const rows = await db.getAllAsync(
+      'SELECT id, crop_id, name, name_ta, description, description_ta, management, management_ta FROM crop_pests WHERE crop_id = ? ORDER BY name ASC',
+      cropId
+    );
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 export async function updateCropPest(pestId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
@@ -1111,12 +1147,30 @@ export async function addCropPestImage(pestId: number, image: string, caption?: 
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
 export async function listCropPestImages(pestId: number) {
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/pests/${pestId}/images`);
+  try {
+    if (API_URL) {
+      try { return await api.get(`/pests/${pestId}/images`); }
+      catch (e) { console.warn('Remote listCropPestImages failed, using local DB:', e); }
+    }
+    const rows = await db.getAllAsync(
+      'SELECT id, image as image, caption, caption_ta FROM crop_pest_images WHERE pest_id = ? ORDER BY id',
+      pestId
+    );
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en') {
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/crops/${cropId}/diseases`);
+  try {
+    if (API_URL) {
+      try { return await api.get(`/crops/${cropId}/diseases`); }
+      catch (e) { console.warn('Remote listCropDiseases failed, using local DB:', e); }
+    }
+    const rows = await db.getAllAsync(
+      'SELECT id, crop_id, name, name_ta, description, description_ta, management, management_ta FROM crop_diseases WHERE crop_id = ? ORDER BY name ASC',
+      cropId
+    );
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 export async function updateCropDisease(diseaseId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
@@ -1167,8 +1221,17 @@ export async function addCropDiseaseImage(diseaseId: number, image: string, capt
   } catch (err) { console.error('SQLite insert error:', err); return null; }
 }
 export async function listCropDiseaseImages(diseaseId: number) {
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/diseases/${diseaseId}/images`);
+  try {
+    if (API_URL) {
+      try { return await api.get(`/diseases/${diseaseId}/images`); }
+      catch (e) { console.warn('Remote listCropDiseaseImages failed, using local DB:', e); }
+    }
+    const rows = await db.getAllAsync(
+      'SELECT id, image as image, caption, caption_ta FROM crop_disease_images WHERE disease_id = ? ORDER BY id',
+      diseaseId
+    );
+    return rows;
+  } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 
 export async function deleteCropPestImage(imageId: number) {

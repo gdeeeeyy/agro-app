@@ -2,10 +2,14 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 async function request(path: string, options: RequestInit = {}) {
   if (!API_URL) throw new Error('API_URL not configured');
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  const url = `${API_URL}${path}`;
+  const doFetch = () => fetch(url, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
+  let res = await doFetch();
+  if (!res.ok && [502,503,504].includes(res.status)) {
+    // Handle cold-starts/transient upstream issues with a short retry
+    await new Promise(r => setTimeout(r, 800));
+    res = await doFetch();
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`API ${res.status}: ${text || res.statusText}`);
