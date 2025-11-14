@@ -70,13 +70,6 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
-    // Vendors (for seller list)
-    await pool.query(`CREATE TABLE IF NOT EXISTS vendors (
-      id BIGSERIAL PRIMARY KEY,
-      name TEXT UNIQUE NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT now()
-    )`);
-
     await pool.query(`CREATE TABLE IF NOT EXISTS crops (
       id BIGSERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
@@ -551,48 +544,6 @@ app.delete('/variants/:id', async (req, res) => {
 // Keywords
 app.get('/keywords', async (req, res) => {
   res.json(await all('SELECT * FROM keywords ORDER BY name ASC'));
-});
-
-// Vendors
-app.get('/vendors', async (req, res) => {
-  res.json(await all('SELECT id, name FROM vendors ORDER BY name ASC'));
-});
-app.post('/vendors', async (req, res) => {
-  const name = String(req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'name required' });
-  try {
-    const r = await one('INSERT INTO vendors (name) VALUES ($1) RETURNING id', [name]);
-    res.json(r);
-  } catch (e) {
-    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
-    console.error(e); res.status(500).json({ error: 'failed' });
-  }
-});
-app.patch('/vendors/:id', async (req, res) => {
-  const name = String(req.body?.name || '').trim();
-  const propagate = req.body?.propagate !== false; // default true
-  if (!name) return res.status(400).json({ error: 'name required' });
-  // Read old name for optional propagation
-  const old = await one('SELECT name FROM vendors WHERE id=$1', [req.params.id]);
-  if (!old) return res.status(404).json({ error: 'not found' });
-  try {
-    await pool.query('UPDATE vendors SET name=$1 WHERE id=$2', [name, req.params.id]);
-    if (propagate && old.name && old.name !== name) {
-      await pool.query('UPDATE products SET seller_name=$1 WHERE seller_name=$2', [name, old.name]);
-    }
-    res.json({ ok: true });
-  } catch (e) {
-    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
-    console.error(e); res.status(500).json({ error: 'failed' });
-  }
-});
-app.delete('/vendors/:id', async (req, res) => {
-  try {
-    await pool.query('DELETE FROM vendors WHERE id=$1', [req.params.id]);
-    res.json({ ok: true });
-  } catch (e) {
-    console.error(e); res.status(500).json({ error: 'failed' });
-  }
 });
 
 // Crops

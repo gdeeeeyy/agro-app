@@ -379,10 +379,42 @@ export async function getAllPlants(userId: number) {
 export async function listUsersBasic() {
   try {
     if (API_URL) {
-      try { return await api.get('/users-basic'); }
-      catch (e) { /* fall back to local if endpoint missing */ }
+      try {
+        const basic = await api.get('/users-basic');
+        // Older deployments may not include is_admin in /users-basic. To keep
+        // the app working, merge with /admins (which always has is_admin for
+        // Vendor/Master) and default everything else to 0 (User).
+        let admins: any[] = [];
+        try {
+          admins = await api.get('/admins');
+        } catch {
+          // If /admins is missing for some reason, just return what we have.
+          return basic;
+        }
+        if (!Array.isArray(basic)) return basic as any;
+        const roleById: Record<number, number> = {};
+        for (const a of admins || []) {
+          if (!a || a.id == null) continue;
+          const idNum = Number(a.id);
+          if (Number.isNaN(idNum)) continue;
+          const role = a.is_admin != null ? Number(a.is_admin) : 0;
+          roleById[idNum] = Number.isNaN(role) ? 0 : role;
+        }
+        return basic.map((u: any) => {
+          const idNum = Number(u?.id);
+          const fromBasic = u?.is_admin != null ? Number(u.is_admin) : undefined;
+          const fromAdmins = !Number.isNaN(idNum) ? roleById[idNum] : undefined;
+          let role: number = 0;
+          if (fromBasic != null && !Number.isNaN(fromBasic)) role = fromBasic;
+          else if (fromAdmins != null && !Number.isNaN(fromAdmins)) role = fromAdmins;
+          return { ...u, is_admin: role };
+        });
+      } catch (e) {
+        // fall back to local if endpoint missing / failing
+      }
     }
-    // Include is_admin so callers can filter by Master/Vendor/User
+    // Include is_admin so callers can filter by Master/Vendor/User when
+    // running in local/offline mode.
     const rows = await db.getAllAsync('SELECT id, full_name, number, is_admin FROM users ORDER BY created_at ASC');
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
@@ -1365,27 +1397,6 @@ export async function getAllKeywords() {
     console.error("SQLite fetch error:", err);
     return [];
   }
-}
-
-// Vendors table helpers (remote only; used for seller list and vendor management)
-export async function getVendors() {
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get('/vendors');
-}
-export async function addVendor(name: string) {
-  if (!API_URL) throw new Error('API_URL not configured');
-  const res = await api.post('/vendors', { name });
-  return (res as any)?.id || null;
-}
-export async function updateVendor(id: number, name: string, propagate: boolean = true) {
-  if (!API_URL) throw new Error('API_URL not configured');
-  await api.patch(`/vendors/${id}`, { name, propagate });
-  return true;
-}
-export async function deleteVendor(id: number) {
-  if (!API_URL) throw new Error('API_URL not configured');
-  await api.del(`/vendors/${id}`);
-  return true;
 }
 
 export async function addKeyword(name: string) {

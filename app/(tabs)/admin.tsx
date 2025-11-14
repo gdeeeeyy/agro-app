@@ -17,18 +17,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../lib/upload';
 import { UserContext } from '../../context/UserContext';
-import { 
-  getAllProducts, 
-  addProduct, 
-  updateProduct, 
+import {
+  getAllProducts,
+  addProduct,
+  updateProduct,
   deleteProduct,
   getAllKeywords,
   addKeyword,
   deleteKeyword,
-  getVendors,
-  addVendor,
-  updateVendor,
-  deleteVendor,
+  listUsersBasic,
 } from '../../lib/database';
 import { addSampleProducts } from '../../lib/sampleProducts';
 import { createAdminCustom } from '../../lib/createAdmin';
@@ -76,13 +73,9 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [loading, setLoading] = useState(true);
-  // Vendors are managed via the vendors table on the server
-  const [vendors, setVendors] = useState<any[]>([]);
+  // Vendor users (role = Vendor in User Manager) used for the Seller dropdown
+  const [vendorUsers, setVendorUsers] = useState<any[]>([]);
   const [vendorOpen, setVendorOpen] = useState(false);
-  const [vendorManageVisible, setVendorManageVisible] = useState(false);
-  const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
-  const [editingVendorName, setEditingVendorName] = useState('');
-  const [newVendorName, setNewVendorName] = useState('');
   const [variantMap, setVariantMap] = useState<Record<number, any[]>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [keywordModalVisible, setKeywordModalVisible] = useState(false);
@@ -154,12 +147,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadVendors = async () => {
+  // Load Vendor-role users (is_admin = 1) for the Seller dropdown
+  const loadVendorUsers = async () => {
     try {
-      const rows = await getVendors();
-      setVendors(rows as any[]);
-    } catch (e) {
-      setVendors([]);
+      const rows = await listUsersBasic() as any[];
+      const onlyVendors = (rows || []).filter(u => Number(u.is_admin) === 1);
+      setVendorUsers(onlyVendors);
+    } catch {
+      setVendorUsers([]);
     }
   };
 
@@ -177,7 +172,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadProducts();
     loadKeywords();
-    loadVendors();
+    loadVendorUsers();
     loadPending();
   }, []);
 
@@ -199,10 +194,14 @@ export default function AdminDashboard() {
     resetForm();
     setDraftVariants([]);
     setNewVarQty(''); setNewVarUnit('g'); setNewVarPrice(''); setNewVarStock('');
+    // Refresh vendor users so the latest Vendor roles appear in the dropdown
+    loadVendorUsers();
     setModalVisible(true);
   };
 
   const openEditModal = (product: any) => {
+    // Ensure vendor users list is up to date when editing
+    loadVendorUsers();
     setFormData({
       seller_name: (product as any).seller_name || '',
       name: product.name || '',
@@ -560,30 +559,32 @@ const pickImage = async () => {
 
         {isMaster && (
           <>
-            <TouchableOpacity style={[styles.sampleButton, { backgroundColor: '#607d8b' }]} onPress={() => router.push('/pending-products')}>
+            <TouchableOpacity
+              style={[styles.sampleButton, { backgroundColor: '#607d8b' }]}
+              onPress={() => router.push('/pending-products')}
+            >
               <Ionicons name="time" size={24} color="#fff" />
-              <Text style={styles.sampleButtonText} numberOfLines={2}>Review products</Text>
+              <Text style={styles.sampleButtonText} numberOfLines={2}>
+                Review products
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sampleButton} onPress={handleAddSampleProducts}>
+            <TouchableOpacity
+              style={styles.sampleButton}
+              onPress={handleAddSampleProducts}
+            >
               <Ionicons name="leaf" size={24} color="#fff" />
               <Text style={styles.sampleButtonText} numberOfLines={2}>
                 Add Sample Products
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.sampleButton, { backgroundColor: '#455a64' }]} onPress={() => setVendorManageVisible(true)}>
-              <Ionicons name="settings" size={24} color="#fff" />
-              <Text style={styles.sampleButtonText} numberOfLines={2}>Manage Vendors</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      <View style={styles.adminButtonContainer}>
-        {isMaster && (
-          <>
-            <TouchableOpacity style={styles.keywordsButton} onPress={() => setKeywordModalVisible(true)}>
+            <TouchableOpacity
+              style={[styles.sampleButton, { backgroundColor: '#00bcd4' }]}
+              onPress={() => setKeywordModalVisible(true)}
+            >
               <Ionicons name="pricetags" size={24} color="#fff" />
-              <Text style={styles.keywordsButtonText}>Manage Keywords</Text>
+              <Text style={styles.sampleButtonText} numberOfLines={2}>
+                Manage Keywords
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -639,25 +640,34 @@ const pickImage = async () => {
                     <TouchableOpacity onPress={() => setVendorOpen(false)}><Ionicons name="close" size={22} color="#333" /></TouchableOpacity>
                   </View>
                   <ScrollView contentContainerStyle={{ paddingVertical:0 }}>
-                    {vendors.length === 0 ? (
+                    {vendorUsers.length === 0 ? (
                       <View style={{ padding:12 }}>
                         <Text style={{ color:'#666' }}>No vendors yet</Text>
                       </View>
                     ) : (
-                      vendors.map(v => {
-                        const name = v.name || 'Vendor';
-                        const label = `[Vendor] ${name}`;
+                      vendorUsers.map(u => {
+                        const name =
+                          (u.full_name && String(u.full_name).trim()) ||
+                          String(u.number || 'Vendor');
                         return (
                           <TouchableOpacity
-                            key={v.id}
+                            key={u.id}
                             style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}
                             onPress={() => {
-                              // seller_name stored as the vendor display name
+                              // seller_name stored as the vendor user's display name
                               setFormData({ ...formData, seller_name: name });
                               setVendorOpen(false);
                             }}
                           >
-                            <Text style={{ color:'#333', fontWeight: formData.seller_name===name ? '700' : '600' }}>{label}</Text>
+                            <Text
+                              style={{
+                                color:'#333',
+                                fontWeight:
+                                  formData.seller_name === name ? '700' : '600',
+                              }}
+                            >
+                              {name}
+                            </Text>
                           </TouchableOpacity>
                         );
                       })
@@ -904,211 +914,6 @@ const pickImage = async () => {
 
       {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
 
-      {/* Vendor Manage Modal */}
-      <Modal
-        visible={vendorManageVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setVendorManageVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <View
-            style={{
-              width: '92%',
-              maxHeight: '80%',
-              backgroundColor: '#fff',
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}
-          >
-            <View
-              style={{
-                padding: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: '#eee',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>
-                Manage Vendors
-              </Text>
-              <TouchableOpacity onPress={() => setVendorManageVisible(false)}>
-                <Ionicons name="close" size={22} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-              {vendors.length === 0 ? (
-                <Text style={{ color: '#666' }}>No vendors yet</Text>
-              ) : (
-                vendors.map(v => (
-                  <View
-                    key={v.id}
-                    style={{
-                      paddingVertical: 10,
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#f0f0f0',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    {editingVendorId === v.id ? (
-                      <TextInput
-                        style={[styles.input, { flex: 1, marginBottom: 0, marginRight: 8 }]}
-                        value={editingVendorName}
-                        onChangeText={setEditingVendorName}
-                        placeholder="Vendor name"
-                        placeholderTextColor="#999"
-                      />
-                    ) : (
-                      <Text
-                        style={{
-                          color: '#333',
-                          fontWeight: '600',
-                          flex: 1,
-                        }}
-                      >
-                        {v.name}
-                      </Text>
-                    )}
-
-                    {editingVendorId === v.id ? (
-                      <>
-                        <TouchableOpacity
-                          onPress={async () => {
-                            const nm = editingVendorName.trim();
-                            if (!nm) {
-                              Alert.alert('Error', 'Enter vendor name');
-                              return;
-                            }
-                            try {
-                              await updateVendor(Number(v.id), nm, true);
-                              setEditingVendorId(null);
-                              setEditingVendorName('');
-                              await loadVendors();
-                              Alert.alert('Success', 'Vendor updated');
-                            } catch (e: any) {
-                              Alert.alert(
-                                'Error',
-                                String(e?.message || 'Failed to update vendor'),
-                              );
-                            }
-                          }}
-                          style={{ padding: 8 }}
-                        >
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={20}
-                            color="#4caf50"
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setEditingVendorId(null);
-                            setEditingVendorName('');
-                          }}
-                          style={{ padding: 8 }}
-                        >
-                          <Ionicons
-                            name="close-circle"
-                            size={20}
-                            color="#d32f2f"
-                          />
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setEditingVendorId(Number(v.id));
-                            setEditingVendorName(String(v.name || ''));
-                          }}
-                          style={{ padding: 8 }}
-                        >
-                          <Ionicons name="pencil" size={18} color="#4caf50" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={async () => {
-                            try {
-                              await deleteVendor(Number(v.id));
-                              await loadVendors();
-                              Alert.alert('Deleted', 'Vendor removed');
-                            } catch (e: any) {
-                              Alert.alert(
-                                'Error',
-                                String(e?.message || 'Failed to delete vendor'),
-                              );
-                            }
-                          }}
-                          style={{ padding: 8 }}
-                        >
-                          <Ionicons name="trash" size={18} color="#f44336" />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                ))
-              )}
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginTop: 12,
-                }}
-              >
-                <TextInput
-                  style={[styles.input, { flex: 1, marginBottom: 0, marginRight: 8 }]}
-                  placeholder="New vendor name"
-                  placeholderTextColor="#666"
-                  value={newVendorName}
-                  onChangeText={setNewVendorName}
-                />
-                <TouchableOpacity
-                  onPress={async () => {
-                    const nm = newVendorName.trim();
-                    if (!nm) {
-                      Alert.alert('Error', 'Enter vendor name');
-                      return;
-                    }
-                    try {
-                      const id = await addVendor(nm);
-                      if (id) {
-                        setNewVendorName('');
-                        await loadVendors();
-                        Alert.alert('Success', 'Vendor added');
-                      }
-                    } catch (e: any) {
-                      Alert.alert(
-                        'Error',
-                        String(e?.message || 'Failed to add vendor'),
-                      );
-                    }
-                  }}
-                  style={{ padding: 8 }}
-                >
-                  <Ionicons
-                    name="add-circle"
-                    size={24}
-                    color="#3f51b5"
-                  />
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
@@ -1218,42 +1023,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     textAlign: 'center',
     flexShrink: 1,
-  },
-  adminButtonContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  keywordsButton: {
-    backgroundColor: '#00bcd4',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 8,
-  },
-  keywordsButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  adminButton: {
-    backgroundColor: '#9c27b0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 8,
-  },
-  adminButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
