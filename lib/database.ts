@@ -1303,6 +1303,27 @@ export async function getAllKeywords() {
   }
 }
 
+// Vendors (remote only)
+export async function getVendors() {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get('/vendors');
+}
+export async function addVendor(name: string) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  const res = await api.post('/vendors', { name });
+  return (res as any)?.id || null;
+}
+export async function updateVendor(id: number, name: string, propagate: boolean = true) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  await api.patch(`/vendors/${id}`, { name, propagate });
+  return true;
+}
+export async function deleteVendor(id: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  await api.del(`/vendors/${id}`);
+  return true;
+}
+
 export async function addKeyword(name: string) {
   try {
     if (API_URL) {

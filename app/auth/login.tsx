@@ -60,13 +60,9 @@ export default function Login() {
     >
       <View style={styles.content}>
         <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.title}>Agriismart - Faith of the Farmers</Text>
+        <Text style={styles.title}>Agriismart</Text>
+        <Text style={styles.tagline}>Faith of the Farmers</Text>
 
-        <View style={styles.langRow}>
-          <TouchableOpacity onPress={() => setLangVisible(true)} accessibilityLabel="Change Language" style={styles.actionBtn}>
-            <Ionicons name="globe-outline" size={22} color="#4caf50" />
-          </TouchableOpacity>
-        </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -110,6 +106,13 @@ export default function Login() {
           <Text style={styles.link}>
             {t('auth.noAccount')} <Text style={styles.linkBold}>{t('auth.signup')}</Text>
           </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity onPress={() => setLangVisible(true)} accessibilityLabel="Change Language" style={styles.langButton}>
+          <Ionicons name="globe-outline" size={18} color="#4caf50" />
+          <Text style={styles.langButtonText}>Language</Text>
         </TouchableOpacity>
       </View>
 
@@ -161,15 +164,36 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#111',
-    marginBottom: 8,
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  langRow: {
-    width: '100%',
-    alignItems: 'flex-end',
-    marginBottom: 8,
+  tagline: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#333',
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  actionBtn: {
-    padding: 6,
+  footer: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  langButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    backgroundColor: '#f1f8f4',
+  },
+  langButtonText: {
+    color: '#2d5016',
+    fontWeight: '600',
+    fontSize: 15,
   },
   subtitle: {
     fontSize: 16,

@@ -29,7 +29,8 @@ interface CartItem {
   name: string;
   image: string;
   cost_per_unit: number;
-  stock_available: number;
+  variant_id?: number | null;
+  variant_label?: string | null;
   created_at: string;
 }
 
@@ -43,12 +44,12 @@ export default function Cart() {
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [orderNote, setOrderNote] = useState<string>('');
 
-  const handleQuantityChange = async (productId: number, newQuantity: number) => {
+const handleQuantityChange = async (productId: number, newQuantity: number, variantId?: number | null) => {
     if (newQuantity < 0) return;
-    await updateQuantity(productId, newQuantity);
+await updateQuantity(productId, newQuantity, variantId ?? undefined);
   };
 
-  const handleRemoveItem = async (productId: number) => {
+const handleRemoveItem = async (productId: number, variantId?: number | null) => {
     Alert.alert(
       t('cart.removeItem'),
       t('cart.removeConfirm'),
@@ -57,7 +58,7 @@ export default function Cart() {
         { 
           text: t('common.delete'), 
           style: 'destructive',
-          onPress: () => removeItem(productId)
+onPress: () => removeItem(productId, variantId ?? undefined)
         },
       ]
     );
@@ -145,9 +146,14 @@ export default function Cart() {
       )}
       
       <View style={styles.itemDetails}>
-        <Text style={styles.itemName} numberOfLines={2}>
+<Text style={styles.itemName} numberOfLines={2}>
           {item.name}
         </Text>
+        {item.variant_label ? (
+          <Text style={{ color:'#4e7c35', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+            {item.variant_label}
+          </Text>
+        ) : null}
         <Text style={styles.itemPrice}>
           ₹{item.cost_per_unit} each
         </Text>
@@ -159,7 +165,7 @@ export default function Cart() {
       <View style={styles.quantityContainer}>
         <TouchableOpacity
           style={styles.quantityButton}
-          onPress={() => handleQuantityChange(item.product_id, item.quantity - 1)}
+onPress={() => handleQuantityChange(item.product_id, item.quantity - 1, item.variant_id ?? undefined)}
         >
           <Ionicons name="remove" size={16} color="#4caf50" />
         </TouchableOpacity>
@@ -168,8 +174,7 @@ export default function Cart() {
         
         <TouchableOpacity
           style={styles.quantityButton}
-          onPress={() => handleQuantityChange(item.product_id, item.quantity + 1)}
-          disabled={item.quantity >= item.stock_available}
+onPress={() => handleQuantityChange(item.product_id, item.quantity + 1, item.variant_id ?? undefined)}
         >
           <Ionicons name="add" size={16} color="#4caf50" />
         </TouchableOpacity>
@@ -177,7 +182,7 @@ export default function Cart() {
 
       <TouchableOpacity
         style={styles.removeButton}
-        onPress={() => handleRemoveItem(item.product_id)}
+onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
       >
         <Ionicons name="trash-outline" size={20} color="#f44336" />
       </TouchableOpacity>

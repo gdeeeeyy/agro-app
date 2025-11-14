@@ -66,6 +66,13 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [vendorManageVisible, setVendorManageVisible] = useState(false);
+  const [editingVendorId, setEditingVendorId] = useState<number|null>(null);
+  const [editingVendorName, setEditingVendorName] = useState('');
+  const [vendorOpen, setVendorOpen] = useState(false);
+  const [variantMap, setVariantMap] = useState<Record<number, any[]>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [keywordModalVisible, setKeywordModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -111,6 +118,16 @@ export default function AdminDashboard() {
       const db = await import('../../lib/database');
       const allProducts = await db.getAllProductsAdmin() as Product[];
       setProducts(allProducts);
+      // Prefetch variants for master view (to show stock per variant)
+      try {
+        const entries = await Promise.all(allProducts.map(async (p:any) => {
+          try { const vs = await db.getProductVariants(Number(p.id)); return [Number(p.id), vs as any[]] as const; }
+          catch { return [Number(p.id), []] as const; }
+        }));
+        const vm: Record<number, any[]> = {};
+        entries.forEach(([pid, vs]) => { vm[pid] = vs; });
+        setVariantMap(vm);
+      } catch {}
     } catch (error) {
       console.error('Error loading products:', error);
       Alert.alert('Error', 'Failed to load products');
@@ -128,9 +145,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadVendors = async () => {
+    try {
+      const db = await import('../../lib/database');
+      const rows = await db.getVendors();
+      setVendors(rows as any[]);
+    } catch (e) {
+      setVendors([]);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
     loadKeywords();
+    loadVendors();
   }, []);
 
   const resetForm = () => {
@@ -401,9 +429,20 @@ const pickImage = async () => {
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.productPrice}>
-          ₹{item.cost_per_unit} • Stock: {item.stock_available}
-        </Text>
+        {!isMaster && (
+          <Text style={styles.productPrice}>
+            ₹{item.cost_per_unit} • Stock: {item.stock_available}
+          </Text>
+        )}
+        {isMaster && Array.isArray(variantMap[item.id]) && variantMap[item.id].length ? (
+          <View style={{ marginTop: 4 }}>
+            {variantMap[item.id].map((v:any) => (
+              <Text key={v.id} style={{ color:'#666', fontSize:12 }}>
+                {String(v.label)} — Stock: {typeof v.stock_available==='number'? v.stock_available : 0}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {item.status && (
           <Text style={{ marginTop: 4, fontSize: 12, color: item.status==='approved'?'#2e7d32': item.status==='pending'?'#ff8f00':'#d32f2f' }}>
             Status: {String(item.status).toUpperCase()} {item.review_note ? `— ${item.review_note}` : ''}
@@ -419,13 +458,6 @@ const pickImage = async () => {
               onPress={() => openEditModal(item)}
             >
               <Ionicons name="pencil" size={20} color="#4caf50" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.variantButton}
-              onPress={() => openEditModal(item)}
-              accessibilityLabel="Manage Variants"
-            >
-              <Ionicons name="options" size={20} color="#00bcd4" />
             </TouchableOpacity>
             {String((item as any).status||'') === 'pending' && (
               <>
@@ -496,14 +528,22 @@ const pickImage = async () => {
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Ionicons name="add" size={24} color="#fff" />
-          <Text style={styles.addButtonText}>Add Product</Text>
+          <Text style={styles.addButtonText} numberOfLines={2}>Add Product</Text>
         </TouchableOpacity>
 
         {isMaster && (
-        <TouchableOpacity style={styles.sampleButton} onPress={handleAddSampleProducts}>
-          <Ionicons name="leaf" size={24} color="#fff" />
-          <Text style={styles.sampleButtonText}>Add Sample Products</Text>
-        </TouchableOpacity>
+          <>
+            <TouchableOpacity style={styles.sampleButton} onPress={handleAddSampleProducts}>
+              <Ionicons name="leaf" size={24} color="#fff" />
+              <Text style={styles.sampleButtonText} numberOfLines={2}>
+                Add Sample Products
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sampleButton, { backgroundColor: '#455a64' }]} onPress={() => setVendorManageVisible(true)}>
+              <Ionicons name="settings" size={24} color="#fff" />
+              <Text style={styles.sampleButtonText} numberOfLines={2}>Manage Vendors</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
@@ -549,14 +589,29 @@ const pickImage = async () => {
 
           <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
           <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 20 }}>
-            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Seller Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Seller Name"
-              placeholderTextColor="#666"
-              value={formData.seller_name}
-              onChangeText={(text) => setFormData({ ...formData, seller_name: text })}
-            />
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Seller</Text>
+            <TouchableOpacity style={[styles.input, { flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={() => setVendorOpen(v => !v)}>
+              <Text style={{ color: formData.seller_name ? '#333' : '#999' }}>{formData.seller_name || 'Select Vendor'}</Text>
+              <Ionicons name={vendorOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#666" />
+            </TouchableOpacity>
+            {vendorOpen && (
+              <ScrollView style={{ borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginTop:6, maxHeight:200 }} contentContainerStyle={{ paddingVertical:0 }}>
+                {vendors.length === 0 ? (
+                  <View style={{ padding:12 }}>
+                    <Text style={{ color:'#666' }}>No vendors yet</Text>
+                    <TouchableOpacity style={{ marginTop:8 }} onPress={() => { setVendorOpen(false); setVendorManageVisible(true); setNewVendorName(''); }}>
+                      <Text style={{ color:'#3f51b5', fontWeight:'700' }}>+ Add new vendor</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  vendors.map(v => (
+                    <TouchableOpacity key={v.id} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }} onPress={() => { setFormData({ ...formData, seller_name: v.name }); setVendorOpen(false); }}>
+                      <Text style={{ color:'#333', fontWeight: formData.seller_name===v.name ? '700' : '600' }}>{v.name}</Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            )}
             <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>English Name</Text>
             <TextInput
               style={styles.input}
@@ -757,6 +812,60 @@ const pickImage = async () => {
       </Modal>
 
 
+
+      {/* Vendor Manage Modal */}
+      <Modal visible={vendorManageVisible} transparent animationType="fade" onRequestClose={() => setVendorManageVisible(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ width:'92%', maxHeight:'80%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+            <View style={{ padding:16, borderBottomWidth:1, borderBottomColor:'#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Manage Vendors</Text>
+              <TouchableOpacity onPress={() => setVendorManageVisible(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding:16 }}>
+              {vendors.length === 0 ? (
+                <Text style={{ color:'#666' }}>No vendors yet</Text>
+              ) : vendors.map(v => (
+                <View key={v.id} style={{ paddingVertical:10, borderBottomWidth:1, borderBottomColor:'#f0f0f0', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                  {editingVendorId === v.id ? (
+                    <TextInput style={[styles.input, { flex:1, marginBottom:0, marginRight:8 }]} value={editingVendorName} onChangeText={setEditingVendorName} />
+                  ) : (
+                    <Text style={{ color:'#333', fontWeight:'600', flex:1 }}>{v.name}</Text>
+                  )}
+                  {editingVendorId === v.id ? (
+                    <>
+                <TouchableOpacity onPress={async ()=> { const nm = editingVendorName.trim(); if (!nm) { Alert.alert('Error','Enter vendor name'); return; } try { const db = await import('../../lib/database'); await db.updateVendor(Number(v.id), nm, true); setEditingVendorId(null); setEditingVendorName(''); await loadVendors(); Alert.alert('Success','Vendor updated'); } catch (e:any) { Alert.alert('Error', String(e?.message||'Failed to update vendor')); } }} style={{ padding:8 }}>
+                        <Ionicons name="checkmark-circle" size={20} color="#4caf50" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={()=> { setEditingVendorId(null); setEditingVendorName(''); }} style={{ padding:8 }}>
+                        <Ionicons name="close-circle" size={20} color="#d32f2f" />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity onPress={()=> { setEditingVendorId(Number(v.id)); setEditingVendorName(String(v.name||'')); }} style={{ padding:8 }}>
+                        <Ionicons name="pencil" size={18} color="#4caf50" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={async ()=> { try { const db = await import('../../lib/database'); await db.deleteVendor(Number(v.id)); await loadVendors(); Alert.alert('Deleted','Vendor removed'); } catch (e:any) { Alert.alert('Error', String(e?.message||'Failed to delete')); } }} style={{ padding:8 }}>
+                        <Ionicons name="trash" size={18} color="#f44336" />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              ))}
+
+              <View style={{ flexDirection:'row', alignItems:'center', marginTop: 12 }}>
+                <TextInput style={[styles.input, { flex:1, marginBottom:0, marginRight:8 }]} placeholder="New vendor name" placeholderTextColor="#666" value={newVendorName} onChangeText={setNewVendorName} />
+                <TouchableOpacity onPress={async ()=> { const nm = newVendorName.trim(); if (!nm) { Alert.alert('Error','Enter vendor name'); return; } try { const db = await import('../../lib/database'); const id = await db.addVendor(nm); if (id) { setNewVendorName(''); await loadVendors(); Alert.alert('Success','Vendor added'); } } catch (e:any) { Alert.alert('Error', String(e?.message||'Failed to add vendor')); } }} style={{ padding:8 }}>
+                  <Ionicons name="add-circle" size={24} color="#3f51b5" />
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
@@ -796,6 +905,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     padding: 16,
     gap: 12,
   },
@@ -804,7 +914,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    flexBasis: '48%',
     paddingVertical: 16,
     borderRadius: 8,
   },
@@ -813,13 +923,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   sampleButton: {
     backgroundColor: '#ff9800',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    flexBasis: '48%',
     paddingVertical: 16,
     borderRadius: 8,
   },
@@ -828,6 +940,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   adminButtonContainer: {
     paddingHorizontal: 16,

@@ -19,9 +19,11 @@ async function runMigrations() {
   try {
     // Columns that might be missing on older deploys
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS seller_name TEXT");
     await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS logistics_name TEXT");
     await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number TEXT");
     await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT");
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN DEFAULT false");
 
     // Core tables required by API (subset; IF NOT EXISTS keeps this idempotent)
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
@@ -45,6 +47,7 @@ async function runMigrations() {
       details_ta TEXT,
       image TEXT,
       unit TEXT,
+      seller_name TEXT,
       stock_available INTEGER DEFAULT 0,
       cost_per_unit DOUBLE PRECISION NOT NULL,
       status TEXT DEFAULT 'approved',
@@ -62,6 +65,13 @@ async function runMigrations() {
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS review_note TEXT");
 
     await pool.query(`CREATE TABLE IF NOT EXISTS keywords (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+
+    // Vendors (for seller list)
+    await pool.query(`CREATE TABLE IF NOT EXISTS vendors (
       id BIGSERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
@@ -460,9 +470,9 @@ app.post('/products', async (req, res) => {
   const creatorRole = p.creator_role != null ? Number(p.creator_role) : null; // 1=vendor,2=master
   const status = creatorRole === 2 ? 'approved' : 'pending';
   const r = await one(
-    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), status, createdBy]
+    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, seller_name, stock_available, cost_per_unit, status, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.seller_name ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), status, createdBy]
   );
   res.json(r);
 });
@@ -476,7 +486,7 @@ app.patch('/products/:id/review', async (req, res) => {
 });
 
 app.patch('/products/:id', async (req, res) => {
-  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','stock_available','cost_per_unit'];
+  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','seller_name','stock_available','cost_per_unit'];
   const set = []; const vals = []; let i = 1;
   for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
   if (!set.length) return res.json({ ok: true });
@@ -524,6 +534,48 @@ app.delete('/variants/:id', async (req, res) => {
 // Keywords
 app.get('/keywords', async (req, res) => {
   res.json(await all('SELECT * FROM keywords ORDER BY name ASC'));
+});
+
+// Vendors
+app.get('/vendors', async (req, res) => {
+  res.json(await all('SELECT id, name FROM vendors ORDER BY name ASC'));
+});
+app.post('/vendors', async (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    const r = await one('INSERT INTO vendors (name) VALUES ($1) RETURNING id', [name]);
+    res.json(r);
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
+    console.error(e); res.status(500).json({ error: 'failed' });
+  }
+});
+app.patch('/vendors/:id', async (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  const propagate = req.body?.propagate !== false; // default true
+  if (!name) return res.status(400).json({ error: 'name required' });
+  // Read old name for optional propagation
+  const old = await one('SELECT name FROM vendors WHERE id=$1', [req.params.id]);
+  if (!old) return res.status(404).json({ error: 'not found' });
+  try {
+    await pool.query('UPDATE vendors SET name=$1 WHERE id=$2', [name, req.params.id]);
+    if (propagate && old.name && old.name !== name) {
+      await pool.query('UPDATE products SET seller_name=$1 WHERE seller_name=$2', [name, old.name]);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
+    console.error(e); res.status(500).json({ error: 'failed' });
+  }
+});
+app.delete('/vendors/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM vendors WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e); res.status(500).json({ error: 'failed' });
+  }
 });
 
 // Crops
@@ -785,8 +837,11 @@ app.delete('/cart/clear', async (req, res) => {
 app.get('/cart/total', async (req, res) => {
   const userId = Number(req.query.userId);
   const r = await one(
-    `SELECT COALESCE(SUM(ci.quantity * p.cost_per_unit),0) as total
-     FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.user_id = $1`, [userId]
+    `SELECT COALESCE(SUM(ci.quantity * COALESCE(v.price, p.cost_per_unit)),0) as total
+     FROM cart_items ci 
+     JOIN products p ON ci.product_id = p.id 
+     LEFT JOIN product_variants v ON ci.variant_id = v.id
+     WHERE ci.user_id = $1`, [userId]
   );
   res.json(r || { total: 0 });
 });
@@ -822,8 +877,6 @@ app.post('/orders', async (req, res) => {
       'INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit, variant_id, variant_label) VALUES ($1,$2,$3,$4,$5,$6,$7)',
       [o.id, it.product_id, it.name, it.quantity, it.price, it.variant_id || null, it.variant_label || null]
     );
-    if (it.variant_id) await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
-    else await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
   }
   await pool.query('DELETE FROM cart_items WHERE user_id=$1', [userId]);
   res.json({ id: o.id });
@@ -903,7 +956,8 @@ app.delete('/logistics/:id', async (req, res) => {
 app.patch('/orders/:id', async (req, res) => {
   const { status, statusNote, deliveryDate, logisticsName, trackingNumber, trackingUrl } = req.body || {};
   const set = []; const vals=[]; let i=1;
-  if (status !== undefined) { set.push(`status=$${i++}`); vals.push(status); }
+  const statusLower = typeof status === 'string' ? status.toLowerCase() : undefined;
+  if (statusLower !== undefined) { set.push(`status=$${i++}`); vals.push(statusLower); }
   set.push(`updated_at=now()`);
   if (statusNote !== undefined) { set.push(`status_note=$${i++}`); vals.push(statusNote); }
   if (deliveryDate !== undefined) { set.push(`delivery_date=$${i++}`); vals.push(deliveryDate); }
@@ -914,10 +968,24 @@ app.patch('/orders/:id', async (req, res) => {
   await pool.query(`UPDATE orders SET ${set.join(', ')} WHERE id=$${i}`, vals);
   // Append to status history timeline if status changed
   try {
-    if (status !== undefined) {
-      await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [req.params.id, status, statusNote || null]);
+    if (statusLower !== undefined) {
+      await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [req.params.id, statusLower, statusNote || null]);
     }
   } catch {}
+  // On dispatch, deduct stock once (idempotent)
+  try {
+    if (statusLower === 'dispatched') {
+      const flag = await one('SELECT stock_deducted FROM orders WHERE id=$1', [req.params.id]);
+      if (!flag || flag.stock_deducted !== true) {
+        const items = await all('SELECT product_id, variant_id, quantity FROM order_items WHERE order_id=$1', [req.params.id]);
+        for (const it of items) {
+          if (it.variant_id) await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
+          else await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
+        }
+        await pool.query('UPDATE orders SET stock_deducted=true WHERE id=$1', [req.params.id]);
+      }
+    }
+  } catch (e) { console.warn('Stock deduction on dispatch failed:', e.message); }
   // Send notification to the order owner (user-specific)
   try {
     const o = await one('SELECT user_id FROM orders WHERE id=$1', [req.params.id]);

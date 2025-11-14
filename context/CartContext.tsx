@@ -17,7 +17,8 @@ interface CartItem {
   name: string;
   image: string;
   cost_per_unit: number;
-  stock_available: number;
+  variant_id?: number | null;
+  variant_label?: string | null;
   created_at: string;
 }
 
