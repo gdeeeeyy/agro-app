@@ -155,10 +155,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const [pendingProducts, setPendingProducts] = useState<any[]>([]);
+  const loadPending = async () => {
+    try {
+      const db = await import('../../lib/database');
+      const rows = await db.getPendingProducts();
+      setPendingProducts(rows as any[]);
+    } catch {
+      setPendingProducts([]);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
     loadKeywords();
     loadVendors();
+    loadPending();
   }, []);
 
   const resetForm = () => {
@@ -533,6 +545,10 @@ const pickImage = async () => {
 
         {isMaster && (
           <>
+            <TouchableOpacity style={[styles.sampleButton, { backgroundColor: '#607d8b' }]} onPress={() => router.push('/pending-products')}>
+              <Ionicons name="time" size={24} color="#fff" />
+              <Text style={styles.sampleButtonText} numberOfLines={2}>Review products</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.sampleButton} onPress={handleAddSampleProducts}>
               <Ionicons name="leaf" size={24} color="#fff" />
               <Text style={styles.sampleButtonText} numberOfLines={2}>
@@ -563,13 +579,18 @@ const pickImage = async () => {
           <Text style={styles.loadingText}>Loading products...</Text>
         </View>
       ) : (
-        <FlatList
-          data={products}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {isMaster ? (
+            <PendingSection pendingList={pendingProducts} onRefresh={async () => { await loadPending(); await loadProducts(); }} />
+          ) : null}
+          <FlatList
+            data={isMaster ? products.filter((p:any) => String((p as any).status || 'approved') !== 'pending') : products}
+            renderItem={renderProduct}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        </>
       )}
 
       <Modal
@@ -869,6 +890,40 @@ const pickImage = async () => {
       {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+    </View>
+  );
+}
+
+function PendingSection({ pendingList, onRefresh }: { pendingList: any[]; onRefresh: () => void }) {
+  if (!pendingList?.length) return null;
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+      <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+        <Text style={{ color:'#2d5016', fontSize: 16, fontWeight:'800' }}>Review products ({pendingList.length})</Text>
+        <View style={{ flexDirection:'row', alignItems:'center', gap: 10 }}>
+          <TouchableOpacity onPress={() => router.push('/pending-products')}><Text style={{ color:'#2d5016', fontWeight:'800' }}>View all</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onRefresh}><Ionicons name="refresh" size={18} color="#2d5016" /></TouchableOpacity>
+        </View>
+      </View>
+      {pendingList.map((item:any) => (
+        <View key={item.id} style={{ backgroundColor:'#f1f8f4', borderWidth:1, borderColor:'#c8e6c9', padding:12, borderRadius:12, marginBottom:8 }}>
+          <View style={{ flexDirection:'row', alignItems:'center' }}>
+            {item.image ? <Image source={{ uri: item.image }} style={{ width:48, height:48, borderRadius:8, marginRight:10 }} /> : <View style={{ width:48, height:48, borderRadius:8, marginRight:10, backgroundColor:'#eaf6ec' }} />}
+            <View style={{ flex:1 }}>
+              <Text style={{ color:'#2d5016', fontWeight:'800' }} numberOfLines={1}>{item.name}</Text>
+              <Text style={{ color:'#4e7c35', fontWeight:'600', fontSize:12 }} numberOfLines={1}>Stock: {item.stock_available} • ₹{item.cost_per_unit}</Text>
+            </View>
+            <View style={{ flexDirection:'row' }}>
+              <TouchableOpacity style={{ padding:6 }} onPress={async ()=> { const db = await import('../../lib/database'); await db.reviewProduct(Number(item.id), 'approved'); await onRefresh(); }}>
+                <Ionicons name="checkmark" size={18} color="#2e7d32" />
+              </TouchableOpacity>
+              <TouchableOpacity style={{ padding:6 }} onPress={async ()=> { const db = await import('../../lib/database'); await db.reviewProduct(Number(item.id), 'rejected'); await onRefresh(); }}>
+                <Ionicons name="close" size={18} color="#d32f2f" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }

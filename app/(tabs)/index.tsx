@@ -224,8 +224,10 @@ export default function Home() {
   const fetchNews = async () => {
     try {
       setNewsLoading(true);
-      // Google News RSS for agriculture
-      const url = 'https://news.google.com/rss/search?q=agriculture&hl=en-IN&gl=IN&ceid=IN:en';
+      // Google News RSS for agriculture, switch to Tamil when app language is Tamil
+      const lang = currentLanguage === 'ta' ? 'ta' : 'en';
+      const query = currentLanguage === 'ta' ? 'விவசாயம்' : 'agriculture';
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${lang}-IN&gl=IN&ceid=IN:${lang}`;
       const res = await fetch(url);
       const xml = await res.text();
       const items: Array<{ title: string; link: string; pubDate?: string; image?: string }> = [];
@@ -253,7 +255,7 @@ export default function Home() {
       setNewsLoading(false);
     }
   };
-  useEffect(() => { fetchNews(); }, []);
+  useEffect(() => { fetchNews(); }, [currentLanguage]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 16 }}>
@@ -464,7 +466,7 @@ export default function Home() {
                     {/* Pests */}
                     {sheetPests.length ? (
                       <View style={styles.guideBox}>
-                        <Text style={styles.guideLabel}>{t('guide.pestsTitle') || 'Pests'}</Text>
+                        <Text style={styles.guideLabel}>Pests</Text>
                         {sheetPests.map((p:any) => (
                           <View key={p.id} style={styles.guideItem}>
                             <Text style={{ fontWeight:'700', color:'#2d5016' }}>{p.name_ta && currentLanguage==='ta' ? p.name_ta : p.name}</Text>
@@ -500,7 +502,7 @@ export default function Home() {
                     {/* Diseases */}
                     {sheetDiseases.length ? (
                       <View style={styles.guideBox}>
-                        <Text style={styles.guideLabel}>{t('guide.diseasesTitle') || 'Diseases'}</Text>
+                        <Text style={styles.guideLabel}>Diseases</Text>
                         {sheetDiseases.map((d:any) => (
                           <View key={d.id} style={styles.guideItem}>
                             <Text style={{ fontWeight:'700', color:'#2d5016' }}>{currentLanguage==='ta' && d.name_ta ? d.name_ta : d.name}</Text>

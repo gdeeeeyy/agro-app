@@ -1378,6 +1378,20 @@ export async function updateUserAddress(userId: number, address: string) {
   }
 }
 
+export async function updateUser(userId: number, fields: { full_name?: string; address?: string; is_admin?: number }) {
+  try {
+    if (API_URL) { await api.patch(`/users/${userId}`, fields); return true; }
+    const sets: string[] = []; const vals: any[] = [];
+    if (fields.full_name !== undefined) { sets.push('full_name = ?'); vals.push(fields.full_name); }
+    if (fields.address !== undefined) { sets.push('address = ?'); vals.push(fields.address); }
+    if (fields.is_admin !== undefined) { sets.push('is_admin = ?'); vals.push(fields.is_admin); }
+    if (!sets.length) return true;
+    vals.push(userId);
+    await db.runAsync(`UPDATE users SET ${sets.join(', ')}, created_at=created_at WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) { console.error('SQLite update error:', err); return false; }
+}
+
 export async function getUserById(userId: number) {
   try {
     const rows = await db.getAllAsync("SELECT * FROM users WHERE id = ?", userId);

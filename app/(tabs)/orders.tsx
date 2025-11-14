@@ -218,7 +218,7 @@ export default function Orders() {
 
   return (
     <View style={styles.container}>
-      <TopBar title={t('orders.title')} showBack={showBack} onBack={() => router.back()} />
+      <TopBar title={t('orders.title')} showBack={showBack} onBack={() => router.push('/(tabs)/profile')} />
 
       <FlatList
         data={orders}
@@ -344,7 +344,11 @@ export default function Orders() {
                       });
                       const done = Boolean(match);
                       const dt = match ? new Date(match.created_at) : null;
-                      const lineActive = idx < 2 && (done || statusHistory.length>0 && ['processed','dispatched'].includes(step));
+                      const display = (() => {
+                        if (dt) return dt.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' });
+                        if (step==='confirmed' || step==='processed') return '--/--/---- --:--';
+                        return 'Pending';
+                      })();
                       return (
                         <View key={step} style={styles.timelineRow}>
                           <View style={styles.timelineColIcon}>
@@ -353,9 +357,7 @@ export default function Orders() {
                           </View>
                           <View style={styles.timelineColText}>
                             <Text style={[styles.timelineTitle, done ? styles.timelineTitleDone : styles.timelineTitlePending]}>{step[0].toUpperCase()+step.slice(1)}</Text>
-                            <Text style={styles.timelineMeta}>
-                              {done && dt ? dt.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' }) : 'Pending'}
-                            </Text>
+                            <Text style={styles.timelineMeta}>{display}</Text>
                             {done && match?.note ? (
                               <Text style={styles.timelineNote}>{match.note}</Text>
                             ) : null}
@@ -692,14 +694,14 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   timelineDotDone: { backgroundColor: '#4caf50' },
-  timelineDotPending: { backgroundColor: '#bdbdbd' },
+  timelineDotPending: { backgroundColor: '#4caf50' },
   timelineLine: {
     width: 2,
     flexGrow: 1,
     marginTop: 4,
   },
   timelineLineDone: { backgroundColor: '#4caf50' },
-  timelineLinePending: { backgroundColor: '#e0e0e0' },
+  timelineLinePending: { backgroundColor: '#4caf50' },
   timelineColText: {
     flex: 1,
     paddingLeft: 8,
@@ -709,7 +711,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   timelineTitleDone: { color: '#2d5016' },
-  timelineTitlePending: { color: '#777' },
+  timelineTitlePending: { color: '#2d5016' },
   timelineMeta: {
     fontSize: 12,
     color: '#666',

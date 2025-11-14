@@ -83,6 +83,8 @@ export default function Masters() {
   // Admin manage state (master only)
   const [adminManageVisible, setAdminManageVisible] = useState(false);
   const [admins, setAdmins] = useState<any[]>([]);
+  const [editUserModal, setEditUserModal] = useState<{ visible: boolean; user: any | null }>({ visible: false, user: null });
+  const openEditUser = openEditUserFactory(setEditUserModal);
   // Logistics manage state
   const [logisticsVisible, setLogisticsVisible] = useState(false);
   const [logistics, setLogistics] = useState<any[]>([]);
@@ -155,85 +157,70 @@ export default function Masters() {
             </TouchableOpacity>
           ) : (
             <>
-              {/* Masters only */}
-              <TouchableOpacity style={styles.masterBtn} onPress={async ()=>{
-                try {
-                  const users = await listUsersBasic() as any[];
-                  const rows = Array.isArray(users) ? users : [];
-                  const html = `<!doctype html><html><head><meta charset='utf-8'><title>Users</title></head><body><h1>Users</h1><table border='1' cellspacing='0' cellpadding='6'><tr><th>ID</th><th>Name</th><th>Phone</th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.full_name||''}</td><td>${u.number||''}</td></tr>`).join('')}</table></body></html>`;
-                  const file = await Print.printToFileAsync({ html });
-                  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Export Users PDF' });
-                  else Alert.alert('Exported', file.uri);
-                } catch (e) {
-                  Alert.alert('Error', 'Failed to export users');
-                }
-              }}>
-                <Ionicons name="download" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Export Users PDF</Text>
-              </TouchableOpacity>
+              {/* Masters only in required order */}
+              {/* 1. Crop Data */}
               <TouchableOpacity style={styles.masterBtn} onPress={() => setGuideModalVisible(true)}>
                 <Ionicons name="book" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Crop Doctor Manager</Text>
+                <Text style={styles.masterBtnText}>Crop Data</Text>
               </TouchableOpacity>
+
+              {/* 2. User Manager */}
+            <TouchableOpacity style={styles.adminTile} onPress={async ()=> { router.push('/user-manager'); }}>
+                <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
+                  <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
+                    <Ionicons name="people" size={20} color="#4caf50" />
+                  </View>
+                  <View>
+                    <Text style={styles.adminTileTitle}>User Manager</Text>
+                    <Text style={styles.adminTileSub}>Edit users, roles, and addresses</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+              </TouchableOpacity>
+
+              {/* 3. Products */}
               <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
                 <Ionicons name="pricetags" size={18} color="#4caf50" />
                 <Text style={styles.masterBtnText}>Products</Text>
               </TouchableOpacity>
-            </>
-          )}
-          {isMaster && (
-            <>
-            <TouchableOpacity style={styles.adminTile} onPress={()=> router.push('/pending-products')}>
-              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
-                  <Ionicons name="time" size={20} color="#4caf50" />
-                </View>
-                <View>
-                  <Text style={styles.adminTileTitle}>Review Product Requests</Text>
-                  <Text style={styles.adminTileSub}>Approve or reject vendor submissions</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#2d5016" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setLogisticsVisible(true); try { const rows = await listLogistics(); setLogistics(rows as any[]); } catch {} }}>
-              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
-                  <Ionicons name="cube" size={20} color="#4caf50" />
-                </View>
-                <View>
-                  <Text style={styles.adminTileTitle}>Manage Logistics</Text>
-                  <Text style={styles.adminTileSub}>Add carriers and tracking URLs</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#2d5016" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setAdminManageVisible(true); setAdminsLoading(true); try { const rows = await listAdmins(); setAdmins(rows as any[]); setAdminCount(Array.isArray(rows)? rows.length : 0); } finally { setAdminsLoading(false); } }}>
-              <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
-                  <Ionicons name="shield-checkmark" size={20} color="#4caf50" />
-                </View>
-                <View>
-                  <Text style={styles.adminTileTitle}>Add/Manage Admins</Text>
-                  <Text style={styles.adminTileSub}>{adminCount!=null? `${adminCount} admin${adminCount===1?'':'s'}` : 'Create vendors, promote to master'}</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#2d5016" />
-            </TouchableOpacity>
-            </>
-          )}
-          {isMaster && (
-            <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/adminOrders')}>
-              <Ionicons name="receipt" size={18} color="#4caf50" />
-              <Text style={styles.masterBtnText}>Manage Orders</Text>
-            </TouchableOpacity>
-          )}
 
-          {/* System Notifications (masters only) */}
-          {isMaster && (
-            <TouchableOpacity style={styles.masterBtn} onPress={()=> setNotifModalVisible(true)}>
-              <Ionicons name="notifications" size={18} color="#4caf50" />
-              <Text style={styles.masterBtnText}>Send Notification</Text>
-            </TouchableOpacity>
+              {/* 4. Export data */}
+              <TouchableOpacity style={styles.masterBtn} onPress={async ()=>{
+                try {
+                  const users = await listUsersBasic() as any[];
+                  const rows = Array.isArray(users) ? users : [];
+                  const html = `<!doctype html><html><head><meta charset='utf-8'><title>Export</title></head><body><h1>Users</h1><table border='1' cellspacing='0' cellpadding='6'><tr><th>ID</th><th>Name</th><th>Phone</th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.full_name||''}</td><td>${u.number||''}</td></tr>`).join('')}</table></body></html>`;
+                  const file = await Print.printToFileAsync({ html });
+                  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Export data' });
+                  else Alert.alert('Exported', file.uri);
+                } catch (e) {
+                  Alert.alert('Error', 'Failed to export');
+                }
+              }}>
+                <Ionicons name="download" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Export data</Text>
+              </TouchableOpacity>
+
+              {/* 5. Send Notifications */}
+              <TouchableOpacity style={styles.masterBtn} onPress={()=> setNotifModalVisible(true)}>
+                <Ionicons name="notifications" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Send Notifications</Text>
+              </TouchableOpacity>
+
+              {/* Manage Logistics (kept after main tasks) */}
+              <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setLogisticsVisible(true); try { const rows = await listLogistics(); setLogistics(rows as any[]); } catch {} }}>
+                <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
+                  <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
+                    <Ionicons name="cube" size={20} color="#4caf50" />
+                  </View>
+                  <View>
+                    <Text style={styles.adminTileTitle}>Manage Logistics</Text>
+                    <Text style={styles.adminTileSub}>Add carriers and tracking URLs</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -244,9 +231,9 @@ export default function Masters() {
         {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
-            <Ionicons name="close" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crop Doctor Manager</Text>
+          <Text style={styles.headerTitle}>Crop Data</Text>
           <View style={{ width: 24 }} />
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -498,9 +485,9 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
           {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => setSavedPestsVisible(false)}>
-              <Ionicons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
+                      <TouchableOpacity onPress={()=> setSavedPestsVisible(false)}>
+                        <Ionicons name="chevron-back" size={24} color="#fff" />
+                      </TouchableOpacity>
             <Text style={styles.headerTitle}>Saved Pests</Text>
             <View style={{ width: 24 }} />
           </View>
@@ -596,7 +583,7 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setSavedDiseasesVisible(false)}>
-              <Ionicons name="close" size={24} color="#fff" />
+              <Ionicons name="chevron-back" size={24} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Saved Diseases</Text>
             <View style={{ width: 24 }} />
@@ -775,7 +762,7 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
         {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setLogisticsVisible(false)}>
-            <Ionicons name="close" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Logistics</Text>
           <View style={{ width: 24 }} />
@@ -810,15 +797,15 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
         <SafeAreaView edges={['bottom']} style={{ backgroundColor:'#fff' }} />
       </Modal>
 
-      {/* Manage Admins (Master only) - top-level so it opens from Masters home */}
+      {/* User Manager (Master only) */}
       <Modal visible={adminManageVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=> setAdminManageVisible(false)}>
         <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setAdminManageVisible(false)}>
-            <Ionicons name="close" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Admins</Text>
+          <Text style={styles.headerTitle}>User Manager</Text>
           <View style={{ width: 24 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding:16, paddingBottom: 28 }}>
@@ -838,25 +825,25 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
               <View key={a.id} style={{ padding:12, borderWidth:1, borderColor:'#e0e0e0', borderRadius:10, backgroundColor:'#fff', marginBottom:12 }}>
                   <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
                     <View style={{ flex:1 }}>
-                      <Text style={{ fontWeight:'700', color:'#2d5016' }}>{a.full_name || 'Admin'}</Text>
+                      <Text style={{ fontWeight:'700', color:'#2d5016' }}>{a.full_name || 'User'}</Text>
                       <Text style={{ color:'#666' }}>{a.number}</Text>
                     </View>
                     <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
-                      <Text style={[styles.rolePill, a.is_admin===2 ? styles.rolePillMaster : (a.is_admin===3 ? styles.rolePillSupport : styles.rolePillVendor)]}>{a.is_admin===2 ? 'MASTER' : (a.is_admin===3 ? 'SUPPORT' : 'VENDOR')}</Text>
-                      <TouchableOpacity onPress={async ()=>{ const ok = await deleteAdmin(Number(a.id)); if (ok) { setAdmins(prev=> { const n = prev.filter(x=> x.id!==a.id); setAdminCount(n.length); return n; }); Alert.alert('Deleted','Admin removed'); } }} style={{ padding:8, backgroundColor:'#fdecea', borderRadius:8 }}>
-                        <Ionicons name="trash" size={18} color="#d32f2f" />
+                      <Text style={[styles.rolePill, a.is_admin===2 ? styles.rolePillMaster : (a.is_admin===3 ? styles.rolePillSupport : styles.rolePillVendor)]}>{a.is_admin===2 ? 'MASTER' : (a.is_admin===3 ? 'SUPPORT' : (a.is_admin===1 ? 'VENDOR' : 'USER'))}</Text>
+                      <TouchableOpacity onPress={()=> openEditUser(a)} style={{ padding:8, backgroundColor:'#eaf6ec', borderRadius:8 }}>
+                        <Ionicons name="create" size={18} color="#2d5016" />
                       </TouchableOpacity>
                     </View>
                   </View>
                 <View style={[styles.segmented, { marginTop:10, alignSelf:'flex-start' }]}>
-                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 2); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:2}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===2 && styles.segmentActive]}>
+                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 2); setAdmins(prev=> prev.map(x=> x.id===a.id?{...x,is_admin:2}:x)); }} style={[styles.segment, a.is_admin===2 && styles.segmentActive]}>
                     <Text style={[styles.segmentText, a.is_admin===2 && styles.segmentTextActive]}>Master</Text>
                   </TouchableOpacity>
-                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 1); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:1}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===1 && styles.segmentActive]}>
+                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 1); setAdmins(prev=> prev.map(x=> x.id===a.id?{...x,is_admin:1}:x)); }} style={[styles.segment, a.is_admin===1 && styles.segmentActive]}>
                     <Text style={[styles.segmentText, a.is_admin===1 && styles.segmentTextActive]}>Vendor</Text>
                   </TouchableOpacity>
-                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 3); setAdmins(prev=> { const next = prev.map(x=> x.id===a.id?{...x,is_admin:3}:x); setAdminCount(next.length); return next; }); }} style={[styles.segment, a.is_admin===3 && styles.segmentActive]}>
-                    <Text style={[styles.segmentText, a.is_admin===3 && styles.segmentTextActive]}>Support</Text>
+                    <TouchableOpacity onPress={async ()=>{ await setAdminRole(Number(a.id), 0); setAdmins(prev=> prev.map(x=> x.id===a.id?{...x,is_admin:0}:x)); }} style={[styles.segment, a.is_admin===0 && styles.segmentActive]}>
+                    <Text style={[styles.segmentText, a.is_admin===0 && styles.segmentTextActive]}>User</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -866,7 +853,26 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           )}
 
           <View style={{ height: 16 }} />
-          <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 8 }}>Create Admin</Text>
+
+          {/* Edit User Modal */}
+          <Modal visible={editUserModal.visible} transparent animationType="fade" onRequestClose={()=> setEditUserModal({ visible:false, user:null })}>
+            <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+              <View style={{ width:'92%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
+                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+                  <TouchableOpacity onPress={()=> setEditUserModal({ visible:false, user:null })}>
+                    <Ionicons name="chevron-back" size={22} color="#333" />
+                  </TouchableOpacity>
+                  <Text style={{ fontSize:18, fontWeight:'700' }}>Edit User</Text>
+                  <View style={{ width: 22 }} />
+                </View>
+                {editUserModal.user && (
+                  <EditUserForm user={editUserModal.user} onClose={async ()=> { setEditUserModal({ visible:false, user:null }); const rows = await listUsersBasic() as any[]; setAdmins(rows as any[]); }} />
+                )}
+              </View>
+            </View>
+          </Modal>
+
+          <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 8 }}>Create User (admin/vendor/support)</Text>
           <View style={{ gap: 10 }}>
             <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#999" value={newAdminFullName} onChangeText={setNewAdminFullName} />
             <TextInput style={styles.input} placeholder="Phone Number" placeholderTextColor="#999" value={newAdminNumber} onChangeText={setNewAdminNumber} keyboardType="number-pad" />
@@ -886,8 +892,8 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           <TouchableOpacity style={styles.savePrimaryBtn} onPress={async ()=> {
             if (!newAdminNumber || !newAdminPassword || !newAdminFullName) { Alert.alert('Error','Fill all fields'); return; }
             const ok = await (await import('../lib/createAdmin')).createAdminCustom(newAdminNumber, newAdminPassword, newAdminFullName, newAdminRole);
-            if (ok) { Alert.alert('Saved','Admin created'); const rows = await listAdmins(); setAdmins(rows as any[]); setAdminCount(Array.isArray(rows)? rows.length : 0); setNewAdminNumber(''); setNewAdminPassword(''); setNewAdminFullName(''); }
-            else { Alert.alert('Error','Failed to create admin'); }
+            if (ok) { Alert.alert('Saved','User created'); const rows = await listUsersBasic(); setAdmins(rows as any[]); setAdminCount(Array.isArray(rows)? rows.length : 0); setNewAdminNumber(''); setNewAdminPassword(''); setNewAdminFullName(''); }
+            else { Alert.alert('Error','Failed to create user'); }
           }}>
             <Ionicons name="save" size={18} color="#fff" />
             <Text style={{ color:'#fff', fontWeight:'700' }}>Create</Text>
@@ -895,6 +901,7 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
         </ScrollView>
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
       </Modal>
+
       {/* Notification compose modal */}
       <Modal visible={notifModalVisible} transparent animationType="fade" onRequestClose={()=> setNotifModalVisible(false)}>
         <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
@@ -902,7 +909,7 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
               <Text style={{ fontSize:18, fontWeight:'700' }}>Publish Notification</Text>
               <TouchableOpacity onPress={()=> setNotifModalVisible(false)}>
-                <Ionicons name="close" size={22} color="#333" />
+                <Ionicons name="chevron-back" size={22} color="#333" />
               </TouchableOpacity>
             </View>
             <View style={{ padding:16 }}>
@@ -924,6 +931,37 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
         </View>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function openEditUserFactory(setEditUserModal: any) {
+  return async function openEditUser(user: any) {
+    try {
+      const details = await (await import('../lib/database')).getUserById(Number(user.id));
+      const u = { ...user, address: (details as any)?.address || '' };
+      setEditUserModal({ visible: true, user: u });
+    } catch {
+      setEditUserModal({ visible: true, user });
+    }
+  };
+}
+
+function EditUserForm({ user, onClose }: { user: any; onClose: () => void }) {
+  const [name, setName] = React.useState<string>(user.full_name || '');
+  const [address, setAddress] = React.useState<string>(user.address || '');
+  const [saving, setSaving] = React.useState(false);
+  return (
+    <View style={{ padding:16 }}>
+      <Text style={{ color:'#2d5016', fontWeight:'700' }}>Name</Text>
+      <TextInput style={[styles.input, { marginTop:6 }]} value={name} onChangeText={setName} placeholder="Full name" placeholderTextColor="#999" />
+      <Text style={{ color:'#2d5016', fontWeight:'700', marginTop:10 }}>Address</Text>
+      <TextInput style={[styles.input, { marginTop:6, minHeight: 90, textAlignVertical:'top' }]} value={address} onChangeText={setAddress} placeholder="Address" placeholderTextColor="#999" multiline />
+      <TouchableOpacity disabled={saving} onPress={async ()=>{ setSaving(true); try { const ok = await (await import('../lib/database')).updateUser(Number(user.id), { full_name: name.trim() || undefined, address: address.trim() || undefined }); if (ok) { Alert.alert('Saved','User updated'); onClose(); } else { Alert.alert('Error','Failed to update user'); } } finally { setSaving(false); } }} style={[styles.savePrimaryBtn, { marginTop: 12, opacity: saving? 0.7 : 1 }]}>
+        <Ionicons name="save" size={18} color="#fff" />
+        <Text style={{ color:'#fff', fontWeight:'700' }}>{saving? 'Saving...' : 'Save'}</Text>
+      </TouchableOpacity>
+      <SafeAreaView edges={['bottom']} />
+    </View>
   );
 }
 

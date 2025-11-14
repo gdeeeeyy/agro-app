@@ -26,13 +26,24 @@ export default function Profile() {
         </TouchableOpacity>
 
         {(user?.is_admin ?? 0) >= 1 && (
-          <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/masters')}>
-            <View style={styles.tileLeft}>
-              <Ionicons name="construct" size={20} color="#4caf50" />
-              <Text style={styles.tileTitle}>Master</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#2d5016" />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/masters')}>
+              <View style={styles.tileLeft}>
+                <Ionicons name="construct" size={20} color="#4caf50" />
+                <Text style={styles.tileTitle}>Master</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+            </TouchableOpacity>
+            {(user?.is_admin ?? 0) === 2 && (
+              <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/adminOrders')}>
+                <View style={styles.tileLeft}>
+                  <Ionicons name="receipt" size={20} color="#4caf50" />
+                  <Text style={styles.tileTitle}>Manage Orders</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
         <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/orders?from=profile')}>

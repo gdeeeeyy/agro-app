@@ -277,6 +277,11 @@ export default function AdminOrders() {
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
+        <View style={{ position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Back" style={{ padding: 4 }}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <View style={{ position: 'absolute', top: 8, right: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Open Profile">
             <Ionicons name="person-circle" size={28} color="#fff" />
@@ -440,6 +445,7 @@ export default function AdminOrders() {
                   <TextInput
                     style={styles.textArea}
                     placeholder="Add a note about the order status..."
+                    placeholderTextColor="#666"
                     value={statusNote}
                     onChangeText={setStatusNote}
                     multiline
@@ -468,11 +474,11 @@ export default function AdminOrders() {
                   )}
                   <TextInput
                     style={[styles.input, { marginTop: 8 }]}
-                    placeholder="Tracking number"
+                    placeholder="Consignment Number"
+                    placeholderTextColor="#666"
                     value={trackingNumber}
                     onChangeText={(v)=> { setTrackingNumber(v); const tpl = (logisticsList.find(x=> x.name===logisticsName)?.tracking_url)||trackingUrl; setTrackingUrl(computeTrackingUrl(tpl, v)); }}
                   />
-                  {!!trackingUrl && <Text style={styles.hint} numberOfLines={1}>URL: {trackingUrl}</Text>}
                 </View>
 
               </>
