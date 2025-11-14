@@ -50,7 +50,6 @@ export default function AppHeader() {
   return (
     <View>
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
-      {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <Image source={require('../assets/images/icon.png')} style={styles.logo} />

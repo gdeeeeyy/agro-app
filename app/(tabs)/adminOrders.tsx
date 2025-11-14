@@ -367,32 +367,40 @@ export default function AdminOrders() {
                     </Text>
                     <Ionicons name={showPreDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#4caf50" />
                   </TouchableOpacity>
-                  {showPreDropdown && (
-                    <View style={styles.dropdownPanel}>
-                      {PRE_CONFIRM_OPTIONS.map((val) => {
-                        const meta = getStatusMeta(val as string)!;
-                        const selected = (newStatus || selectedOrder?.status || '').toLowerCase() === (val as string);
-                        return (
-                          <TouchableOpacity
-                            key={val as string}
-                            style={[styles.dropdownItem, selected && { backgroundColor: '#f1f8f4', borderColor: meta.color }]}
-                            onPress={() => {
-                              setStage1Choice(val as 'confirmed' | 'cancelled');
-                              setNewStatus(val as string);
-                              setShowPreDropdown(false);
-                              if ((val as string) === 'confirmed') setShowPostDropdown(true);
-                              else setShowPostDropdown(false);
-                            }}
-                          >
-                            <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : '#666'} />
-                            <Text style={[styles.dropdownItemText, selected && { color: meta.color }]}>
-                              {meta.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                  <Modal visible={showPreDropdown} transparent animationType="fade" onRequestClose={()=> setShowPreDropdown(false)}>
+                    <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+                      <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                        <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+                          <Text style={{ fontWeight:'700', color:'#333' }}>Select status</Text>
+                          <TouchableOpacity onPress={()=> setShowPreDropdown(false)}><Ionicons name="close" size={20} color="#333" /></TouchableOpacity>
+                        </View>
+                        <ScrollView>
+                          {PRE_CONFIRM_OPTIONS.map((val) => {
+                            const meta = getStatusMeta(val as string)!;
+                            const selected = (newStatus || selectedOrder?.status || '').toLowerCase() === (val as string);
+                            return (
+                              <TouchableOpacity
+                                key={val as string}
+                                style={[styles.dropdownItem, selected && { backgroundColor: '#f1f8f4', borderColor: meta.color }]}
+                                onPress={() => {
+                                  setStage1Choice(val as 'confirmed' | 'cancelled');
+                                  setNewStatus(val as string);
+                                  setShowPreDropdown(false);
+                                  if ((val as string) === 'confirmed') setShowPostDropdown(true);
+                                  else setShowPostDropdown(false);
+                                }}
+                              >
+                                <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : '#666'} />
+                                <Text style={[styles.dropdownItemText, selected && { color: meta.color }]}>
+                                  {meta.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
                     </View>
-                  )}
+                  </Modal>
 
                   {/* Step 2: Processing -> Shipped -> Delivered */}
                   <TouchableOpacity
@@ -415,29 +423,37 @@ export default function AdminOrders() {
                     </Text>
                     <Ionicons name={showPostDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#4caf50" />
                   </TouchableOpacity>
-                  {showPostDropdown && (
-                    <View style={styles.dropdownPanel}>
-                      {POST_CONFIRM_OPTIONS.map((val) => {
-                        const meta = getStatusMeta(val as string)!;
-                        const selected = (newStatus || selectedOrder?.status || '').toLowerCase() === (val as string);
-                        return (
-                          <TouchableOpacity
-                            key={val as string}
-                            style={[styles.dropdownItem, selected && { backgroundColor: '#f1f8f4', borderColor: meta.color }]}
-                            onPress={() => {
-                              setNewStatus(val as string);
-                              setShowPostDropdown(false);
-                            }}
-                          >
-                            <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : '#666'} />
-                            <Text style={[styles.dropdownItemText, selected && { color: meta.color }]}>
-                              {meta.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                  <Modal visible={showPostDropdown} transparent animationType="fade" onRequestClose={()=> setShowPostDropdown(false)}>
+                    <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+                      <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                        <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+                          <Text style={{ fontWeight:'700', color:'#333' }}>Select next status</Text>
+                          <TouchableOpacity onPress={()=> setShowPostDropdown(false)}><Ionicons name="close" size={20} color="#333" /></TouchableOpacity>
+                        </View>
+                        <ScrollView>
+                          {POST_CONFIRM_OPTIONS.map((val) => {
+                            const meta = getStatusMeta(val as string)!;
+                            const selected = (newStatus || selectedOrder?.status || '').toLowerCase() === (val as string);
+                            return (
+                              <TouchableOpacity
+                                key={val as string}
+                                style={[styles.dropdownItem, selected && { backgroundColor: '#f1f8f4', borderColor: meta.color }]}
+                                onPress={() => {
+                                  setNewStatus(val as string);
+                                  setShowPostDropdown(false);
+                                }}
+                              >
+                                <Ionicons name={meta.icon as any} size={20} color={selected ? meta.color : '#666'} />
+                                <Text style={[styles.dropdownItemText, selected && { color: meta.color }]}>
+                                  {meta.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
                     </View>
-                  )}
+                  </Modal>
                 </View>
 
                 <View style={styles.section}>
@@ -460,18 +476,26 @@ export default function AdminOrders() {
                     <Text style={styles.dropdownTriggerText}>{logisticsName || 'Select carrier'}</Text>
                     <Ionicons name={showLogisticsDropdown? 'chevron-up':'chevron-down'} size={18} color="#4caf50" />
                   </TouchableOpacity>
-                  {showLogisticsDropdown && (
-                    <View style={styles.dropdownPanel}>
-                      {logisticsList.length===0 ? (
-                        <View style={{ padding:12 }}><Text style={{ color:'#666' }}>No carriers yet. Add in Masters → Manage Logistics.</Text></View>
-                      ) : logisticsList.map((l)=> (
-                        <TouchableOpacity key={l.id} style={styles.dropdownItem} onPress={()=> { setLogisticsName(l.name); setShowLogisticsDropdown(false); setTrackingUrl(computeTrackingUrl(l.tracking_url, trackingNumber)); }}>
-                          <Ionicons name="cube" size={18} color="#4caf50" />
-                          <Text style={styles.dropdownItemText}>{l.name}</Text>
-                        </TouchableOpacity>
-                      ))}
+                  <Modal visible={showLogisticsDropdown} transparent animationType="fade" onRequestClose={()=> setShowLogisticsDropdown(false)}>
+                    <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+                      <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                        <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+                          <Text style={{ fontWeight:'700', color:'#333' }}>Select carrier</Text>
+                          <TouchableOpacity onPress={()=> setShowLogisticsDropdown(false)}><Ionicons name="close" size={20} color="#333" /></TouchableOpacity>
+                        </View>
+                        <ScrollView>
+                          {logisticsList.length===0 ? (
+                            <View style={{ padding:12 }}><Text style={{ color:'#666' }}>No carriers yet. Add in Masters → Manage Logistics.</Text></View>
+                          ) : logisticsList.map((l)=> (
+                            <TouchableOpacity key={l.id} style={styles.dropdownItem} onPress={()=> { setLogisticsName(l.name); setShowLogisticsDropdown(false); setTrackingUrl(computeTrackingUrl(l.tracking_url, trackingNumber)); }}>
+                              <Ionicons name="cube" size={18} color="#4caf50" />
+                              <Text style={styles.dropdownItemText}>{l.name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
                     </View>
-                  )}
+                  </Modal>
                   <TextInput
                     style={[styles.input, { marginTop: 8 }]}
                     placeholder="Consignment Number"

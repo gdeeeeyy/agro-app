@@ -382,7 +382,8 @@ export async function listUsersBasic() {
       try { return await api.get('/users-basic'); }
       catch (e) { /* fall back to local if endpoint missing */ }
     }
-    const rows = await db.getAllAsync('SELECT id, full_name, number FROM users ORDER BY created_at ASC');
+    // Include is_admin so callers can filter by Master/Vendor/User
+    const rows = await db.getAllAsync('SELECT id, full_name, number, is_admin FROM users ORDER BY created_at ASC');
     return rows;
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
@@ -1366,7 +1367,7 @@ export async function getAllKeywords() {
   }
 }
 
-// Vendors (remote only)
+// Vendors table helpers (remote only; used for seller list and vendor management)
 export async function getVendors() {
   if (!API_URL) throw new Error('API_URL not configured');
   return await api.get('/vendors');
@@ -1441,12 +1442,13 @@ export async function updateUserAddress(userId: number, address: string) {
   }
 }
 
-export async function updateUser(userId: number, fields: { full_name?: string; address?: string; is_admin?: number }) {
+export async function updateUser(userId: number, fields: { full_name?: string; address?: string; number?: string; is_admin?: number }) {
   try {
     if (API_URL) { await api.patch(`/users/${userId}`, fields); return true; }
     const sets: string[] = []; const vals: any[] = [];
     if (fields.full_name !== undefined) { sets.push('full_name = ?'); vals.push(fields.full_name); }
     if (fields.address !== undefined) { sets.push('address = ?'); vals.push(fields.address); }
+    if (fields.number !== undefined) { sets.push('number = ?'); vals.push(fields.number); }
     if (fields.is_admin !== undefined) { sets.push('is_admin = ?'); vals.push(fields.is_admin); }
     if (!sets.length) return true;
     vals.push(userId);
@@ -1476,12 +1478,26 @@ export async function listAdmins() {
   } catch (err) { console.error('SQLite fetch error:', err); return []; }
 }
 
-export async function setAdminRole(userId: number, role: 1|2|3) {
+export async function setAdminRole(userId: number, role: 0|1|2) {
   try {
     if (API_URL) { await api.patch(`/users/${userId}`, { is_admin: role }); return true; }
     await db.runAsync("UPDATE users SET is_admin = ? WHERE id = ?", role, userId);
     return true;
   } catch (err) { console.error('SQLite update error:', err); return false; }
+}
+
+export async function deleteUser(id: number) {
+  try {
+    if (API_URL) {
+      await api.del(`/users/${id}`);
+      return true;
+    }
+    await db.runAsync("DELETE FROM users WHERE id = ?", id);
+    return true;
+  } catch (err) {
+    console.error('SQLite delete error:', err);
+    return false;
+  }
 }
 
 // Conversation seen (local-only for unread badges)

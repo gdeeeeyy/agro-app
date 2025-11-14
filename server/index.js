@@ -366,14 +366,14 @@ app.post('/auth/create-admin', async (req, res) => {
   }
 });
 
-// Users (address update)
+// Users (update basic details + role)
 app.patch('/users/:id', async (req, res) => {
-  const { address, full_name, is_admin } = req.body || {};
+  const { address, full_name, number, is_admin } = req.body || {};
   const set = []; const vals=[]; let i=1;
   if (address !== undefined) { set.push(`address=$${i++}`); vals.push(address); }
   if (full_name !== undefined) { set.push(`full_name=$${i++}`); vals.push(full_name); }
+  if (number !== undefined) { set.push(`number=$${i++}`); vals.push(number); }
   // Role change with last-master guard
-  let roleToSet = null;
   if (is_admin !== undefined) {
     const role = [0,1,2].includes(Number(is_admin)) ? Number(is_admin) : null;
     if (role !== null) {
@@ -385,13 +385,19 @@ app.patch('/users/:id', async (req, res) => {
           return res.status(400).json({ error: 'cannot demote the last master admin' });
         }
       }
-      roleToSet = role;
       set.push(`is_admin=$${i++}`); vals.push(role);
     }
   }
   if (!set.length) return res.json({ ok: true });
   vals.push(req.params.id);
-  await pool.query(`UPDATE users SET ${set.join(', ')}, created_at=created_at WHERE id=$${i}`, vals);
+  try {
+    await pool.query(`UPDATE users SET ${set.join(', ')}, created_at=created_at WHERE id=$${i}`, vals);
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unique') && String(e.message).toLowerCase().includes('users_number_key')) {
+      return res.status(400).json({ error: 'number already exists' });
+    }
+    throw e;
+  }
   const u = await one('SELECT id, number, full_name, is_admin, created_at, address FROM users WHERE id=$1', [req.params.id]);
   res.json(u);
 });
@@ -409,6 +415,17 @@ app.delete('/admins/:id', async (req, res) => {
     if (mc && mc.c <= 1) return res.status(400).json({ error: 'cannot delete the last master admin' });
   }
   await pool.query('DELETE FROM users WHERE id=$1 AND is_admin > 0', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Delete any user (used by User Manager). Protect last admin.
+app.delete('/users/:id', async (req, res) => {
+  const u = await one('SELECT is_admin FROM users WHERE id=$1', [req.params.id]);
+  if (u && Number(u.is_admin) === 2) {
+    const mc = await one('SELECT COUNT(*)::int AS c FROM users WHERE is_admin=2');
+    if (mc && mc.c <= 1) return res.status(400).json({ error: 'cannot delete the last admin user' });
+  }
+  await pool.query('DELETE FROM users WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
 
@@ -899,9 +916,10 @@ app.get('/orders/all', async (req, res) => {
   res.json(await all('SELECT o.*, u.full_name, u.number FROM orders o JOIN users u ON o.user_id=u.id ORDER BY o.created_at DESC'));
 });
 
-// Users basic export (name, number)
+// Users basic export (name, number, role)
 app.get('/users-basic', async (req, res) => {
-  res.json(await all('SELECT id, full_name, number FROM users ORDER BY created_at ASC'));
+  // Include is_admin so clients can filter by role (e.g., Vendor/Master/User)
+  res.json(await all('SELECT id, full_name, number, is_admin FROM users ORDER BY created_at ASC'));
 });
 
 // Notifications APIs

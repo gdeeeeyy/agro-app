@@ -17,9 +17,9 @@ export async function createDefaultAdmin() {
     const hashedPassword = await hashPassword(password);
 
     if (API_URL) {
-      // Remote mode: try to create via API; ignore if it already exists
+      // Remote mode: create as Master admin via API; ignore if it already exists
       try {
-        await api.post('/auth/signup', { number, password: hashedPassword, full_name: fullName });
+        await api.post('/auth/create-admin', { number, password: hashedPassword, full_name: fullName, is_admin: 2 });
         console.log('Default admin created on server');
       } catch (e: any) {
         const msg = String(e?.message || '').toLowerCase();

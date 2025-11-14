@@ -13,6 +13,7 @@ import {
   Modal,
   ActionSheetIOS,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -198,10 +199,11 @@ mediaTypes: ['images'] as any,
   }, []);
 
   return (
-    <View style={styles.wrapper}>
-      <AppHeader />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View style={styles.wrapper}>
+        <AppHeader />
 
-      <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.inputSection}>
           <Text style={styles.label}>{t('scanner.plantName')}</Text>
           <TouchableOpacity
@@ -270,9 +272,9 @@ mediaTypes: ['images'] as any,
             ))}
           </View>
         )}
-      </ScrollView>
-      <View style={{ height: 10 }} />
-      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+        </ScrollView>
+        <View style={{ height: 10 }} />
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
 
       {/* Plant picker modal */}
       <Modal
@@ -313,7 +315,8 @@ mediaTypes: ['images'] as any,
           </View>
         </View>
       </Modal>
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

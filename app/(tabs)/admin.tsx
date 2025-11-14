@@ -10,6 +10,8 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,7 +24,11 @@ import {
   deleteProduct,
   getAllKeywords,
   addKeyword,
-  deleteKeyword
+  deleteKeyword,
+  getVendors,
+  addVendor,
+  updateVendor,
+  deleteVendor,
 } from '../../lib/database';
 import { addSampleProducts } from '../../lib/sampleProducts';
 import { createAdminCustom } from '../../lib/createAdmin';
@@ -63,15 +69,20 @@ interface Keyword {
 
 export default function AdminDashboard() {
   const { user } = useContext(UserContext);
+  const isAdmin = (user?.is_admin ?? 0) >= 1;
+  const isMaster = (user?.is_admin ?? 0) === 2;
+  const isVendor = (user?.is_admin ?? 0) === 1;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [loading, setLoading] = useState(true);
+  // Vendors are managed via the vendors table on the server
   const [vendors, setVendors] = useState<any[]>([]);
-  const [newVendorName, setNewVendorName] = useState('');
-  const [vendorManageVisible, setVendorManageVisible] = useState(false);
-  const [editingVendorId, setEditingVendorId] = useState<number|null>(null);
-  const [editingVendorName, setEditingVendorName] = useState('');
   const [vendorOpen, setVendorOpen] = useState(false);
+  const [vendorManageVisible, setVendorManageVisible] = useState(false);
+  const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
+  const [editingVendorName, setEditingVendorName] = useState('');
+  const [newVendorName, setNewVendorName] = useState('');
   const [variantMap, setVariantMap] = useState<Record<number, any[]>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [keywordModalVisible, setKeywordModalVisible] = useState(false);
@@ -97,9 +108,7 @@ export default function AdminDashboard() {
     pack_unit: 'gms',
   });
 
-  // Check if user is admin
-  const isAdmin = (user?.is_admin || 0) >= 1;
-  const isMaster = user?.is_admin === 2;
+  // (moved isAdmin/isMaster/isVendor declarations up near UserContext)
 
   // Variants manage state
   const [variantsVisible, setVariantsVisible] = useState(false);
@@ -147,8 +156,7 @@ export default function AdminDashboard() {
 
   const loadVendors = async () => {
     try {
-      const db = await import('../../lib/database');
-      const rows = await db.getVendors();
+      const rows = await getVendors();
       setVendors(rows as any[]);
     } catch (e) {
       setVendors([]);
@@ -431,7 +439,11 @@ const pickImage = async () => {
     setAdminModalVisible(true);
   };
 
-  const renderProduct = ({ item }: { item: Product & { status?: string; review_note?: string } }) => (
+  const renderProduct = ({ item }: { item: Product & { status?: string; review_note?: string; created_by?: number } }) => {
+    const createdBy = (item as any).created_by as number | null | undefined;
+    const canEditOrDelete = isMaster || (isVendor && createdBy != null && user?.id === createdBy);
+
+    return (
     <View style={styles.productCard}>
       {item.image && (
         <Image source={{ uri: item.image }} style={styles.productImage} />
@@ -463,7 +475,7 @@ const pickImage = async () => {
       </View>
 
       <View style={styles.productActions}>
-        {isMaster && (
+        {canEditOrDelete && (
           <>
             <TouchableOpacity
               style={styles.editButton}
@@ -471,7 +483,7 @@ const pickImage = async () => {
             >
               <Ionicons name="pencil" size={20} color="#4caf50" />
             </TouchableOpacity>
-            {String((item as any).status||'') === 'pending' && (
+            {isMaster && String((item as any).status||'') === 'pending' && (
               <>
                 <TouchableOpacity style={[styles.variantButton,{ borderColor:'#c8e6c9' }]} onPress={async ()=> {
                   const db = await import('../../lib/database');
@@ -492,15 +504,18 @@ const pickImage = async () => {
           </>
         )}
         
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDelete(item)}
-        >
-          <Ionicons name="trash" size={20} color="#f44336" />
-        </TouchableOpacity>
+        {canEditOrDelete && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDelete(item)}
+          >
+            <Ionicons name="trash" size={20} color="#f44336" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
+  }
 
   if (!isAdmin) {
     return (
@@ -598,8 +613,9 @@ const pickImage = async () => {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               {editingProduct ? 'Edit Product' : 'Add Product'}
             </Text>
@@ -609,30 +625,47 @@ const pickImage = async () => {
           </View>
 
           <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
-          <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 20 }}>
+          <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
             <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Seller</Text>
-            <TouchableOpacity style={[styles.input, { flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={() => setVendorOpen(v => !v)}>
+            <TouchableOpacity style={[styles.input, { flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={() => setVendorOpen(true)}>
               <Text style={{ color: formData.seller_name ? '#333' : '#999' }}>{formData.seller_name || 'Select Vendor'}</Text>
               <Ionicons name={vendorOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#666" />
             </TouchableOpacity>
-            {vendorOpen && (
-              <ScrollView style={{ borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginTop:6, maxHeight:200 }} contentContainerStyle={{ paddingVertical:0 }}>
-                {vendors.length === 0 ? (
-                  <View style={{ padding:12 }}>
-                    <Text style={{ color:'#666' }}>No vendors yet</Text>
-                    <TouchableOpacity style={{ marginTop:8 }} onPress={() => { setVendorOpen(false); setVendorManageVisible(true); setNewVendorName(''); }}>
-                      <Text style={{ color:'#3f51b5', fontWeight:'700' }}>+ Add new vendor</Text>
-                    </TouchableOpacity>
+            <Modal visible={vendorOpen} transparent animationType="fade" onRequestClose={() => setVendorOpen(false)}>
+              <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+                <View style={{ width:'92%', maxHeight: '70%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                  <View style={{ padding:14, borderBottomWidth:1, borderBottomColor:'#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Select Vendor</Text>
+                    <TouchableOpacity onPress={() => setVendorOpen(false)}><Ionicons name="close" size={22} color="#333" /></TouchableOpacity>
                   </View>
-                ) : (
-                  vendors.map(v => (
-                    <TouchableOpacity key={v.id} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }} onPress={() => { setFormData({ ...formData, seller_name: v.name }); setVendorOpen(false); }}>
-                      <Text style={{ color:'#333', fontWeight: formData.seller_name===v.name ? '700' : '600' }}>{v.name}</Text>
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-            )}
+                  <ScrollView contentContainerStyle={{ paddingVertical:0 }}>
+                    {vendors.length === 0 ? (
+                      <View style={{ padding:12 }}>
+                        <Text style={{ color:'#666' }}>No vendors yet</Text>
+                      </View>
+                    ) : (
+                      vendors.map(v => {
+                        const name = v.name || 'Vendor';
+                        const label = `[Vendor] ${name}`;
+                        return (
+                          <TouchableOpacity
+                            key={v.id}
+                            style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}
+                            onPress={() => {
+                              // seller_name stored as the vendor display name
+                              setFormData({ ...formData, seller_name: name });
+                              setVendorOpen(false);
+                            }}
+                          >
+                            <Text style={{ color:'#333', fontWeight: formData.seller_name===name ? '700' : '600' }}>{label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
             <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>English Name</Text>
             <TextInput
               style={styles.input}
@@ -687,11 +720,28 @@ const pickImage = async () => {
                 ))}
                 <View style={{ flexDirection:'row', gap:8 }}>
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Qty" placeholderTextColor="#666" keyboardType="numeric" value={newVarQty} onChangeText={setNewVarQty} />
-                  <TouchableOpacity style={[styles.input, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> { /* simple cycle through units for now */ const idx = unitsList.indexOf(newVarUnit); setNewVarUnit(unitsList[(idx+1) % unitsList.length]); }}>
+                  <TouchableOpacity style={[styles.input, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> setUnitPickerOpen(true)}>
                     <Text style={{ color:'#333' }}>{newVarUnit}</Text>
-                    <Ionicons name="swap-vertical" size={18} color="#666" />
+                    <Ionicons name={unitPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#666" />
                   </TouchableOpacity>
                 </View>
+                <Modal visible={unitPickerOpen} transparent animationType="fade" onRequestClose={()=> setUnitPickerOpen(false)}>
+                  <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+                    <View style={{ width:'80%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                      <View style={{ padding:14, borderBottomWidth:1, borderBottomColor:'#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                        <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Select Unit</Text>
+                        <TouchableOpacity onPress={()=> setUnitPickerOpen(false)}><Ionicons name="close" size={22} color="#333" /></TouchableOpacity>
+                      </View>
+                      <ScrollView>
+                        {unitsList.map(u => (
+                          <TouchableOpacity key={u} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }} onPress={()=> { setNewVarUnit(u); setUnitPickerOpen(false); }}>
+                            <Text style={{ color:'#333', fontWeight: newVarUnit===u ? '700' : '600' }}>{u}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </Modal>
                 <View style={{ flexDirection:'row', gap:8, marginTop: 8 }}>
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={newVarPrice} onChangeText={setNewVarPrice} />
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Stock" placeholderTextColor="#666" keyboardType="numeric" value={newVarStock} onChangeText={setNewVarStock} />
@@ -721,11 +771,28 @@ const pickImage = async () => {
                 ))}
                 <View style={{ flexDirection:'row', gap:8 }}>
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Qty" placeholderTextColor="#666" keyboardType="numeric" value={newVarQty} onChangeText={setNewVarQty} />
-                  <TouchableOpacity style={[styles.input, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> { const idx = unitsList.indexOf(newVarUnit); setNewVarUnit(unitsList[(idx+1) % unitsList.length]); }}>
+                  <TouchableOpacity style={[styles.input, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]} onPress={()=> setUnitPickerOpen(true)}>
                     <Text style={{ color:'#333' }}>{newVarUnit}</Text>
-                    <Ionicons name="swap-vertical" size={18} color="#666" />
+                    <Ionicons name={unitPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#666" />
                   </TouchableOpacity>
                 </View>
+                <Modal visible={unitPickerOpen} transparent animationType="fade" onRequestClose={()=> setUnitPickerOpen(false)}>
+                  <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
+                    <View style={{ width:'80%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                      <View style={{ padding:14, borderBottomWidth:1, borderBottomColor:'#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                        <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Select Unit</Text>
+                        <TouchableOpacity onPress={()=> setUnitPickerOpen(false)}><Ionicons name="close" size={22} color="#333" /></TouchableOpacity>
+                      </View>
+                      <ScrollView>
+                        {unitsList.map(u => (
+                          <TouchableOpacity key={u} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }} onPress={()=> { setNewVarUnit(u); setUnitPickerOpen(false); }}>
+                            <Text style={{ color:'#333', fontWeight: newVarUnit===u ? '700' : '600' }}>{u}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </Modal>
                 <View style={{ flexDirection:'row', gap:8, marginTop: 8 }}>
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Price (Rs.)" placeholderTextColor="#666" keyboardType="numeric" value={newVarPrice} onChangeText={setNewVarPrice} />
                   <TextInput style={[styles.input, { flex:1 }]} placeholder="Stock" placeholderTextColor="#666" keyboardType="numeric" value={newVarStock} onChangeText={setNewVarStock} />
@@ -770,6 +837,7 @@ const pickImage = async () => {
           <View style={{ height: 10 }} />
           <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -834,52 +902,206 @@ const pickImage = async () => {
 
 
 
+      {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
+
       {/* Vendor Manage Modal */}
-      <Modal visible={vendorManageVisible} transparent animationType="fade" onRequestClose={() => setVendorManageVisible(false)}>
-        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
-          <View style={{ width:'92%', maxHeight:'80%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
-            <View style={{ padding:16, borderBottomWidth:1, borderBottomColor:'#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-              <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Manage Vendors</Text>
+      <Modal
+        visible={vendorManageVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVendorManageVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              width: '92%',
+              maxHeight: '80%',
+              backgroundColor: '#fff',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <View
+              style={{
+                padding: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: '#eee',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>
+                Manage Vendors
+              </Text>
               <TouchableOpacity onPress={() => setVendorManageVisible(false)}>
                 <Ionicons name="close" size={22} color="#333" />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding:16 }}>
-              {vendors.length === 0 ? (
-                <Text style={{ color:'#666' }}>No vendors yet</Text>
-              ) : vendors.map(v => (
-                <View key={v.id} style={{ paddingVertical:10, borderBottomWidth:1, borderBottomColor:'#f0f0f0', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-                  {editingVendorId === v.id ? (
-                    <TextInput style={[styles.input, { flex:1, marginBottom:0, marginRight:8 }]} value={editingVendorName} onChangeText={setEditingVendorName} />
-                  ) : (
-                    <Text style={{ color:'#333', fontWeight:'600', flex:1 }}>{v.name}</Text>
-                  )}
-                  {editingVendorId === v.id ? (
-                    <>
-                <TouchableOpacity onPress={async ()=> { const nm = editingVendorName.trim(); if (!nm) { Alert.alert('Error','Enter vendor name'); return; } try { const db = await import('../../lib/database'); await db.updateVendor(Number(v.id), nm, true); setEditingVendorId(null); setEditingVendorName(''); await loadVendors(); Alert.alert('Success','Vendor updated'); } catch (e:any) { Alert.alert('Error', String(e?.message||'Failed to update vendor')); } }} style={{ padding:8 }}>
-                        <Ionicons name="checkmark-circle" size={20} color="#4caf50" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={()=> { setEditingVendorId(null); setEditingVendorName(''); }} style={{ padding:8 }}>
-                        <Ionicons name="close-circle" size={20} color="#d32f2f" />
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <>
-                      <TouchableOpacity onPress={()=> { setEditingVendorId(Number(v.id)); setEditingVendorName(String(v.name||'')); }} style={{ padding:8 }}>
-                        <Ionicons name="pencil" size={18} color="#4caf50" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={async ()=> { try { const db = await import('../../lib/database'); await db.deleteVendor(Number(v.id)); await loadVendors(); Alert.alert('Deleted','Vendor removed'); } catch (e:any) { Alert.alert('Error', String(e?.message||'Failed to delete')); } }} style={{ padding:8 }}>
-                        <Ionicons name="trash" size={18} color="#f44336" />
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              ))}
 
-              <View style={{ flexDirection:'row', alignItems:'center', marginTop: 12 }}>
-                <TextInput style={[styles.input, { flex:1, marginBottom:0, marginRight:8 }]} placeholder="New vendor name" placeholderTextColor="#666" value={newVendorName} onChangeText={setNewVendorName} />
-                <TouchableOpacity onPress={async ()=> { const nm = newVendorName.trim(); if (!nm) { Alert.alert('Error','Enter vendor name'); return; } try { const db = await import('../../lib/database'); const id = await db.addVendor(nm); if (id) { setNewVendorName(''); await loadVendors(); Alert.alert('Success','Vendor added'); } } catch (e:any) { Alert.alert('Error', String(e?.message||'Failed to add vendor')); } }} style={{ padding:8 }}>
-                  <Ionicons name="add-circle" size={24} color="#3f51b5" />
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              {vendors.length === 0 ? (
+                <Text style={{ color: '#666' }}>No vendors yet</Text>
+              ) : (
+                vendors.map(v => (
+                  <View
+                    key={v.id}
+                    style={{
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#f0f0f0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    {editingVendorId === v.id ? (
+                      <TextInput
+                        style={[styles.input, { flex: 1, marginBottom: 0, marginRight: 8 }]}
+                        value={editingVendorName}
+                        onChangeText={setEditingVendorName}
+                        placeholder="Vendor name"
+                        placeholderTextColor="#999"
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          color: '#333',
+                          fontWeight: '600',
+                          flex: 1,
+                        }}
+                      >
+                        {v.name}
+                      </Text>
+                    )}
+
+                    {editingVendorId === v.id ? (
+                      <>
+                        <TouchableOpacity
+                          onPress={async () => {
+                            const nm = editingVendorName.trim();
+                            if (!nm) {
+                              Alert.alert('Error', 'Enter vendor name');
+                              return;
+                            }
+                            try {
+                              await updateVendor(Number(v.id), nm, true);
+                              setEditingVendorId(null);
+                              setEditingVendorName('');
+                              await loadVendors();
+                              Alert.alert('Success', 'Vendor updated');
+                            } catch (e: any) {
+                              Alert.alert(
+                                'Error',
+                                String(e?.message || 'Failed to update vendor'),
+                              );
+                            }
+                          }}
+                          style={{ padding: 8 }}
+                        >
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={20}
+                            color="#4caf50"
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditingVendorId(null);
+                            setEditingVendorName('');
+                          }}
+                          style={{ padding: 8 }}
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={20}
+                            color="#d32f2f"
+                          />
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditingVendorId(Number(v.id));
+                            setEditingVendorName(String(v.name || ''));
+                          }}
+                          style={{ padding: 8 }}
+                        >
+                          <Ionicons name="pencil" size={18} color="#4caf50" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={async () => {
+                            try {
+                              await deleteVendor(Number(v.id));
+                              await loadVendors();
+                              Alert.alert('Deleted', 'Vendor removed');
+                            } catch (e: any) {
+                              Alert.alert(
+                                'Error',
+                                String(e?.message || 'Failed to delete vendor'),
+                              );
+                            }
+                          }}
+                          style={{ padding: 8 }}
+                        >
+                          <Ionicons name="trash" size={18} color="#f44336" />
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                ))
+              )}
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: 12,
+                }}
+              >
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0, marginRight: 8 }]}
+                  placeholder="New vendor name"
+                  placeholderTextColor="#666"
+                  value={newVendorName}
+                  onChangeText={setNewVendorName}
+                />
+                <TouchableOpacity
+                  onPress={async () => {
+                    const nm = newVendorName.trim();
+                    if (!nm) {
+                      Alert.alert('Error', 'Enter vendor name');
+                      return;
+                    }
+                    try {
+                      const id = await addVendor(nm);
+                      if (id) {
+                        setNewVendorName('');
+                        await loadVendors();
+                        Alert.alert('Success', 'Vendor added');
+                      }
+                    } catch (e: any) {
+                      Alert.alert(
+                        'Error',
+                        String(e?.message || 'Failed to add vendor'),
+                      );
+                    }
+                  }}
+                  style={{ padding: 8 }}
+                >
+                  <Ionicons
+                    name="add-circle"
+                    size={24}
+                    color="#3f51b5"
+                  />
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -887,7 +1109,6 @@ const pickImage = async () => {
         </View>
       </Modal>
 
-      {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>

@@ -100,11 +100,12 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   };
 
   const handleAddToCart = async () => {
-    // If variants exist, require inline selector (no popup)
     if (variants.length > 0) {
       if (!selectedVariantId) { setUnitOpen(true); return; }
-      if (product.stock_available <= 0) { Alert.alert(t('store.outOfStock'), t('store.outOfStock')); return; }
-      if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) { Alert.alert(t('common.error'), t('cart.invalidQuantity')); return; }
+      const sv = variants.find(v => Number(v.id) === Number(selectedVariantId));
+      const vStock = Number(sv?.stock_available ?? 0);
+      if (vStock <= 0) { Alert.alert(t('store.outOfStock'), t('store.outOfStock')); return; }
+      if (selectedQuantity <= 0 || selectedQuantity > vStock) { Alert.alert(t('common.error'), t('cart.invalidQuantity')); return; }
       await doAddToCart(selectedQuantity, Number(selectedVariantId));
       return;
     }
@@ -159,98 +160,103 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   const Unit = (product as any).unit || 'units';
 
   return (
-    <TouchableOpacity style={[styles.card, horizontal ? styles.cardHorizontal : null, compact && styles.cardCompact]} onPress={onPress || openDetails}>
-      {!listOnlyDescription && (
-        <Image source={{ uri: productImage }} style={[horizontal ? styles.imageSquareSmall : styles.image, compact && !horizontal && styles.imageCompact]} />
-      )}
-      
-      <View style={[horizontal ? styles.contentRight : styles.content, compact && styles.contentCompact]}>
-        {horizontal ? null : (
-          !compact && !listOnlyDescription ? (
-            <Text style={styles.plantUsed} numberOfLines={1}>
-              {t('product.plant')}: {(currentLanguage === 'ta' && (product as any).plant_used_ta) ? (product as any).plant_used_ta : product.plant_used}
-            </Text>
-          ) : null
-        )}
-        
-        {variants.length > 0 && !horizontal && (
-          <View style={styles.unitContainer}>
-            <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
-<Text style={styles.unitSelectorText}>
-                {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
-              </Text>
-              <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
-            </TouchableOpacity>
-            {unitOpen && (
-              <ScrollView style={styles.unitDropdownScroll} contentContainerStyle={styles.unitDropdownContent}>
-                {variants.map(v => {
-                  const p = parseVariantLabel(v.label);
-                  const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
-                  return (
-                    <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
-<Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-          </View>
-        )}
-        
-        {listOnlyDescription ? null : (
-          <View style={{ flexGrow: 1 }}>
-            <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={horizontal ? 1 : 2}>
+    <Pressable style={[styles.card, horizontal ? styles.cardHorizontal : null, compact && styles.cardCompact]} onPress={onPress || openDetails}>
+      {horizontal ? (
+        <>
+          <Image source={{ uri: productImage }} style={styles.imageSquareSmall} />
+          <View style={styles.contentRight}>
+            <Text style={[styles.name, styles.nameCompact]} numberOfLines={1}>
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
-            {(product as any).seller_name ? (
-              <Text style={styles.sellerTag} numberOfLines={1}>Seller: {(product as any).seller_name}</Text>
-            ) : null}
-            {horizontal && variants.length > 0 && (
+            {variants.length > 0 && (
               <View style={styles.unitContainer}>
-                <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
-<Text style={styles.unitSelectorText}>
+                <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
+                  <Text style={styles.unitSelectorText}>
                     {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
                   </Text>
                   <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
                 </TouchableOpacity>
-                {unitOpen && (
-                  <ScrollView style={styles.unitDropdownScroll} contentContainerStyle={styles.unitDropdownContent}>
-                    {variants.map(v => {
-                      const p = parseVariantLabel(v.label);
-                      const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
-                      return (
-                        <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
-<Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                )}
               </View>
             )}
             <View style={styles.bottomRow}>
-              {/* Quantity control (left) */}
               <View style={styles.qtyPill}>
-                <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}>
+                <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => Math.max(1, q - 1)); }}>
                   <Ionicons name="remove" size={16} color="#2d5016" />
                 </TouchableOpacity>
                 <Text style={styles.qtyText}>{selectedQuantity}</Text>
-                <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}>
+                <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => q + 1); }}>
                   <Ionicons name="add" size={16} color="#2d5016" />
                 </TouchableOpacity>
               </View>
-              {/* Add button (right) */}
               <TouchableOpacity
-                style={[styles.fabAdd, compact && styles.fabAddCompact, product.stock_available <= 0 && styles.addButtonDisabled]}
-                onPress={handleAddToCart}
-                disabled={product.stock_available <= 0}
+                style={[styles.fabAdd, compact && styles.fabAddCompact, (variants.length===0 && product.stock_available <= 0) && styles.addButtonDisabled]}
+                onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
+                disabled={(variants.length===0 && product.stock_available <= 0)}
               >
-                <Ionicons name="add" size={20} color={product.stock_available <= 0 ? '#999' : '#fff'} />
+                <Ionicons name="add" size={20} color={(variants.length===0 && product.stock_available <= 0) ? '#999' : '#fff'} />
               </TouchableOpacity>
             </View>
           </View>
-        )}
-      </View>
+        </>
+      ) : (
+        // Square layout: image and all content within the same square height
+        <View style={styles.square}>
+          <Image source={{ uri: productImage }} style={styles.squareImage} />
+          <View style={styles.overlay}>
+            <Text style={styles.nameOverlay} numberOfLines={2}>
+              {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+            </Text>
+            {variants.length > 0 && (
+              <TouchableOpacity style={[styles.unitSelector, { marginTop: 4 }]} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
+                <Text style={[styles.unitSelectorText, { fontSize: 12 }]}>
+                  {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
+                </Text>
+                <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#4caf50" />
+              </TouchableOpacity>
+            )}
+            <View style={[styles.bottomRow, { marginTop: 6 }]}>
+              <View style={[styles.qtyPill, { height: 30, paddingHorizontal: 10, borderRadius: 8, gap: 8 }]}>
+                <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => Math.max(1, q - 1)); }}>
+                  <Ionicons name="remove" size={14} color="#2d5016" />
+                </TouchableOpacity>
+                <Text style={[styles.qtyText, { fontSize: 14 }]}>{selectedQuantity}</Text>
+                <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => q + 1); }}>
+                  <Ionicons name="add" size={14} color="#2d5016" />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.fabAdd, { width: 36, height: 36, borderRadius: 18 }, (variants.length===0 && product.stock_available <= 0) && styles.addButtonDisabled]}
+                onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
+                disabled={(variants.length===0 && product.stock_available <= 0)}
+              >
+                <Ionicons name="add" size={18} color={(variants.length===0 && product.stock_available <= 0) ? '#999' : '#fff'} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      <Modal visible={unitOpen} transparent animationType="fade" onRequestClose={()=> setUnitOpen(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+          <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+              <Text style={{ fontWeight:'700', color:'#333' }}>Select unit</Text>
+              <TouchableOpacity onPress={()=> setUnitOpen(false)}><Ionicons name="close" size={20} color="#333" /></TouchableOpacity>
+            </View>
+            <ScrollView>
+              {variants.map(v => {
+                const p = parseVariantLabel(v.label);
+                const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                return (
+                  <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
+<Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={detailsVisible}
@@ -287,19 +293,27 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                     </Text>
                     <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
                   </TouchableOpacity>
-                  {unitOpen && (
-                    <ScrollView style={styles.unitDropdownScroll} contentContainerStyle={styles.unitDropdownContent}>
-                      {variants.map(v => {
-                        const p = parseVariantLabel(v.label);
-                        const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
-                        return (
-                          <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
+                  <Modal visible={unitOpen} transparent animationType="fade" onRequestClose={()=> setUnitOpen(false)}>
+                    <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+                      <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                        <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
+                          <Text style={{ fontWeight:'700', color:'#333' }}>Select unit</Text>
+                          <TouchableOpacity onPress={()=> setUnitOpen(false)}><Ionicons name="close" size={20} color="#333" /></TouchableOpacity>
+                        </View>
+                        <ScrollView>
+                          {variants.map(v => {
+                            const p = parseVariantLabel(v.label);
+                            const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                            return (
+                              <TouchableOpacity key={v.id} style={styles.unitItem} onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}>
 <Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    </View>
+                  </Modal>
                 </View>
               )}
 
@@ -327,7 +341,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
       </Modal>
 
 
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -336,34 +350,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     marginBottom: 16,
-    minHeight: 120,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
     overflow: 'hidden',
   },
   cardHorizontal: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingLeft: 12,
-    paddingVertical: 10,
-    minHeight: 120,
+    paddingVertical: 12,
+    minHeight: 140,
   },
-  image: {
+  square: {
     width: '100%',
     aspectRatio: 1,
+    position: 'relative',
+  },
+  squareImage: {
+    ...StyleSheet.absoluteFillObject,
     resizeMode: 'cover',
     backgroundColor: '#eef2e6',
   },
+  overlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)'
+  },
   imageSquareSmall: {
-    width: 88,
-    height: 88,
+    width: 120,
+    height: 120,
     resizeMode: 'cover',
     backgroundColor: '#eef2e6',
-    marginRight: 12,
-    borderRadius: 12,
+    marginRight: 10,
+    borderRadius: 14,
   },
   imageCompact: {
     height: undefined,
@@ -373,10 +400,11 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
+  nameOverlay: { fontSize: 14, fontWeight: '700', color:'#2d5016' },
   contentRight: {
     flex: 1,
-    paddingVertical: 10,
-    paddingRight: 12,
+    paddingVertical: 8,
+    paddingRight: 8,
   },
   contentCompact: {
     padding: 12,
@@ -516,8 +544,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9f9f9',
   },
   unitContainer: { marginTop: 6 },
-  unitSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#c8e6c9', backgroundColor:'#f1f8f4', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
-  unitSelectorText: { color:'#2d5016', fontWeight:'700' },
+  unitSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#c8e6c9', backgroundColor:'#f1f8f4', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, minHeight: 32 },
+  unitSelectorText: { color:'#2d5016', fontWeight:'700', fontSize: 13 },
   unitDropdownScroll: { borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginTop:6, maxHeight: 200 },
   unitDropdownContent: { paddingVertical: 0 },
   unitItem: { padding:10, borderBottomWidth:1, borderBottomColor:'#f3f3f3' },

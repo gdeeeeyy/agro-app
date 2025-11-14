@@ -136,17 +136,22 @@ export default function Masters() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Masters</Text>
-        <View style={{ width: 24 }} />
+      {/* Green header area covering safe zone above Masters */}
+      <View style={{ backgroundColor: '#4caf50' }}>
+        {Platform.OS === 'android' ? (
+          <View style={{ height: 20, backgroundColor: '#4caf50' }} />
+        ) : null}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Masters</Text>
+          <View style={{ width: 24 }} />
+        </View>
       </View>
 
-
-      <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
+      {/* Main content area with light background */}
+      <View style={{ flex: 1, backgroundColor: '#f5f5f5', paddingHorizontal: 12, paddingTop: 12 }}>
         <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Masters</Text>
         <View style={{ gap: 10 }}>
           {/* Vendors: show only Products */}
@@ -165,17 +170,9 @@ export default function Masters() {
               </TouchableOpacity>
 
               {/* 2. User Manager */}
-            <TouchableOpacity style={styles.adminTile} onPress={async ()=> { router.push('/user-manager'); }}>
-                <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                  <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
-                    <Ionicons name="people" size={20} color="#4caf50" />
-                  </View>
-                  <View>
-                    <Text style={styles.adminTileTitle}>User Manager</Text>
-                    <Text style={styles.adminTileSub}>Edit users, roles, and addresses</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+              <TouchableOpacity style={styles.masterBtn} onPress={async ()=> { router.push('/user-manager'); }}>
+                <Ionicons name="people" size={20} color="#4caf50" />
+                <Text style={styles.masterBtnText}>User Manager</Text>
               </TouchableOpacity>
 
               {/* 3. Products */}
@@ -207,18 +204,10 @@ export default function Masters() {
                 <Text style={styles.masterBtnText}>Send Notifications</Text>
               </TouchableOpacity>
 
-              {/* Manage Logistics (kept after main tasks) */}
-              <TouchableOpacity style={styles.adminTile} onPress={async ()=> { setLogisticsVisible(true); try { const rows = await listLogistics(); setLogistics(rows as any[]); } catch {} }}>
-                <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                  <View style={{ width:36, height:36, borderRadius:8, backgroundColor:'#eaf6ec', alignItems:'center', justifyContent:'center' }}>
-                    <Ionicons name="cube" size={20} color="#4caf50" />
-                  </View>
-                  <View>
-                    <Text style={styles.adminTileTitle}>Manage Logistics</Text>
-                    <Text style={styles.adminTileSub}>Add carriers and tracking URLs</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+              {/* Manage Logistics */}
+              <TouchableOpacity style={styles.masterBtn} onPress={async ()=> { setLogisticsVisible(true); try { const rows = await listLogistics(); setLogistics(rows as any[]); } catch {} }}>
+                <Ionicons name="cube" size={20} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Manage Logistics</Text>
               </TouchableOpacity>
             </>
           )}

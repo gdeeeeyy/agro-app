@@ -10,6 +10,8 @@ import {
   Alert,
   Image,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -140,8 +142,9 @@ export default function Products() {
   }
 
   return (
-    <View style={styles.container}>
-      <AppHeader />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View style={styles.container}>
+        <AppHeader />
 
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
@@ -166,21 +169,23 @@ export default function Products() {
 
       {/* Keyword filters removed as requested */}
 
-      <FlatList
-        data={filteredProducts}
-        renderItem={renderProduct}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={[styles.listContent]}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={renderEmptyState}
-        showsVerticalScrollIndicator={false}
-        numColumns={numColumns}
-      />
-      <View style={{ height: 10 }} />
-      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
-    </View>
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProduct}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={[styles.listContent]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={renderEmptyState}
+          showsVerticalScrollIndicator={false}
+          numColumns={numColumns}
+          keyboardShouldPersistTaps="handled"
+        />
+        <View style={{ height: 10 }} />
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -238,7 +243,7 @@ const styles = StyleSheet.create({
     color: '#e8f5e9',
   },
   searchContainer: {
-    padding: 16,
+    padding: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
@@ -247,16 +252,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
   },
   clearButton: {
