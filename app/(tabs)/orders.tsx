@@ -205,6 +205,15 @@ export default function Orders() {
     }
   };
 
+  const getStatusStageIndex = (status: string) => {
+    const s = status.toLowerCase();
+    if (!s || s === 'pending' || s === 'cancelled') return -1;
+    if (s === 'confirmed') return 0;
+    if (s === 'processing' || s === 'processed') return 1;
+    if (s === 'dispatched' || s === 'shipped' || s === 'delivered') return 2;
+    return -1;
+  };
+
   const renderOrder = ({ item }: { item: Order }) => (
     <TouchableOpacity 
       style={styles.orderCard}
@@ -391,6 +400,16 @@ export default function Orders() {
                             {(item as any).review}
                           </Text>
                         ) : null}
+                        {selectedOrder && ['shipped','delivered','dispatched'].includes(selectedOrder.status.toLowerCase()) && (
+                          <TouchableOpacity
+                            style={styles.editReviewButton}
+                            onPress={() => setShowRatingEditor(true)}
+                          >
+                            <Text style={styles.editReviewText}>
+                              {(item as any).rating != null ? 'Edit review' : 'Add review'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <Text style={styles.itemPrice}>₹{(item.quantity * item.price_per_unit).toFixed(2)}</Text>
                     </View>
@@ -491,39 +510,53 @@ export default function Orders() {
                 {/* Status Timeline */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Order Status</Text>
-                  <View style={styles.timeline}>
-                    {['confirmed','processed','dispatched'].map((step, idx) => {
-                      // map statuses from history; treat 'processing' as 'processed', 'shipped'/'delivered' as 'dispatched'
-                      const match = statusHistory.find(h => {
-                        const s = String(h.status||'').toLowerCase();
-                        if (step==='processed') return (s==='processed' || s==='processing');
-                        if (step==='dispatched') return (s==='dispatched' || s==='shipped' || s==='delivered');
-                        return s===step;
-                      });
-                      const done = Boolean(match);
-                      const dt = match ? new Date(match.created_at) : null;
-                      const display = (() => {
-                        if (dt) return dt.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' });
-                        if (step==='confirmed' || step==='processed') return '--/--/---- --:--';
-                        return 'Pending';
-                      })();
-                      return (
-                        <View key={step} style={styles.timelineRow}>
-                          <View style={styles.timelineColIcon}>
-                            <View style={[styles.timelineDot, done ? styles.timelineDotDone : styles.timelineDotPending]} />
-                            {idx < 2 && <View style={[styles.timelineLine, done ? styles.timelineLineDone : styles.timelineLinePending]} />}
-                          </View>
-                          <View style={styles.timelineColText}>
-                            <Text style={[styles.timelineTitle, done ? styles.timelineTitleDone : styles.timelineTitlePending]}>{step[0].toUpperCase()+step.slice(1)}</Text>
-                            <Text style={styles.timelineMeta}>{display}</Text>
-                            {done && match?.note ? (
-                              <Text style={styles.timelineNote}>{match.note}</Text>
-                            ) : null}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
+                  {selectedOrder && selectedOrder.status.toLowerCase() === 'cancelled' ? (
+                    <View style={styles.cancelledContainer}>
+                      <Ionicons name="close-circle" size={18} color="#f44336" />
+                      <Text style={styles.cancelledText}>Your order has been cancelled</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.timeline}>
+                      {(() => {
+                        const stageIndex = selectedOrder ? getStatusStageIndex(selectedOrder.status) : -1;
+                        return ['confirmed','processed','dispatched'].map((step, idx) => {
+                          const isWithinStage = stageIndex >= 0 && idx <= stageIndex;
+                          const match = isWithinStage
+                            ? statusHistory.find(h => {
+                                const s = String(h.status||'').toLowerCase();
+                                if (step==='processed') return (s==='processed' || s==='processing');
+                                if (step==='dispatched') return (s==='dispatched' || s==='shipped' || s==='delivered');
+                                return s===step;
+                              })
+                            : undefined;
+                          const done = isWithinStage && Boolean(match);
+                          const dt = done && match ? new Date(match.created_at) : null;
+                          const display = dt
+                            ? dt.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'numeric', minute:'2-digit' })
+                            : 'Pending';
+                          return (
+                            <View key={step} style={styles.timelineRow}>
+                              <View style={styles.timelineColIcon}>
+                                <View style={[styles.timelineDot, done ? styles.timelineDotDone : styles.timelineDotPending]} />
+                                {idx < 2 && (
+                                  <View style={[styles.timelineLine, done ? styles.timelineLineDone : styles.timelineLinePending]} />
+                                )}
+                              </View>
+                              <View style={styles.timelineColText}>
+                                <Text style={[styles.timelineTitle, done ? styles.timelineTitleDone : styles.timelineTitlePending]}>
+                                  {step[0].toUpperCase()+step.slice(1)}
+                                </Text>
+                                <Text style={styles.timelineMeta}>{display}</Text>
+                                {done && match?.note ? (
+                                  <Text style={styles.timelineNote}>{match.note}</Text>
+                                ) : null}
+                              </View>
+                            </View>
+                          );
+                        });
+                      })()}
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.totalSection}>
@@ -808,6 +841,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#555',
   },
+  editReviewButton: {
+    marginTop: 4,
+  },
+  editReviewText: {
+    fontSize: 12,
+    color: '#4caf50',
+    fontWeight: '600',
+  },
   totalSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -856,13 +897,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginBottom: 4,
+    borderWidth: 2,
+    borderColor: '#4caf50',
+    backgroundColor: 'transparent',
   },
-  timelineDotDone: { backgroundColor: '#4caf50' },
-  timelineDotPending: { backgroundColor: '#4caf50' },
+  timelineDotDone: { backgroundColor: '#4caf50', borderWidth: 0 },
+  timelineDotPending: { backgroundColor: 'transparent' },
   timelineLine: {
     width: 2,
     flexGrow: 1,
@@ -889,6 +933,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#2d5016',
     marginTop: 2,
+  },
+  timelineHorizontal: {
+    marginTop: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  timelineStep: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   ratingHeaderRow: {
     flexDirection: 'row',
@@ -945,6 +999,20 @@ const styles = StyleSheet.create({
   ratingToggleButtonText: {
     color: '#4caf50',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  cancelledContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#fdecea',
+  },
+  cancelledText: {
+    marginLeft: 8,
+    color: '#c62828',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

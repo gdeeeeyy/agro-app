@@ -217,9 +217,9 @@ export default function AdminOrders() {
           </Text>
         </View>
         {item.delivery_address && (
-          <View style={styles.orderDetailRow}>
+          <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
             <Ionicons name="location" size={18} color="#666" />
-            <Text style={styles.orderDetailText} numberOfLines={2}>
+            <Text style={styles.orderDetailText} numberOfLines={3}>
               {item.delivery_address}
             </Text>
           </View>
@@ -628,8 +628,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   orderDetailText: {
+    flex: 1,
     fontSize: 14,
     color: '#333',
+    flexShrink: 1,
   },
   actionButtons: {
     flexDirection: 'row',
