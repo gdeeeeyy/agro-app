@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -13,9 +13,10 @@ import { onNotificationsChanged } from '../lib/notifBus';
 export default function AppHeader() {
   const { currentLanguage, setLanguage, t } = useLanguage();
   const { user } = React.useContext(UserContext);
-  const [langVisible, setLangVisible] = React.useState(false);
   const [unread, setUnread] = React.useState(0);
-  const changeLang = async (lang: 'en'|'ta') => { await setLanguage(lang); setLangVisible(false); };
+  const changeLang = async (lang: 'en'|'ta') => {
+    await setLanguage(lang);
+  };
 
   const keyFor = (uid?: number|null) => `@agro_last_notif_time_${uid?String(uid):'all'}`;
   const refreshNotifCount = React.useCallback(async () => {
@@ -56,9 +57,40 @@ export default function AppHeader() {
           <Text style={styles.title} numberOfLines={1}>Agriismart</Text>
         </View>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => setLangVisible(true)} accessibilityLabel="Change Language" style={styles.actionBtn}>
-            <Ionicons name="globe-outline" size={22} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.langToggle}>
+            <TouchableOpacity
+              onPress={() => changeLang('en')}
+              style={[
+                styles.langChip,
+                currentLanguage === 'en' && styles.langChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.langChipText,
+                  currentLanguage === 'en' && styles.langChipTextActive,
+                ]}
+              >
+                EN
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => changeLang('ta')}
+              style={[
+                styles.langChip,
+                currentLanguage === 'ta' && styles.langChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.langChipText,
+                  currentLanguage === 'ta' && styles.langChipTextActive,
+                ]}
+              >
+                TA
+              </Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity onPress={openNotifications} accessibilityLabel="Notifications" style={[styles.actionBtn, { position:'relative' }]}>
             <Ionicons name="notifications" size={22} color="#fff" />
             {unread > 0 && (
@@ -73,28 +105,6 @@ export default function AppHeader() {
         </View>
       </View>
 
-      <Modal visible={langVisible} transparent animationType="fade" onRequestClose={() => setLangVisible(false)}>
-        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
-          <View style={{ width: '80%', backgroundColor:'#fff', borderRadius: 12, overflow:'hidden' }}>
-            <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-              <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>{t('language.selectLanguageTitle')}</Text>
-              <TouchableOpacity onPress={() => setLangVisible(false)}>
-                <Ionicons name="close" size={22} color="#333" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={{ padding: 10 }}>
-              <TouchableOpacity onPress={() => changeLang('en')} style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='en'?'#4caf50':'#eee', backgroundColor: currentLanguage==='en'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
-                <Text style={{ color:'#333', fontWeight:'600' }}>English</Text>
-                {currentLanguage==='en' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => changeLang('ta')} style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='ta'?'#4caf50':'#eee', backgroundColor: currentLanguage==='ta'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-                <Text style={{ color:'#333', fontWeight:'600' }}>தமிழ்</Text>
-                {currentLanguage==='ta' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -108,4 +118,28 @@ const styles = StyleSheet.create({
   actionBtn: { padding: 6 },
   badge: { position:'absolute', top: 0, right: 0, backgroundColor:'#f44336', minWidth:16, height:16, borderRadius:8, alignItems:'center', justifyContent:'center' },
   badgeText: { color:'#fff', fontSize: 10, fontWeight:'800', paddingHorizontal: 3 },
+  langToggle: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#a5d6a7',
+    overflow: 'hidden',
+    marginRight: 4,
+  },
+  langChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'transparent',
+  },
+  langChipActive: {
+    backgroundColor: '#66bb6a',
+  },
+  langChipText: {
+    color: '#e8f5e9',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  langChipTextActive: {
+    color: '#fff',
+  },
 });

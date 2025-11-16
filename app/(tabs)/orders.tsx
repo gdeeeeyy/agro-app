@@ -11,12 +11,13 @@ import {
   Modal,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { getUserOrders, getOrderItems, getOrderStatusHistory } from '../../lib/database';
+import { getUserOrders, getOrderItems, getOrderStatusHistory, rateOrderItem } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../../components/TopBar';
 
@@ -43,6 +44,8 @@ interface OrderItem {
   product_name: string;
   quantity: number;
   price_per_unit: number;
+  rating?: number | null;
+  review?: string | null;
 }
 
 export default function Orders() {
@@ -54,6 +57,9 @@ export default function Orders() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [statusHistory, setStatusHistory] = useState<Array<{ status: string; note?: string; created_at: string }>>([]);
+  const [ratingDraft, setRatingDraft] = useState<Record<number, number>>({});
+  const [reviewDraft, setReviewDraft] = useState<Record<number, string>>({});
+  const [showRatingEditor, setShowRatingEditor] = useState(false);
 
   const loadOrders = async () => {
     if (!user) return;
@@ -74,9 +80,79 @@ export default function Orders() {
   const handleViewDetails = async (order: Order) => {
     const items = await getOrderItems(order.id) as OrderItem[];
     setOrderItems(items);
+    // Seed rating/review drafts from existing values
+    const ratingMap: Record<number, number> = {};
+    const reviewMap: Record<number, string> = {};
+    for (const it of items) {
+      const r = (it as any).rating;
+      const rv = (it as any).review;
+      if (r != null) ratingMap[it.id] = Number(r);
+      if (rv) reviewMap[it.id] = String(rv);
+    }
+    setRatingDraft(ratingMap);
+    setReviewDraft(reviewMap);
     setSelectedOrder(order);
+    setShowRatingEditor(false);
     try { const hist = await getOrderStatusHistory(order.id) as any[]; setStatusHistory(Array.isArray(hist)? hist : []); } catch { setStatusHistory([]); }
     setDetailsModalVisible(true);
+  };
+
+  const handleChangeReview = (itemId: number, text: string) => {
+    const words = text.split(/\s+/).filter(Boolean);
+    const capped = words.length > 100 ? words.slice(0, 100).join(' ') : text;
+    setReviewDraft(prev => {
+      if (!capped.trim()) {
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
+      }
+      return { ...prev, [itemId]: capped };
+    });
+  };
+
+  const handleSubmitRatings = async () => {
+    if (!selectedOrder) return;
+    const items = orderItems;
+    const rateable = items.filter(it => {
+      const r = ratingDraft[it.id];
+      return typeof r === 'number' && r >= 1 && r <= 5;
+    });
+    if (!rateable.length) {
+      Alert.alert('No ratings', 'Please rate at least one product');
+      return;
+    }
+    try {
+      const results = await Promise.all(
+        rateable.map(async it => {
+          const rating = ratingDraft[it.id];
+          const review = reviewDraft[it.id];
+          return rateOrderItem(it.id, rating, review);
+        })
+      );
+      const anyFailed = results.some(ok => !ok);
+      if (anyFailed) {
+        Alert.alert('Partial error', 'Some ratings could not be saved. Please try again.');
+      } else {
+        Alert.alert('Thank you', 'Your ratings have been saved.');
+      }
+      // Reload order items to reflect latest ratings
+      try {
+        const freshItems = await getOrderItems(selectedOrder.id) as OrderItem[];
+        setOrderItems(freshItems);
+        const ratingMap: Record<number, number> = {};
+        const reviewMap: Record<number, string> = {};
+        for (const it of freshItems) {
+          const r = (it as any).rating;
+          const rv = (it as any).review;
+          if (r != null) ratingMap[it.id] = Number(r);
+          if (rv) reviewMap[it.id] = String(rv);
+        }
+        setRatingDraft(ratingMap);
+        setReviewDraft(reviewMap);
+      } catch {}
+    } catch (e) {
+      Alert.alert('Error', 'Failed to save ratings. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -243,7 +319,7 @@ export default function Orders() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('orders.orderDetails')}</Text>
-            <TouchableOpacity onPress={() => setDetailsModalVisible(false)}>
+            <TouchableOpacity onPress={() => { setDetailsModalVisible(false); setShowRatingEditor(false); }}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
@@ -303,6 +379,71 @@ export default function Orders() {
                     </View>
                   ))}
                 </View>
+
+                {selectedOrder && ['shipped','delivered','dispatched'].includes(selectedOrder.status.toLowerCase()) && (
+                  <View style={styles.detailSection}>
+                    <View style={styles.ratingHeaderRow}>
+                      <Text style={styles.detailSectionTitle}>Rate your products</Text>
+                      {!showRatingEditor && (
+                        <TouchableOpacity
+                          style={styles.ratingToggleButton}
+                          onPress={() => setShowRatingEditor(true)}
+                        >
+                          <Text style={styles.ratingToggleButtonText}>
+                            {Object.keys(ratingDraft || {}).length ? 'Edit ratings' : 'Add ratings'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {showRatingEditor && (
+                      <>
+                        {orderItems.map((item) => {
+                          const currentRating = ratingDraft[item.id] || 0;
+                          const currentReview = reviewDraft[item.id] || '';
+                          return (
+                            <View key={item.id} style={styles.ratingItem}>
+                              <Text style={styles.ratingItemName}>{item.product_name}</Text>
+                              <View style={styles.starRow}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <TouchableOpacity
+                                    key={star}
+                                    onPress={() =>
+                                      setRatingDraft((prev) => ({
+                                        ...prev,
+                                        [item.id]: star,
+                                      }))
+                                    }
+                                  >
+                                    <Ionicons
+                                      name={currentRating >= star ? 'star' : 'star-outline'}
+                                      size={20}
+                                      color="#fbc02d"
+                                    />
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                              <TextInput
+                                style={styles.reviewInput}
+                                placeholder="Write a short review (optional, up to 100 words)"
+                                placeholderTextColor="#666"
+                                multiline
+                                value={currentReview}
+                                onChangeText={(text) => handleChangeReview(item.id, text)}
+                              />
+                            </View>
+                          );
+                        })}
+                        <TouchableOpacity
+                          style={styles.submitRatingsButton}
+                          onPress={handleSubmitRatings}
+                        >
+                          <Text style={styles.submitRatingsButtonText}>Submit Ratings</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                )}
 
                 {Boolean((selectedOrder as any).logistics_name) && (
                   <View style={styles.detailRow}>
@@ -721,5 +862,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#2d5016',
     marginTop: 2,
+  },
+  ratingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  ratingItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  ratingItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  starRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    gap: 4,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 8,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    backgroundColor: '#fafafa',
+  },
+  submitRatingsButton: {
+    marginTop: 12,
+    alignSelf: 'flex-end',
+    backgroundColor: '#4caf50',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  submitRatingsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  ratingToggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#4caf50',
+  },
+  ratingToggleButtonText: {
+    color: '#4caf50',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

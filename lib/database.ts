@@ -300,6 +300,8 @@ if (Platform.OS !== 'web') (async () => {
     const orderItemColNames = (orderItemCols as any[]).map(c => c.name);
     if (!orderItemColNames.includes('variant_id')) await db.runAsync('ALTER TABLE order_items ADD COLUMN variant_id INTEGER');
     if (!orderItemColNames.includes('variant_label')) await db.runAsync('ALTER TABLE order_items ADD COLUMN variant_label TEXT');
+    if (!orderItemColNames.includes('rating')) await db.runAsync('ALTER TABLE order_items ADD COLUMN rating INTEGER');
+    if (!orderItemColNames.includes('review')) await db.runAsync('ALTER TABLE order_items ADD COLUMN review TEXT');
 
     // image caption bilingual columns
     const pestImgCols = await db.getAllAsync("PRAGMA table_info(crop_pest_images)");
@@ -902,6 +904,29 @@ export async function getOrderItems(orderId: number) {
   } catch (err) {
     console.error("SQLite fetch error:", err);
     return [];
+  }
+}
+
+export async function rateOrderItem(orderItemId: number, rating: number, review?: string) {
+  try {
+    const r = Math.round(Number(rating));
+    if (!Number.isFinite(r) || r < 1 || r > 5) throw new Error('invalid rating');
+    const trimmed = (review || '').trim();
+    const reviewText = trimmed.length ? trimmed : undefined;
+    if (API_URL) {
+      await api.patch(`/order-items/${orderItemId}/rating`, { rating: r, review: reviewText });
+      return true;
+    }
+    const sets: string[] = ['rating = ?'];
+    const vals: any[] = [r];
+    sets.push('review = ?');
+    vals.push(reviewText || null);
+    vals.push(orderItemId);
+    await db.runAsync(`UPDATE order_items SET ${sets.join(', ')} WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) {
+    console.error('SQLite update error:', err);
+    return false;
   }
 }
 

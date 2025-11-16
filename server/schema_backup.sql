@@ -181,6 +181,8 @@ CREATE TABLE order_items (
   price_per_unit  DOUBLE PRECISION NOT NULL,
   variant_id      BIGINT,
   variant_label   TEXT,
+  rating          INTEGER,
+  review          TEXT,
   created_at      TIMESTAMPTZ DEFAULT now()
 );
 

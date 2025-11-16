@@ -275,7 +275,11 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 16 }}>
-              <Image source={{ uri: productImage }} style={{ width:'100%', height: 180, borderRadius: 12, backgroundColor:'#eef2e6' }} resizeMode="cover" />
+              <Image
+                source={{ uri: productImage }}
+                style={{ width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#eef2e6' }}
+                resizeMode="cover"
+              />
 
               {(product as any).seller_name ? (
                 <Text style={[styles.sellerTag, { marginTop: 8 }]}>Seller: {(product as any).seller_name}</Text>

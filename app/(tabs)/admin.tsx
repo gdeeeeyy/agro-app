@@ -41,6 +41,8 @@ interface Product {
   image?: string;
   stock_available: number;
   cost_per_unit: number;
+  avg_rating?: number;
+  rating_count?: number;
 }
 
 interface ProductForm {
@@ -324,6 +326,10 @@ const pickImage = async () => {
       Alert.alert('Error', 'Add at least one variant');
       return;
     }
+    if (!formData.image) {
+      Alert.alert('Error', 'Please add an image for the product');
+      return;
+    }
 
     const productData: any = {
       name: formData.name?.trim() || '',
@@ -343,6 +349,13 @@ const pickImage = async () => {
       if (editingProduct) {
         const success = await updateProduct(editingProduct.id, productData);
         if (success) {
+          // If a vendor edited this product, mark it as pending for admin review
+          if (isVendor && !isMaster) {
+            try {
+              const db = await import('../../lib/database');
+              await db.reviewProduct(Number(editingProduct.id), 'pending');
+            } catch {}
+          }
           Alert.alert('Success', 'Product updated successfully');
           await loadProducts();
           closeModal();
@@ -452,6 +465,21 @@ const pickImage = async () => {
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
+        {isMaster && (() => {
+          const avgRaw = (item as any).avg_rating;
+          const countRaw = (item as any).rating_count;
+          const avg = avgRaw != null ? Number(avgRaw) : 0;
+          const count = countRaw != null ? Number(countRaw) : 0;
+          if (!count || !isFinite(avg)) return null;
+          return (
+            <View style={styles.productRatingRow}>
+              <Ionicons name="star" size={14} color="#fbc02d" />
+              <Text style={styles.productRatingText}>
+                {avg.toFixed(1)} ({count})
+              </Text>
+            </View>
+          );
+        })()}
         {!isMaster && (
           <Text style={styles.productPrice}>
             ₹{item.cost_per_unit} • Stock: {item.stock_available}
@@ -459,18 +487,34 @@ const pickImage = async () => {
         )}
         {isMaster && Array.isArray(variantMap[item.id]) && variantMap[item.id].length ? (
           <View style={{ marginTop: 4 }}>
-            {variantMap[item.id].map((v:any) => (
-              <Text key={v.id} style={{ color:'#666', fontSize:12 }}>
-                {String(v.label)} — Stock: {typeof v.stock_available==='number'? v.stock_available : 0}
-              </Text>
-            ))}
+            {variantMap[item.id].map((v:any) => {
+              const label = String(v.label || '');
+              const price = Number(v.price);
+              const stock = typeof v.stock_available === 'number' ? v.stock_available : 0;
+              return (
+                <Text
+                  key={v.id}
+                  style={{ color: '#4e7c35', fontSize: 12, fontWeight: '600' }}
+                >
+                  Rs. {isFinite(price) ? price : '-'} / {label} (Stock: {stock})
+                </Text>
+              );
+            })}
           </View>
         ) : null}
-        {item.status && (
-          <Text style={{ marginTop: 4, fontSize: 12, color: item.status==='approved'?'#2e7d32': item.status==='pending'?'#ff8f00':'#d32f2f' }}>
-            Status: {String(item.status).toUpperCase()} {item.review_note ? `— ${item.review_note}` : ''}
-          </Text>
-        )}
+        {(() => {
+          const status = String((item as any).status || '').toLowerCase();
+          if (!status) return null;
+          // For masters, hide the noisy "Status: approved" label on the main list,
+          // but vendors still see all statuses.
+          if (isMaster && status === 'approved') return null;
+          const color = status === 'approved' ? '#2e7d32' : status === 'pending' ? '#ff8f00' : '#d32f2f';
+          return (
+            <Text style={{ marginTop: 4, fontSize: 12, color }}>
+              Status: {status.toUpperCase()} {(item as any).review_note ? `— ${(item as any).review_note}` : ''}
+            </Text>
+          );
+        })()}
       </View>
 
       <View style={styles.productActions}>
@@ -1065,6 +1109,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2d5016',
     marginBottom: 4,
+  },
+  productRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 4,
+  },
+  productRatingText: {
+    fontSize: 12,
+    color: '#555',
+    fontWeight: '600',
   },
   productPlant: {
     fontSize: 14,

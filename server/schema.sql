@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL,
   price_per_unit DOUBLE PRECISION NOT NULL,
+  rating INTEGER,
+  review TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

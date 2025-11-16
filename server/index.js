@@ -293,6 +293,9 @@ async function runMigrations() {
     // Order items capture variant
     await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id BIGINT');
     await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label TEXT');
+    // Ratings & reviews per ordered product
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS rating INTEGER');
+    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS review TEXT');
   } catch (e) {
     console.warn('Startup migration warning:', e.message);
   } finally {
@@ -460,9 +463,18 @@ app.get('/products/by-keyword', async (req, res) => {
     ORDER BY p.created_at DESC`, [like]));
 });
 
-// Admin list (all products with status)
+// Admin list (all products with status + rating summary)
 app.get('/products/admin', async (req, res) => {
-  res.json(await all('SELECT * FROM products ORDER BY created_at DESC'));
+  res.json(await all(`
+    SELECT
+      p.*,
+      COALESCE(AVG(oi.rating)::numeric(3,2), 0) AS avg_rating,
+      COUNT(oi.rating) AS rating_count
+    FROM products p
+    LEFT JOIN order_items oi
+      ON oi.product_id = p.id AND oi.rating IS NOT NULL
+    GROUP BY p.id
+    ORDER BY p.created_at DESC`));
 });
 app.get('/products/pending', async (req, res) => {
   res.json(await all("SELECT * FROM products WHERE status='pending' ORDER BY created_at DESC"));
@@ -858,6 +870,31 @@ app.get('/orders', async (req, res) => {
 app.get('/orders/:id/items', async (req, res) => {
   res.json(await all('SELECT * FROM order_items WHERE order_id=$1 ORDER BY id', [req.params.id]));
 });
+
+// Rate a specific order item (per-product rating within an order)
+app.patch('/order-items/:id/rating', async (req, res) => {
+  const { rating, review } = req.body || {};
+  const r = Number(rating);
+  if (!Number.isInteger(r) || r < 1 || r > 5) {
+    return res.status(400).json({ error: 'invalid rating' });
+  }
+  let reviewText = typeof review === 'string' ? review.trim() : '';
+  // Enforce ~100 word limit server-side as a safeguard
+  if (reviewText) {
+    const words = reviewText.split(/\s+/).filter(Boolean);
+    if (words.length > 100) {
+      return res.status(400).json({ error: 'review too long (max 100 words)' });
+    }
+  }
+  try {
+    await pool.query('UPDATE order_items SET rating=$1, review=$2 WHERE id=$3', [r, reviewText || null, req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
 app.get('/orders/:id/status-history', async (req, res) => {
   const rows = await all('SELECT status, note, created_at FROM order_status_history WHERE order_id=$1 ORDER BY created_at ASC, id ASC', [req.params.id]);
   res.json(rows);

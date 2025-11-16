@@ -37,7 +37,7 @@ interface CartItem {
 export default function Cart() {
   const { user } = useContext(UserContext);
   const { t } = useLanguage();
-  const { cartItems, cartTotal, updateQuantity, removeItem, clearAll } = useCart();
+  const { cartItems, cartTotal, updateQuantity, removeItem, clearAll, refreshCart } = useCart();
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<string>('');
@@ -122,11 +122,21 @@ onPress: () => removeItem(productId, variantId ?? undefined)
         return;
       }
 
-      const orderId = await createOrder(user.id, selectedPayment, deliveryAddress, orderNote.trim() || undefined);
+      const orderId = await createOrder(
+        user.id,
+        selectedPayment,
+        deliveryAddress,
+        orderNote.trim() || undefined,
+      );
+
+      // Clear and refresh cart after successful order (server clears DB cart)
+      await refreshCart();
+
       setPaymentModalVisible(false);
       setAddressModalVisible(false);
       setSelectedPayment('');
       setDeliveryAddress('');
+      setOrderNote('');
       
       Alert.alert(
         t('order.placed'),
