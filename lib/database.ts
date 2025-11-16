@@ -459,6 +459,11 @@ export async function getAllProductsAdmin() {
   return await api.get('/products/admin');
 }
 
+export async function getProductReviews(productId: number) {
+  if (!API_URL) throw new Error('API_URL not configured');
+  return await api.get(`/products/${productId}/reviews`);
+}
+
 export async function reviewProduct(id: number, status: 'approved'|'rejected'|'pending', note?: string, reviewer_id?: number) {
   if (!API_URL) throw new Error('API_URL not configured');
   await api.patch(`/products/${id}/review`, { status, note, reviewer_id });

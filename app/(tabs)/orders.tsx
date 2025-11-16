@@ -374,6 +374,23 @@ export default function Orders() {
                       <View style={styles.itemInfo}>
                         <Text style={styles.itemName}>{item.product_name}</Text>
                         <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                        {(item as any).rating != null && Number((item as any).rating) > 0 && (
+                          <View style={styles.itemRatingRow}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Ionicons
+                                key={star}
+                                name={Number((item as any).rating) >= star ? 'star' : 'star-outline'}
+                                size={14}
+                                color="#fbc02d"
+                              />
+                            ))}
+                          </View>
+                        )}
+                        {(item as any).review ? (
+                          <Text style={styles.itemReviewText} numberOfLines={2}>
+                            {(item as any).review}
+                          </Text>
+                        ) : null}
                       </View>
                       <Text style={styles.itemPrice}>₹{(item.quantity * item.price_per_unit).toFixed(2)}</Text>
                     </View>
@@ -780,6 +797,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#4caf50',
+  },
+  itemRatingRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+    gap: 2,
+  },
+  itemReviewText: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#555',
   },
   totalSection: {
     flexDirection: 'row',

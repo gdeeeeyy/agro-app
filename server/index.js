@@ -480,6 +480,34 @@ app.get('/products/pending', async (req, res) => {
   res.json(await all("SELECT * FROM products WHERE status='pending' ORDER BY created_at DESC"));
 });
 
+// Per-product reviews (for Masters to inspect ratings and comments)
+app.get('/products/:id/reviews', async (req, res) => {
+  const pid = Number(req.params.id);
+  if (!Number.isFinite(pid)) return res.status(400).json({ error: 'invalid product id' });
+  const rows = await all(
+    `SELECT
+       oi.id,
+       oi.order_id,
+       oi.product_id,
+       oi.product_name,
+       oi.quantity,
+       oi.price_per_unit,
+       oi.rating,
+       oi.review,
+       o.user_id,
+       o.created_at AS order_created_at,
+       u.full_name,
+       u.number
+     FROM order_items oi
+     JOIN orders o ON oi.order_id = o.id
+     JOIN users u ON o.user_id = u.id
+     WHERE oi.product_id = $1 AND oi.rating IS NOT NULL
+     ORDER BY o.created_at DESC, oi.id DESC`,
+    [pid]
+  );
+  res.json(rows);
+});
+
 app.get('/products/:id', async (req, res) => {
   const r = await one('SELECT * FROM products WHERE id=$1', [req.params.id]);
   if (!r) return res.status(404).json({ error: 'not found' });

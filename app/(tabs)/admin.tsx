@@ -26,6 +26,7 @@ import {
   addKeyword,
   deleteKeyword,
   listUsersBasic,
+  getProductReviews,
 } from '../../lib/database';
 import { addSampleProducts } from '../../lib/sampleProducts';
 import { createAdminCustom } from '../../lib/createAdmin';
@@ -116,6 +117,11 @@ export default function AdminDashboard() {
   const unitsList = ['g','kg','mL','Litres','Nos','Pieces'];
   // Draft variants when adding a new product
   const [draftVariants, setDraftVariants] = useState<{ label: string; price: number; stock_available: number; }[]>([]);
+  const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
+  const [reviewsProduct, setReviewsProduct] = useState<Product | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsFilter, setReviewsFilter] = useState<0 | 1 | 2 | 3 | 4 | 5>(0);
 
   const loadProducts = async () => {
     try {
@@ -451,6 +457,26 @@ const pickImage = async () => {
     setAdminModalVisible(true);
   };
 
+  const openReviewsModal = async (product: Product & { [key: string]: any }) => {
+    if (!isMaster) return;
+    setReviewsProduct(product);
+    setReviews([]);
+    setReviewsFilter(0);
+    setReviewsLoading(true);
+    setReviewsModalVisible(true);
+    try {
+      const rows = await getProductReviews(product.id) as any[];
+      setReviews(Array.isArray(rows) ? rows : []);
+    } catch (e: any) {
+      console.error('Error loading reviews', e);
+      setReviews([]);
+      const msg = String(e?.message || e || 'Failed to load reviews');
+      Alert.alert('Error loading reviews', msg);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
   const renderProduct = ({ item }: { item: Product & { status?: string; review_note?: string; created_by?: number } }) => {
     const createdBy = (item as any).created_by as number | null | undefined;
     const canEditOrDelete = isMaster || (isVendor && createdBy != null && user?.id === createdBy);
@@ -480,6 +506,15 @@ const pickImage = async () => {
             </View>
           );
         })()}
+        {isMaster && (item as any).rating_count > 0 && (
+          <TouchableOpacity
+            style={styles.viewReviewsChip}
+            onPress={() => openReviewsModal(item as any)}
+          >
+            <Ionicons name="chatbubbles-outline" size={14} color="#2d5016" />
+            <Text style={styles.viewReviewsText}>View reviews</Text>
+          </TouchableOpacity>
+        )}
         {!isMaster && (
           <Text style={styles.productPrice}>
             ₹{item.cost_per_unit} • Stock: {item.stock_available}
@@ -958,6 +993,126 @@ const pickImage = async () => {
 
       {/* Admin creation modal removed; handled in Masters > Add/Manage Admins */}
 
+      <Modal
+        visible={reviewsModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {reviewsProduct ? `Reviews - ${reviewsProduct.name}` : 'Product Reviews'}
+            </Text>
+            <TouchableOpacity onPress={() => { setReviewsModalVisible(false); setReviewsProduct(null); }}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 20 }}>
+            {reviewsProduct && (
+              (() => {
+                const avgRaw = (reviewsProduct as any).avg_rating;
+                const countRaw = (reviewsProduct as any).rating_count;
+                const computedAvg = (() => {
+                  if (avgRaw != null && avgRaw !== undefined) return Number(avgRaw);
+                  if (!reviews.length) return 0;
+                  const sum = reviews.reduce((s: number, r: any) => s + (Number(r.rating) || 0), 0);
+                  return sum / reviews.length;
+                })();
+                const computedCount = countRaw != null ? Number(countRaw) : reviews.length;
+                return (
+                  <View style={styles.reviewSummary}>
+                    <Text style={styles.reviewSummaryAverage}>{computedAvg > 0 && isFinite(computedAvg) ? computedAvg.toFixed(1) : '–'}</Text>
+                    <View style={styles.reviewSummaryStarsRow}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Ionicons
+                          key={star}
+                          name={computedAvg >= star ? 'star' : 'star-outline'}
+                          size={16}
+                          color="#fbc02d"
+                        />
+                      ))}
+                    </View>
+                    <Text style={styles.reviewSummaryCount}>
+                      {computedCount} rating{computedCount === 1 ? '' : 's'}
+                    </Text>
+                    <View style={styles.reviewFilterRow}>
+                      {([
+                        { label: 'All', value: 0 },
+                        { label: '5★', value: 5 },
+                        { label: '4★', value: 4 },
+                        { label: '3★', value: 3 },
+                        { label: '2★', value: 2 },
+                        { label: '1★', value: 1 },
+                      ] as const).map((opt) => (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[
+                            styles.reviewFilterChip,
+                            reviewsFilter === opt.value && styles.reviewFilterChipActive,
+                          ]}
+                          onPress={() => setReviewsFilter(opt.value)}
+                        >
+                          <Text
+                            style={[
+                              styles.reviewFilterText,
+                              reviewsFilter === opt.value && styles.reviewFilterTextActive,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })()
+            )}
+
+            {reviewsLoading ? (
+              <Text style={styles.loadingText}>Loading reviews...</Text>
+            ) : !reviews.length ? (
+              <Text style={styles.noKeywordsText}>No reviews yet for this product.</Text>
+            ) : (
+              (reviewsFilter === 0 ? reviews : reviews.filter((r: any) => Number(r.rating) === reviewsFilter)).map((r: any) => {
+                const rating = r.rating != null ? Number(r.rating) : 0;
+                const name = (r.full_name && String(r.full_name).trim()) || String(r.number || 'User');
+                const createdAt = r.order_created_at || r.created_at;
+                const dt = createdAt ? new Date(createdAt) : null;
+                return (
+                  <View key={r.id} style={styles.reviewItem}>
+                    <View style={styles.reviewHeaderRow}>
+                      <Text style={styles.reviewUserName}>{name}</Text>
+                      {dt && (
+                        <Text style={styles.reviewDate}>
+                          {dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.reviewRatingRow}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Ionicons
+                          key={star}
+                          name={rating >= star ? 'star' : 'star-outline'}
+                          size={14}
+                          color="#fbc02d"
+                        />
+                      ))}
+                    </View>
+                    {r.review ? (
+                      <Text style={styles.reviewText}>{r.review}</Text>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+          <View style={{ height: 10 }} />
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
+        </View>
+      </Modal>
+
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
@@ -1132,6 +1287,23 @@ const styles = StyleSheet.create({
   },
   productActions: {
     flexDirection: 'row',
+  },
+  viewReviewsChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    marginBottom: 4,
+    gap: 4,
+  },
+  viewReviewsText: {
+    fontSize: 11,
+    color: '#2d5016',
+    fontWeight: '600',
   },
   editButton: {
     padding: 8,
@@ -1342,5 +1514,83 @@ const styles = StyleSheet.create({
   },
   keywordItemDelete: {
     padding: 8,
+  },
+  reviewItem: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  reviewHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  reviewUserName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2d5016',
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#777',
+  },
+  reviewRatingRow: {
+    flexDirection: 'row',
+    gap: 2,
+    marginBottom: 4,
+  },
+  reviewText: {
+    fontSize: 13,
+    color: '#333',
+    lineHeight: 18,
+  },
+  reviewSummary: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#f1f8f4',
+    borderRadius: 8,
+  },
+  reviewSummaryAverage: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#2d5016',
+    marginBottom: 4,
+  },
+  reviewSummaryStarsRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+    gap: 2,
+  },
+  reviewSummaryCount: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 8,
+  },
+  reviewFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reviewFilterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    backgroundColor: '#fff',
+  },
+  reviewFilterChipActive: {
+    borderColor: '#4caf50',
+    backgroundColor: '#e8f5e9',
+  },
+  reviewFilterText: {
+    fontSize: 12,
+    color: '#2d5016',
+    fontWeight: '500',
+  },
+  reviewFilterTextActive: {
+    fontWeight: '700',
   },
 });
