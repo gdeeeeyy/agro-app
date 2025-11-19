@@ -11,8 +11,8 @@ if (!DATABASE_URL) {
 }
 
 // Treat common managed Postgres hosts (Neon, Supabase, Render, Railway, etc.) as SSL endpoints.
-// This keeps the same behavior as before but also works when you point DATABASE_URL at Supabase.
-const isManagedSsl = /neon\.tech|supabase\.co|sslmode=require|render|railway/.test(DATABASE_URL);
+// Include Supabase pooler hosts even if `sslmode=require` is not present in the URL.
+const isManagedSsl = /neon\.tech|supabase\.co|supabase\.com|pooler\.supabase\.com|sslmode=require|render|railway/.test(DATABASE_URL);
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: isManagedSsl ? { rejectUnauthorized: false } : undefined });
 
 // Ensure runtime migrations (idempotent)
