@@ -4,8 +4,8 @@ This guide sets up a free, secure, centrally hosted database for the app with a 
 
 Stack
 
-- Database: Postgres on Neon (free tier, browser dashboard, SSL)
-- API: Node/Express on Render (free web service) that talks to Neon
+- Database: Postgres on **Supabase** (recommended) or Neon (both free tier, browser dashboard, SSL)
+- API: Node/Express on Render (free web service) that talks to your hosted Postgres
 - App: Points to your API via `EXPO_PUBLIC_API_URL`
 
 What you’ll get
@@ -26,22 +26,23 @@ Prerequisites
 - Server code for the API is in `server/`.
 - Postgres schema is in `server/schema.sql`.
 
-2. Create the free Postgres on Neon
+2. Create the free Postgres on Supabase (or Neon)
 
-1) Go to neon.tech and create a new project.
+1) Go to supabase.com (or neon.tech) and create a new project.
 2) Pick a region close to your users.
-3) Copy the “Connection string” for Postgres. Make sure it includes SSL, e.g.
+3) From the project settings, copy the **Postgres connection string**. For managed hosts like Supabase/Neon, include SSL, e.g.
    ```text path=null start=null
    postgres://USER:PASSWORD@HOST/DB?sslmode=require
    ```
-4) Open the Neon SQL Editor (browser) for your project.
+4) Open the SQL editor for your project (Supabase SQL editor or Neon SQL editor).
 5) Apply the schema using the included file at `server/schema.sql`:
-   - In browser: open `server/schema.sql`, copy all, paste into Neon SQL Editor, Run.
-   - Or via CLI:
+   - In browser: open `server/schema.sql`, copy all, paste into the SQL editor, Run.
+   - Or via CLI from your machine:
      ```bash path=null start=null
      psql "postgres://USER:PASSWORD@HOST/DB?sslmode=require" -f server/schema.sql
      ```
-6) Verify tables exist:
+6) Start your Render API once; the runtime migrations in `server/index.js` will create the remaining tables/columns (orders, variants, messaging, notifications, etc.) in the same Supabase database.
+7) Verify tables exist:
    ```sql path=null start=null
    \dt
    SELECT table_name FROM information_schema.tables WHERE table_schema='public';

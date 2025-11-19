@@ -1,10 +1,10 @@
-# Free Postgres hosting + API (Neon + Render)
+# Free Postgres hosting + API (Supabase/Neon + Render)
 
-This sets up a free Postgres with a web dashboard and a free Node API your app can call.
+This sets up a free hosted Postgres (Supabase or Neon) with a web dashboard and a free Node API your app can call.
 
-1) Create a free Postgres (Neon)
-- Go to neon.tech → New project → copy the connection string (include `?sslmode=require`).
-- In the Neon SQL editor, run the schema from server/schema.sql (below).
+1) Create a free Postgres (Supabase or Neon)
+- Go to supabase.com (or neon.tech)  New project  copy the Postgres connection string (include `?sslmode=require`).
+- In the SQL editor (Supabase or Neon), run the schema from server/schema.sql (below).
 
 2) Deploy the API (Render free web service)
 - Push this repo to GitHub (private ok).

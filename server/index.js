@@ -10,8 +10,10 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-const isNeon = /neon\.tech|sslmode=require|render|railway/.test(DATABASE_URL);
-const pool = new Pool({ connectionString: DATABASE_URL, ssl: isNeon ? { rejectUnauthorized: false } : undefined });
+// Treat common managed Postgres hosts (Neon, Supabase, Render, Railway, etc.) as SSL endpoints.
+// This keeps the same behavior as before but also works when you point DATABASE_URL at Supabase.
+const isManagedSsl = /neon\.tech|supabase\.co|sslmode=require|render|railway/.test(DATABASE_URL);
+const pool = new Pool({ connectionString: DATABASE_URL, ssl: isManagedSsl ? { rejectUnauthorized: false } : undefined });
 
 // Ensure runtime migrations (idempotent)
 let isReady = false;
