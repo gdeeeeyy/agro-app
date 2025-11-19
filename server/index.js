@@ -1,8 +1,3 @@
-// Relax Node TLS verification globally so we don't fail on
-// `self-signed certificate in certificate chain` when connecting
-// from Render free tier to managed Postgres (e.g., Supabase pooler).
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
