@@ -10,6 +10,10 @@ const { Pool } = require('pg');
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL;
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+const RAZORPAY_BASE_URL = process.env.RAZORPAY_BASE_URL || 'https://api.razorpay.com/v1';
+const RAZORPAY_CALLBACK_URL = process.env.RAZORPAY_CALLBACK_URL || null;
 
 if (!DATABASE_URL) {
   console.error('DATABASE_URL not set');
@@ -896,6 +900,101 @@ app.post('/orders', async (req, res) => {
   }
   await pool.query('DELETE FROM cart_items WHERE user_id=$1', [userId]);
   res.json({ id: o.id });
+});
+
+// Razorpay: create Payment Link for online payment (test/production based on keys)
+app.post('/payments/razorpay/link', async (req, res) => {
+  try {
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({ error: 'razorpay_not_configured' });
+    }
+    const { userId, deliveryAddress, note } = req.body || {};
+    const uid = Number(userId);
+    if (!uid) return res.status(400).json({ error: 'invalid_userId' });
+
+    // Reuse cart + total logic from order creation to avoid trusting client amount
+    const cartItems = await all(
+      `SELECT ci.product_id, ci.variant_id, ci.quantity, p.name,
+              COALESCE(v.price, p.cost_per_unit) as price,
+              v.label as variant_label
+       FROM cart_items ci 
+       JOIN products p ON ci.product_id = p.id 
+       LEFT JOIN product_variants v ON ci.variant_id = v.id
+       WHERE ci.user_id = $1`, [uid]
+    );
+    if (!cartItems.length) return res.status(400).json({ error: 'Cart is empty' });
+
+    const totalRow = await one(
+      `SELECT COALESCE(SUM(ci.quantity * COALESCE(v.price, p.cost_per_unit)),0) as total
+       FROM cart_items ci 
+       JOIN products p ON ci.product_id = p.id 
+       LEFT JOIN product_variants v ON ci.variant_id = v.id
+       WHERE ci.user_id = $1`, [uid]
+    );
+    const totalAmount = Number(totalRow?.total || 0);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      return res.status(400).json({ error: 'invalid_amount' });
+    }
+
+    // Create a pending order locally with payment_method = 'razorpay'
+    const order = await one(
+      'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+      [uid, totalAmount, 'razorpay', deliveryAddress || null, 'pending', note || null]
+    );
+
+    // Optional: fetch basic user info for Razorpay customer contact
+    let customer = null;
+    try {
+      customer = await one('SELECT number, full_name FROM users WHERE id=$1', [uid]);
+    } catch {}
+
+    const authHeader = 'Basic ' + Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+
+    const payload = {
+      amount: Math.round(totalAmount * 100), // in paise
+      currency: 'INR',
+      description: `Order #${order.id}`,
+      reference_id: String(order.id),
+      callback_url: RAZORPAY_CALLBACK_URL || undefined,
+      callback_method: RAZORPAY_CALLBACK_URL ? 'get' : undefined,
+      notes: {
+        app_order_id: String(order.id),
+        user_id: String(uid),
+      },
+      customer: customer
+        ? {
+            name: customer.full_name || undefined,
+            contact: customer.number || undefined,
+          }
+        : undefined,
+    };
+
+    const resp = await fetch(`${RAZORPAY_BASE_URL}/payment_links`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.short_url) {
+      console.error('Razorpay link error:', json || resp.statusText);
+      return res.status(400).json({ error: 'razorpay_failed', details: json || resp.statusText });
+    }
+
+    return res.json({
+      orderId: order.id,
+      amount: totalAmount.toFixed(2),
+      payment_link_id: json.id,
+      payment_link_url: json.short_url,
+      status: json.status,
+    });
+  } catch (e) {
+    console.error('Razorpay link error:', e);
+    return res.status(500).json({ error: 'razorpay_link_failed' });
+  }
 });
 
 app.get('/orders', async (req, res) => {

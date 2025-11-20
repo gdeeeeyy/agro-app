@@ -499,6 +499,8 @@ export async function addProduct(product: {
   cost_per_unit: number;
   unit?: string;
   seller_name?: string;
+  created_by?: number;      // optional: backend uses this to track creator
+  creator_role?: number;    // optional: 1=vendor, 2=master (auto-approve)
 }) {
   try {
     if (API_URL) {

@@ -17,9 +17,11 @@ import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
 import { createOrder } from '../../lib/database';
+import { api } from '../../lib/api';
 import AddressModal from '../../components/AddressModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
+import { Linking } from 'react-native';
 
 interface CartItem {
   id: number;
@@ -104,7 +106,58 @@ onPress: () => removeItem(productId, variantId ?? undefined)
       return;
     }
 
-    if (selectedPayment === 'card' || selectedPayment === 'upi') {
+    // Online Razorpay flow (test integration via Payment Link)
+    if (selectedPayment === 'upi') {
+      try {
+        if (!user) {
+          Alert.alert(t('common.error'), t('order.loginRequired'));
+          return;
+        }
+        if (!deliveryAddress.trim()) {
+          setPaymentModalVisible(false);
+          setAddressModalVisible(true);
+          return;
+        }
+
+        const resp = await api.post('/payments/razorpay/link', {
+          userId: user.id,
+          deliveryAddress,
+          note: orderNote.trim() || undefined,
+        });
+
+        const { payment_link_url } = resp as any;
+
+        setPaymentModalVisible(false);
+        setAddressModalVisible(false);
+        setSelectedPayment('');
+        setOrderNote('');
+
+        Alert.alert(
+          'Razorpay Test Payment',
+          'We will open the Razorpay payment page in your browser. Complete the payment there, then return to the app.',
+          [
+            {
+              text: t('common.ok'),
+              onPress: () => {
+                if (payment_link_url) {
+                  Linking.openURL(payment_link_url).catch(() => {});
+                }
+                // After user completes payment in browser and returns,
+                // show the Orders screen so they can view their order.
+                router.push('/(tabs)/orders');
+              },
+            },
+          ]
+        );
+        return;
+      } catch (error) {
+        console.error('Razorpay link error:', error);
+        Alert.alert(t('common.error'), 'Unable to start Razorpay payment. Please try again.');
+        return;
+      }
+    }
+
+    if (selectedPayment === 'card') {
       Alert.alert(t('common.info') ?? t('common.success'), t('payment.comingSoon'));
       return;
     }
@@ -307,47 +360,23 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 )}
               </TouchableOpacity>
 
+              {/* Single online payment option via Razorpay */}
               <TouchableOpacity
                 style={[
                   styles.paymentOption,
-                  selectedPayment === 'card' && styles.paymentOptionSelected,
-                  styles.paymentOptionDisabled
-                ]}
-                onPress={() => handlePaymentSelect('card')}
-              >
-                <View style={styles.paymentOptionContent}>
-                  <Ionicons 
-                    name="card" 
-                    size={32} 
-                    color={selectedPayment === 'card' ? '#4caf50' : '#ccc'} 
-                  />
-                  <View style={styles.paymentOptionText}>
-                    <Text style={[styles.paymentOptionTitle, styles.disabledText]}>{t('payment.card')}</Text>
-                    <Text style={[styles.paymentOptionSubtitle, styles.disabledText]}>{t('payment.cardDesc')}</Text>
-                  </View>
-                </View>
-                {selectedPayment === 'card' && (
-                  <Ionicons name="checkmark-circle" size={24} color="#4caf50" />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.paymentOption,
-                  selectedPayment === 'upi' && styles.paymentOptionSelected,
-                  styles.paymentOptionDisabled
+                  selectedPayment === 'upi' && styles.paymentOptionSelected
                 ]}
                 onPress={() => handlePaymentSelect('upi')}
               >
                 <View style={styles.paymentOptionContent}>
                   <Ionicons 
-                    name="phone-portrait" 
+                    name="card" 
                     size={32} 
                     color={selectedPayment === 'upi' ? '#4caf50' : '#ccc'} 
                   />
                   <View style={styles.paymentOptionText}>
-                    <Text style={[styles.paymentOptionTitle, styles.disabledText]}>{t('payment.upi')}</Text>
-                    <Text style={[styles.paymentOptionSubtitle, styles.disabledText]}>{t('payment.upiDesc')}</Text>
+                    <Text style={styles.paymentOptionTitle}>UPI / Card Payment</Text>
+                    <Text style={styles.paymentOptionSubtitle}>Pay securely via Razorpay (UPI or cards)</Text>
                   </View>
                 </View>
                 {selectedPayment === 'upi' && (

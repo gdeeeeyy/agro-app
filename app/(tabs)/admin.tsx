@@ -349,6 +349,9 @@ const pickImage = async () => {
       // Required by server schema (NOT NULL); will be corrected after variants are added
       stock_available: 0,
       cost_per_unit: 0,
+      // Let backend auto-approve products created by master admin (is_admin=2)
+      created_by: user?.id ?? undefined,
+      creator_role: user?.is_admin ?? 0,
     };
 
     try {
