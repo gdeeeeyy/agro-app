@@ -26,6 +26,7 @@ interface Order {
   user_id: number;
   total_amount: number;
   payment_method: string;
+  payment_status?: string; // 'unpaid' | 'paid' | null
   delivery_address?: string;
   status: string;
   status_note?: string;
@@ -155,6 +156,14 @@ export default function Orders() {
     }
   };
 
+  const formatPayment = (method: string, status?: string) => {
+    const m = method.toLowerCase();
+    const s = (status || '').toLowerCase();
+    const label = m === 'cod' ? 'Cash on Delivery' : 'Credit/Debit Card/Netbanking/UPI';
+    const paid = s === 'paid';
+    return `${label} • ${paid ? 'Paid' : 'Not Paid'}`;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -236,6 +245,12 @@ export default function Orders() {
           <View style={styles.orderDetailRow}>
             <Ionicons name="cash" size={20} color="#666" />
             <Text style={styles.orderDetailText}>₹{item.total_amount.toFixed(2)}</Text>
+          </View>
+          <View style={styles.orderDetailRow}>
+            <Ionicons name="card" size={20} color="#666" />
+            <Text style={styles.orderDetailText}>
+              {formatPayment(item.payment_method, (item as any).payment_status)}
+            </Text>
           </View>
           <View style={styles.orderDetailRow}>
             <Ionicons name="wallet" size={20} color="#666" />

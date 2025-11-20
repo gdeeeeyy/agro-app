@@ -25,6 +25,7 @@ interface Order {
   number: string;
   total_amount: number;
   payment_method: string;
+  payment_status?: string; // 'unpaid' | 'paid' | null
   delivery_address?: string;
   status: string;
   status_note?: string;
@@ -181,6 +182,14 @@ export default function AdminOrders() {
   };
 
 
+  const formatPayment = (method: string, status?: string) => {
+    const m = method.toLowerCase();
+    const s = (status || '').toLowerCase();
+    const label = m === 'cod' ? 'Cash on Delivery' : 'Credit/Debit Card/Netbanking/UPI';
+    const paid = s === 'paid';
+    return `${label} • ${paid ? 'Paid' : 'Not Paid'}`;
+  };
+
   const getStatusColor = (status: string) => {
     const s = status.toLowerCase();
     const norm = (s==='shipped' || s==='delivered') ? 'dispatched' : s;
@@ -209,6 +218,12 @@ export default function AdminOrders() {
         <View style={styles.orderDetailRow}>
           <Ionicons name="cash" size={18} color="#666" />
           <Text style={styles.orderDetailText}>₹{item.total_amount.toFixed(2)}</Text>
+        </View>
+        <View style={styles.orderDetailRow}>
+          <Ionicons name="card" size={18} color="#666" />
+          <Text style={styles.orderDetailText}>
+            {formatPayment(item.payment_method, (item as any).payment_status)}
+          </Text>
         </View>
         <View style={styles.orderDetailRow}>
           <Ionicons name="calendar" size={18} color="#666" />
@@ -327,6 +342,9 @@ export default function AdminOrders() {
                   <Text style={styles.orderInfoText}>Customer: {selectedOrder.full_name}</Text>
                   <Text style={styles.orderInfoText}>Phone: {selectedOrder.number}</Text>
                   <Text style={styles.orderInfoText}>Total: ₹{selectedOrder.total_amount.toFixed(2)}</Text>
+                  <Text style={styles.orderInfoText}>
+                    Payment: {formatPayment(selectedOrder.payment_method, (selectedOrder as any).payment_status)}
+                  </Text>
                   {selectedOrder.delivery_address && (
                     <View style={styles.addressInfo}>
                       <Text style={styles.addressLabel}>Delivery Address:</Text>

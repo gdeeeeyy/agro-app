@@ -16,12 +16,28 @@ This sets up a free hosted Postgres (Supabase or Neon) with a web dashboard and 
 - Create `.env` in the project root:
   ```
   EXPO_PUBLIC_API_URL=https://agriismart-api.onrender.com
+  EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=<your_cloudinary_cloud_name>
+  EXPO_PUBLIC_CLOUDINARY_PRESET=<your_cloudinary_unsigned_preset>
   ```
 - Rebuild the APK so the env is embedded.
 
-4) Verify
+4) Configure Razorpay on the server (Render)
+- In the Razorpay dashboard, create an API key pair (test mode is fine for dev).
+- In your Render Web Service (root directory `server`), add these environment variables:
+  ```
+  DATABASE_URL=<your Postgres connection string>
+  RAZORPAY_KEY_ID=<your_razorpay_key_id>
+  RAZORPAY_KEY_SECRET=<your_razorpay_key_secret>
+  RAZORPAY_BASE_URL=https://api.razorpay.com/v1
+  RAZORPAY_CALLBACK_URL=https://agriismart-api.onrender.com/payments/razorpay/callback
+  ```
+- Do **not** put Razorpay keys into the Expo `.env`; they must stay only on the backend.
+- Redeploy the Render service after adding/updating env vars.
+
+5) Verify
 - `curl $EXPO_PUBLIC_API_URL/health` → `{ ok: true }`
 - Sign up in the app; data should appear in Neon’s dashboard under the tables.
+- Add items to cart and choose Online payment → it should open a Razorpay Payment Link.
 
 server/schema.sql (Postgres)
 ```sql

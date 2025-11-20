@@ -42,7 +42,7 @@ export default function Cart() {
   const { cartItems, cartTotal, updateQuantity, removeItem, clearAll, refreshCart } = useCart();
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<string>('');
+  const [selectedPayment, setSelectedPayment] = useState<string>(''); // 'cod' or 'online'
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [orderNote, setOrderNote] = useState<string>('');
 
@@ -107,7 +107,7 @@ onPress: () => removeItem(productId, variantId ?? undefined)
     }
 
     // Online Razorpay flow (test integration via Payment Link)
-    if (selectedPayment === 'upi') {
+    if (selectedPayment === 'online') {
       try {
         if (!user) {
           Alert.alert(t('common.error'), t('order.loginRequired'));
@@ -157,10 +157,7 @@ onPress: () => removeItem(productId, variantId ?? undefined)
       }
     }
 
-    if (selectedPayment === 'card') {
-      Alert.alert(t('common.info') ?? t('common.success'), t('payment.comingSoon'));
-      return;
-    }
+    // no separate 'card' paymentMethod; all gateways handled via 'online'
 
     // For delivery orders, ensure address is provided
     if (selectedPayment === 'cod' && !deliveryAddress.trim()) {
@@ -364,22 +361,22 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
               <TouchableOpacity
                 style={[
                   styles.paymentOption,
-                  selectedPayment === 'upi' && styles.paymentOptionSelected
+                  selectedPayment === 'online' && styles.paymentOptionSelected
                 ]}
-                onPress={() => handlePaymentSelect('upi')}
+                onPress={() => handlePaymentSelect('online')}
               >
                 <View style={styles.paymentOptionContent}>
                   <Ionicons 
                     name="card" 
                     size={32} 
-                    color={selectedPayment === 'upi' ? '#4caf50' : '#ccc'} 
+                    color={selectedPayment === 'online' ? '#4caf50' : '#ccc'} 
                   />
                   <View style={styles.paymentOptionText}>
                     <Text style={styles.paymentOptionTitle}>UPI / Card Payment</Text>
                     <Text style={styles.paymentOptionSubtitle}>Pay securely via Razorpay (UPI or cards)</Text>
                   </View>
                 </View>
-                {selectedPayment === 'upi' && (
+                {selectedPayment === 'online' && (
                   <Ionicons name="checkmark-circle" size={24} color="#4caf50" />
                 )}
               </TouchableOpacity>

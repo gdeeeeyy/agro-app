@@ -192,9 +192,11 @@ async function runMigrations() {
       logistics_name TEXT,
       tracking_number TEXT,
       tracking_url TEXT,
+      payment_status TEXT DEFAULT 'unpaid',
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'");
 
     await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
       id BIGSERIAL PRIMARY KEY,
@@ -887,8 +889,8 @@ app.post('/orders', async (req, res) => {
      WHERE ci.user_id = $1`, [userId]
   )).total || 0;
   const o = await one(
-    'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
-    [userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null]
+    'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null, 'unpaid']
   );
   // Record initial timeline status as "confirmed" at order creation
   try { await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [o.id, 'confirmed', note || null]); } catch {}
@@ -938,8 +940,8 @@ app.post('/payments/razorpay/link', async (req, res) => {
 
     // Create a pending order locally with payment_method = 'razorpay'
     const order = await one(
-      'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
-      [uid, totalAmount, 'razorpay', deliveryAddress || null, 'pending', note || null]
+'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+      [uid, totalAmount, 'razorpay', deliveryAddress || null, 'pending', note || null, 'unpaid']
     );
 
     // Optional: fetch basic user info for Razorpay customer contact
@@ -1037,6 +1039,54 @@ app.get('/orders/:id/status-history', async (req, res) => {
 
 app.get('/orders/all', async (req, res) => {
   res.json(await all('SELECT o.*, u.full_name, u.number FROM orders o JOIN users u ON o.user_id=u.id ORDER BY o.created_at DESC'));
+});
+
+// Razorpay callback to mark orders as paid (for Payment Links)
+app.get('/payments/razorpay/callback', async (req, res) => {
+  try {
+    const refId = typeof req.query.razorpay_payment_link_reference_id === 'string'
+      ? req.query.razorpay_payment_link_reference_id
+      : undefined;
+    const status = typeof req.query.razorpay_payment_link_status === 'string'
+      ? req.query.razorpay_payment_link_status
+      : undefined;
+    const paymentId = typeof req.query.razorpay_payment_id === 'string'
+      ? req.query.razorpay_payment_id
+      : undefined;
+    if (!refId) {
+      return res.status(400).send('Missing reference id');
+    }
+    const orderId = Number(refId);
+    if (!Number.isFinite(orderId)) {
+      return res.status(400).send('Invalid reference id');
+    }
+
+    // For demo/testing: trust Razorpay callback status; in production also
+    // verify via Razorpay Orders/Payments API or webhook signature.
+    if (status && status.toLowerCase() === 'paid') {
+      await pool.query(
+        `UPDATE orders
+         SET payment_status = 'paid',
+             status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+             status_note = COALESCE(status_note, 'Paid via Razorpay')
+         WHERE id = $1`,
+        [orderId]
+      );
+      try {
+        await pool.query(
+          'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
+          [orderId, 'payment_success', paymentId || null]
+        );
+      } catch {}
+    }
+
+    res.status(200).send(
+      '<html><body><h2>Payment status recorded.</h2><p>You can now return to the app.</p></body></html>'
+    );
+  } catch (e) {
+    console.error('Razorpay callback error:', e);
+    res.status(500).send('Error processing payment callback');
+  }
 });
 
 // Users basic export (name, number, role)
