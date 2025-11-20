@@ -940,9 +940,17 @@ app.post('/payments/razorpay/link', async (req, res) => {
 
     // Create a pending order locally with payment_method = 'razorpay'
     const order = await one(
-'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+      'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
       [uid, totalAmount, 'razorpay', deliveryAddress || null, 'pending', note || null, 'unpaid']
     );
+
+    // Snapshot current cart into order_items (do NOT clear cart yet; clear only on successful payment)
+    for (const it of cartItems) {
+      await pool.query(
+        'INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit, variant_id, variant_label) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [order.id, it.product_id, it.name, it.quantity, it.price, it.variant_id || null, it.variant_label || null]
+      );
+    }
 
     // Optional: fetch basic user info for Razorpay customer contact
     let customer = null;
@@ -1004,6 +1012,13 @@ app.get('/orders', async (req, res) => {
   res.json(await all('SELECT * FROM orders WHERE user_id=$1 ORDER BY created_at DESC', [userId]));
 });
 
+// Single order by id (used by mobile app to poll payment status)
+app.get('/orders/:id', async (req, res) => {
+  const row = await one('SELECT * FROM orders WHERE id=$1', [req.params.id]);
+  if (!row) return res.status(404).json({ error: 'not_found' });
+  res.json(row);
+});
+
 app.get('/orders/:id/items', async (req, res) => {
   res.json(await all('SELECT * FROM order_items WHERE order_id=$1 ORDER BY id', [req.params.id]));
 });
@@ -1063,21 +1078,48 @@ app.get('/payments/razorpay/callback', async (req, res) => {
 
     // For demo/testing: trust Razorpay callback status; in production also
     // verify via Razorpay Orders/Payments API or webhook signature.
-    if (status && status.toLowerCase() === 'paid') {
-      await pool.query(
-        `UPDATE orders
-         SET payment_status = 'paid',
-             status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
-             status_note = COALESCE(status_note, 'Paid via Razorpay')
-         WHERE id = $1`,
-        [orderId]
-      );
-      try {
+    if (status) {
+      const st = status.toLowerCase();
+      if (st === 'paid') {
         await pool.query(
-          'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
-          [orderId, 'payment_success', paymentId || null]
+          `UPDATE orders
+           SET payment_status = 'paid',
+               status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+               status_note = COALESCE(status_note, 'Paid via Razorpay')
+           WHERE id = $1`,
+          [orderId]
         );
-      } catch {}
+        try {
+          await pool.query(
+            'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
+            [orderId, 'payment_success', paymentId || null]
+          );
+        } catch {}
+
+        // On successful payment, clear cart for this user
+        try {
+          const o = await one('SELECT user_id FROM orders WHERE id=$1', [orderId]);
+          if (o && o.user_id) {
+            await pool.query('DELETE FROM cart_items WHERE user_id=$1', [o.user_id]);
+          }
+        } catch (ce) {
+          console.warn('Failed to clear cart after Razorpay payment:', ce.message);
+        }
+      } else if (st === 'cancelled' || st === 'failed' || st === 'expired') {
+        await pool.query(
+          `UPDATE orders
+           SET payment_status = 'failed',
+               status_note = COALESCE(status_note, 'Payment failed or cancelled via Razorpay')
+           WHERE id = $1`,
+          [orderId]
+        );
+        try {
+          await pool.query(
+            'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
+            [orderId, 'payment_failed', paymentId || null]
+          );
+        } catch {}
+      }
     }
 
     res.status(200).send(
