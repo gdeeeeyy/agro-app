@@ -115,21 +115,21 @@ export default function Cart() {
     }
   };
 
-const handleQuantityChange = async (productId: number, newQuantity: number, variantId?: number | null) => {
+  const handleQuantityChange = async (productId: number, newQuantity: number, variantId?: number | null) => {
     if (newQuantity < 0) return;
-await updateQuantity(productId, newQuantity, variantId ?? undefined);
+    await updateQuantity(productId, newQuantity, variantId ?? undefined);
   };
 
-const handleRemoveItem = async (productId: number, variantId?: number | null) => {
+  const handleRemoveItem = async (productId: number, variantId?: number | null) => {
     Alert.alert(
       t('cart.removeItem'),
       t('cart.removeConfirm'),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { 
-          text: t('common.delete'), 
+        {
+          text: t('common.delete'),
           style: 'destructive',
-onPress: () => removeItem(productId, variantId ?? undefined)
+          onPress: () => removeItem(productId, variantId ?? undefined),
         },
       ]
     );
@@ -187,9 +187,9 @@ onPress: () => removeItem(productId, variantId ?? undefined)
           setAddressModalVisible(true);
           return;
         }
-n        setLoading(true);
+
+        setLoading(true);
         const resp = await api.post('/payments/razorpay/link', {
-          userId: user.id,
           deliveryAddress,
           note: orderNote.trim() || undefined,
         });
