@@ -1013,7 +1013,7 @@ app.get('/orders', async (req, res) => {
 });
 
 // Single order by id (used by mobile app to poll payment status)
-app.get('/orders/:id', async (req, res) => {
+app.get('/order/:id', async (req, res) => {
   const row = await one('SELECT * FROM orders WHERE id=$1', [req.params.id]);
   if (!row) return res.status(404).json({ error: 'not_found' });
   res.json(row);

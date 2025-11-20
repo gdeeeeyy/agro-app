@@ -46,6 +46,75 @@ export default function Cart() {
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [orderNote, setOrderNote] = useState<string>('');
 
+  const [loading, setLoading] = useState(false);
+  const [paymentStatusModalVisible, setPaymentStatusModalVisible] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'checking' | 'paid' | 'failed' | 'cancelled'>('checking');
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+
+  const startPaymentStatusPolling = (orderId: number) => {
+    let attempts = 0;
+    const maxAttempts = 40; // ~2 minutes
+    const pollInterval = 3000;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setPaymentStatus('cancelled');
+        return;
+      }
+      attempts += 1;
+      try {
+        // Prefer single-order endpoint if available
+        if (orderId) {
+          try {
+            const order = await api.get(`/order/${orderId}` as any) as any;
+            if (order && order.payment_status === 'paid') {
+              setPaymentStatus('paid');
+              await refreshCart();
+              return;
+            }
+            if (order && order.payment_status === 'failed') {
+              setPaymentStatus('failed');
+              return;
+            }
+          } catch {
+            // ignore and fall back to list endpoint
+          }
+        }
+
+        if (user) {
+          const orders = await api.get(`/orders?userId=${user.id}`) as any[];
+          const match = Array.isArray(orders)
+            ? orders.find(o => Number(o.id) === Number(orderId))
+            : null;
+
+          if (match && match.payment_status === 'paid') {
+            setPaymentStatus('paid');
+            await refreshCart();
+            return;
+          }
+          if (match && match.payment_status === 'failed') {
+            setPaymentStatus('failed');
+            return;
+          }
+        }
+      } catch {
+        // swallow error and keep polling
+      }
+      setTimeout(poll, pollInterval);
+    };
+
+    poll();
+  };
+
+  const handlePaymentStatusClose = () => {
+    setPaymentStatusModalVisible(false);
+    if (paymentStatus === 'paid') {
+      router.push('/(tabs)/orders');
+    } else {
+      router.push('/(tabs)/cart');
+    }
+  };
+
 const handleQuantityChange = async (productId: number, newQuantity: number, variantId?: number | null) => {
     if (newQuantity < 0) return;
 await updateQuantity(productId, newQuantity, variantId ?? undefined);
@@ -106,7 +175,7 @@ onPress: () => removeItem(productId, variantId ?? undefined)
       return;
     }
 
-    // Online Razorpay flow (test integration via Payment Link)
+    // Online Razorpay flow (Razorpay Payment Link)
     if (selectedPayment === 'online') {
       try {
         if (!user) {
@@ -118,40 +187,35 @@ onPress: () => removeItem(productId, variantId ?? undefined)
           setAddressModalVisible(true);
           return;
         }
-
+n        setLoading(true);
         const resp = await api.post('/payments/razorpay/link', {
           userId: user.id,
           deliveryAddress,
           note: orderNote.trim() || undefined,
         });
+        setLoading(false);
 
-        const { payment_link_url } = resp as any;
+        const { payment_link_url, orderId } = resp as any;
 
         setPaymentModalVisible(false);
         setAddressModalVisible(false);
         setSelectedPayment('');
         setOrderNote('');
 
-        Alert.alert(
-          'Razorpay Test Payment',
-          'We will open the Razorpay payment page in your browser. Complete the payment there, then return to the app.',
-          [
-            {
-              text: t('common.ok'),
-              onPress: () => {
-                if (payment_link_url) {
-                  Linking.openURL(payment_link_url).catch(() => {});
-                }
-                // After user completes payment in browser and returns,
-                // show the Orders screen so they can view their order.
-                router.push('/(tabs)/orders');
-              },
-            },
-          ]
-        );
+        // Open Razorpay payment page in browser right away
+        if (payment_link_url) {
+          Linking.openURL(payment_link_url).catch(() => {});
+        }
+
+        // Start waiting for backend to confirm payment
+        setCreatedOrderId(orderId || null);
+        setPaymentStatus('checking');
+        setPaymentStatusModalVisible(true);
+        startPaymentStatusPolling(orderId);
         return;
       } catch (error) {
         console.error('Razorpay link error:', error);
+        setLoading(false);
         Alert.alert(t('common.error'), 'Unable to start Razorpay payment. Please try again.');
         return;
       }
@@ -191,7 +255,7 @@ onPress: () => removeItem(productId, variantId ?? undefined)
       Alert.alert(
         t('order.placed'),
         t('order.placedDesc').replace('{orderId}', String(orderId)),
-        [{ text: t('common.ok') }]
+        [{ text: t('common.ok'), onPress: () => router.push('/(tabs)/orders') }]
       );
     } catch (error) {
       console.error('Order creation error:', error);
@@ -369,7 +433,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                   <Ionicons 
                     name="card" 
                     size={32} 
-                    color={selectedPayment === 'online' ? '#4caf50' : '#ccc'} 
+                    color={selectedPayment === 'online' ? '#4caf50' : '#666'} 
                   />
                   <View style={styles.paymentOptionText}>
                     <Text style={styles.paymentOptionTitle}>UPI / Card Payment</Text>
@@ -417,6 +481,78 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
         onClose={() => setAddressModalVisible(false)}
         onAddressConfirmed={handleAddressConfirmed}
       />
+
+      {/* Creating payment loading overlay */}
+      <Modal visible={loading} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center', minWidth: 220 }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 }}>Preparing payment…</Text>
+            <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+              Please wait while we create a secure Razorpay link.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment status overlay while waiting for Razorpay callback */}
+      <Modal visible={paymentStatusModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center', minWidth: 260 }}>
+            {paymentStatus === 'checking' && (
+              <>
+                <Ionicons name="time-outline" size={64} color="#ff9800" />
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#333', marginTop: 16, textAlign: 'center' }}>
+                  Waiting for payment…
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
+                  Complete the payment in your browser, then return here.
+                </Text>
+              </>
+            )}
+            {paymentStatus === 'paid' && (
+              <>
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#4caf50', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="checkmark" size={48} color="#fff" />
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#4caf50', marginTop: 16, textAlign: 'center' }}>
+                  Payment Successful!
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
+                  Your order is confirmed and your cart has been cleared.
+                </Text>
+                <TouchableOpacity
+                  style={{ marginTop: 20, backgroundColor: '#4caf50', paddingHorizontal: 28, paddingVertical: 10, borderRadius: 8 }}
+                  onPress={handlePaymentStatusClose}
+                >
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Go to Orders</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {(paymentStatus === 'failed' || paymentStatus === 'cancelled') && (
+              <>
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#f44336', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="close" size={48} color="#fff" />
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#f44336', marginTop: 16, textAlign: 'center' }}>
+                  {paymentStatus === 'cancelled' ? 'Payment Cancelled' : 'Payment Failed'}
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
+                  {paymentStatus === 'cancelled'
+                    ? 'Payment was not completed.'
+                    : 'Something went wrong. Please try again.'}
+                </Text>
+                <TouchableOpacity
+                  style={{ marginTop: 20, backgroundColor: '#f44336', paddingHorizontal: 28, paddingVertical: 10, borderRadius: 8 }}
+                  onPress={handlePaymentStatusClose}
+                >
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Back to Cart</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <View style={{ height: 10 }} />
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
     </View>
