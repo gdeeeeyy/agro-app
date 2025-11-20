@@ -190,6 +190,7 @@ export default function Cart() {
 
         setLoading(true);
         const resp = await api.post('/payments/razorpay/link', {
+          userId: user.id,
           deliveryAddress,
           note: orderNote.trim() || undefined,
         });
