@@ -9,9 +9,6 @@ export default function UpdateNotes({ context }: { context?: string }) {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Updates {context ? `– ${context}` : ''}</Text>
-        <TouchableOpacity onPress={() => setVisible(false)}>
-          <Ionicons name="close" size={18} color="#333" />
-        </TouchableOpacity>
       </View>
       <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={{ paddingBottom: 6 }}>
         <Text style={styles.section}>Products page</Text>

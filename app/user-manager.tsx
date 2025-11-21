@@ -234,7 +234,7 @@ export default function UserManager() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontWeight: '700', color: '#2d5016' }}>
-                      {(item.full_name || 'User') + ` (${roleLabel})`}
+                      {item.full_name || 'User'}
                     </Text>
                     <Text style={{ color: '#666' }}>{item.number}</Text>
                   </View>
@@ -381,7 +381,7 @@ export default function UserManager() {
                 onChangeText={setCreateNumber}
               />
               <TextInput
-                style={[styles.input, { marginBottom: 8 }]}
+                style={[styles.input, { marginBottom: 8, color: '#2d5016' }]}
                 placeholder="Password"
                 placeholderTextColor="#999"
                 secureTextEntry

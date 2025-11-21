@@ -115,6 +115,7 @@ export default function AdminDashboard() {
   const [newVarPrice, setNewVarPrice] = useState('');
   const [newVarStock, setNewVarStock] = useState('');
   const unitsList = ['g','kg','mL','Litres','Nos','Pieces'];
+  const [keywordsDropdownOpen, setKeywordsDropdownOpen] = useState(false);
   // Draft variants when adding a new product
   const [draftVariants, setDraftVariants] = useState<{ label: string; price: number; stock_available: number; }[]>([]);
   const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
@@ -246,7 +247,8 @@ export default function AdminDashboard() {
 
 const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // SDK 52+: use literal MediaType strings instead of MediaTypeOptions enum
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.9,
@@ -645,7 +647,16 @@ const pickImage = async () => {
               style={[styles.sampleButton, { backgroundColor: '#607d8b' }]}
               onPress={() => router.push('/pending-products')}
             >
-              <Ionicons name="time" size={24} color="#fff" />
+              <View style={{ position:'relative', marginRight: 6 }}>
+                <Ionicons name="time" size={24} color="#fff" />
+                {pendingProducts.length > 0 && (
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>
+                      {pendingProducts.length > 99 ? '99+' : String(pendingProducts.length)}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text style={styles.sampleButtonText} numberOfLines={2}>
                 Review products
               </Text>
@@ -766,6 +777,7 @@ const pickImage = async () => {
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
             />
+
             <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Tamil Name</Text>
             <TextInput
               style={styles.input}
@@ -774,6 +786,67 @@ const pickImage = async () => {
               value={formData.name_ta}
               onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
             />
+
+            {/* Keywords dropdown under product name */}
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginTop:10, marginBottom:6 }}>Keywords</Text>
+            <TouchableOpacity
+              style={[styles.input, { flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}
+              onPress={() => setKeywordsDropdownOpen(true)}
+            >
+              <Text style={{ color: selectedKeywords.length ? '#333' : '#999', flex:1 }} numberOfLines={1}>
+                {selectedKeywords.length ? selectedKeywords.join(', ') : 'Select keywords'}
+              </Text>
+              <Ionicons
+                name={keywordsDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color="#666"
+              />
+            </TouchableOpacity>
+            <Modal
+              visible={keywordsDropdownOpen}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setKeywordsDropdownOpen(false)}
+            >
+              <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+                <View style={{ width:'92%', maxHeight:'70%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+                  <View style={{ padding:14, borderBottomWidth:1, borderBottomColor:'#eee', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <Text style={{ fontSize:16, fontWeight:'700', color:'#333' }}>Select Keywords</Text>
+                    <TouchableOpacity onPress={() => setKeywordsDropdownOpen(false)}>
+                      <Ionicons name="close" size={22} color="#333" />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView contentContainerStyle={{ paddingVertical:0 }}>
+                    {keywords.length === 0 ? (
+                      <View style={{ padding:12 }}>
+                        <Text style={{ color:'#666' }}>No keywords yet. Use "Manage Keywords" to add some.</Text>
+                      </View>
+                    ) : (
+                      keywords.map(k => {
+                        const selected = selectedKeywords.includes(k.name);
+                        return (
+                          <TouchableOpacity
+                            key={k.id}
+                            style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}
+                            onPress={() => toggleKeyword(k.name)}
+                          >
+                            <View style={{ flexDirection:'row', alignItems:'center' }}>
+                              <Ionicons
+                                name={selected ? 'radio-button-on' : 'radio-button-off'}
+                                size={18}
+                                color={selected ? '#4caf50' : '#999'}
+                                style={{ marginRight: 8 }}
+                              />
+                              <Text style={{ color:'#333', fontWeight: selected ? '700' : '600' }}>{k.name}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
 
             {/* Keywords UI hidden to match new design */}
 
@@ -825,11 +898,26 @@ const pickImage = async () => {
                         <TouchableOpacity onPress={()=> setUnitPickerOpen(false)}><Ionicons name="close" size={22} color="#333" /></TouchableOpacity>
                       </View>
                       <ScrollView>
-                        {unitsList.map(u => (
-                          <TouchableOpacity key={u} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }} onPress={()=> { setNewVarUnit(u); setUnitPickerOpen(false); }}>
-                            <Text style={{ color:'#333', fontWeight: newVarUnit===u ? '700' : '600' }}>{u}</Text>
-                          </TouchableOpacity>
-                        ))}
+                        {unitsList.map(u => {
+                          const selected = newVarUnit === u;
+                          return (
+                            <TouchableOpacity
+                              key={u}
+                              style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}
+                              onPress={()=> { setNewVarUnit(u); setUnitPickerOpen(false); }}
+                            >
+                              <View style={{ flexDirection:'row', alignItems:'center' }}>
+                                <Ionicons
+                                  name={selected ? 'radio-button-on' : 'radio-button-off'}
+                                  size={18}
+                                  color={selected ? '#4caf50' : '#999'}
+                                  style={{ marginRight: 8 }}
+                                />
+                                <Text style={{ color:'#333', fontWeight: selected ? '700' : '600' }}>{u}</Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </ScrollView>
                     </View>
                   </View>
@@ -876,11 +964,26 @@ const pickImage = async () => {
                         <TouchableOpacity onPress={()=> setUnitPickerOpen(false)}><Ionicons name="close" size={22} color="#333" /></TouchableOpacity>
                       </View>
                       <ScrollView>
-                        {unitsList.map(u => (
-                          <TouchableOpacity key={u} style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }} onPress={()=> { setNewVarUnit(u); setUnitPickerOpen(false); }}>
-                            <Text style={{ color:'#333', fontWeight: newVarUnit===u ? '700' : '600' }}>{u}</Text>
-                          </TouchableOpacity>
-                        ))}
+                        {unitsList.map(u => {
+                          const selected = newVarUnit === u;
+                          return (
+                            <TouchableOpacity
+                              key={u}
+                              style={{ padding:12, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}
+                              onPress={()=> { setNewVarUnit(u); setUnitPickerOpen(false); }}
+                            >
+                              <View style={{ flexDirection:'row', alignItems:'center' }}>
+                                <Ionicons
+                                  name={selected ? 'radio-button-on' : 'radio-button-off'}
+                                  size={18}
+                                  color={selected ? '#4caf50' : '#999'}
+                                  style={{ marginRight: 8 }}
+                                />
+                                <Text style={{ color:'#333', fontWeight: selected ? '700' : '600' }}>{u}</Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </ScrollView>
                     </View>
                   </View>
@@ -1220,11 +1323,26 @@ const styles = StyleSheet.create({
   },
   sampleButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginLeft: 8,
     textAlign: 'center',
-    flexShrink: 1,
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ff5252',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  pendingBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,

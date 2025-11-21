@@ -544,9 +544,29 @@ app.post('/products', async (req, res) => {
 // Admin review products (approve/reject)
 app.patch('/products/:id/review', async (req, res) => {
   const { status, note, reviewer_id } = req.body || {};
-  if (!['approved','rejected','pending'].includes(String(status||'').toLowerCase())) return res.status(400).json({ error: 'invalid status' });
-  await pool.query('UPDATE products SET status=$1, review_note=$2, reviewed_by=$3, reviewed_at=now(), updated_at=now() WHERE id=$4', [String(status).toLowerCase(), note || null, reviewer_id || null, req.params.id]);
-  res.json({ ok: true });
+  const statusLower = String(status || '').toLowerCase();
+  if (!['approved','rejected','pending'].includes(statusLower)) return res.status(400).json({ error: 'invalid status' });
+
+  // Update review fields
+  await pool.query(
+    'UPDATE products SET status=$1, review_note=$2, reviewed_by=$3, reviewed_at=now(), updated_at=now() WHERE id=$4',
+    [statusLower, note || null, reviewer_id || null, req.params.id]
+  );
+
+  // If a pending vendor product is rejected and has no order history, delete it
+  if (statusLower === 'rejected') {
+    try {
+      const ref = await one('SELECT 1 FROM order_items WHERE product_id=$1 LIMIT 1', [req.params.id]);
+      if (!ref) {
+        await pool.query('DELETE FROM products WHERE id=$1', [req.params.id]);
+        return res.json({ ok: true, deleted: true });
+      }
+    } catch (e) {
+      console.warn('Failed to delete rejected product:', e.message);
+    }
+  }
+
+  res.json({ ok: true, deleted: false });
 });
 
 app.patch('/products/:id', async (req, res) => {
@@ -892,8 +912,13 @@ app.post('/orders', async (req, res) => {
     'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
     [userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null, 'unpaid']
   );
-  // Record initial timeline status as "confirmed" at order creation
-  try { await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [o.id, 'confirmed', note || null]); } catch {}
+  // Record initial timeline status as "pending" at order creation
+  try {
+    await pool.query(
+      'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
+      [o.id, 'pending', note || null]
+    );
+  } catch {}
   for (const it of cartItems) {
     await pool.query(
       'INSERT INTO order_items (order_id, product_id, product_name, quantity, price_per_unit, variant_id, variant_label) VALUES ($1,$2,$3,$4,$5,$6,$7)',
@@ -943,6 +968,14 @@ app.post('/payments/razorpay/link', async (req, res) => {
       'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
       [uid, totalAmount, 'razorpay', deliveryAddress || null, 'pending', note || null, 'unpaid']
     );
+
+    // Record initial pending status in timeline for Razorpay orders as well
+    try {
+      await pool.query(
+        'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
+        [order.id, 'pending', note || null]
+      );
+    } catch {}
 
     // Snapshot current cart into order_items (do NOT clear cart yet; clear only on successful payment)
     for (const it of cartItems) {
@@ -1081,18 +1114,21 @@ app.get('/payments/razorpay/callback', async (req, res) => {
     if (status) {
       const st = status.toLowerCase();
       if (st === 'paid') {
+        // Mark Razorpay payment as paid and auto-confirm the order.
+        // This "confirmed" timestamp is used for the Confirmed step in the order timeline.
         await pool.query(
           `UPDATE orders
            SET payment_status = 'paid',
-               status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+               status = CASE WHEN status IN ('pending') THEN 'confirmed' ELSE status END,
                status_note = COALESCE(status_note, 'Paid via Razorpay')
            WHERE id = $1`,
           [orderId]
         );
         try {
+          // Record the confirmation time based on Razorpay payment completion.
           await pool.query(
             'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
-            [orderId, 'payment_success', paymentId || null]
+            [orderId, 'confirmed', paymentId || null]
           );
         } catch {}
 
@@ -1243,6 +1279,15 @@ app.patch('/orders/:id', async (req, res) => {
       } catch {}
     }
   } catch {}
+  // If order is rejected/cancelled, remove it entirely from the system so it no longer
+  // appears in admin/order lists. Associated rows (order_items, status history) cascade.
+  if (statusLower === 'rejected' || statusLower === 'cancelled') {
+    try {
+      await pool.query('DELETE FROM orders WHERE id=$1', [req.params.id]);
+    } catch (e) {
+      console.warn('Failed to delete rejected/cancelled order:', e.message);
+    }
+  }
   res.json({ ok: true });
 });
 
