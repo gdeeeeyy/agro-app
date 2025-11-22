@@ -50,6 +50,7 @@ const translations = {
     // Account/Profile
     'account.title': 'Account',
     'account.profile': 'Profile',
+    'account.forSaleContact': 'For sale contact us',
     'profile.masterControls': 'Master Controls',
     
     // Authentication
@@ -311,6 +312,7 @@ const translations = {
     // Account/Profile
     'account.title': 'கணக்கு',
     'account.profile': 'சுயவிவரம்',
+    'account.forSaleContact': 'விற்பனை தொடர்புக்கு எங்களை தொடர்பு கொள்ளவும்',
     'profile.masterControls': 'மாஸ்டர் கட்டுப்பாடுகள்',
     
     // Authentication

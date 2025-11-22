@@ -485,6 +485,7 @@ const pickImage = async () => {
   const renderProduct = ({ item }: { item: Product & { status?: string; review_note?: string; created_by?: number } }) => {
     const createdBy = (item as any).created_by as number | null | undefined;
     const canEditOrDelete = isMaster || (isVendor && createdBy != null && user?.id === createdBy);
+    const canSeeVariants = isMaster || (isVendor && createdBy != null && user?.id === createdBy);
 
     return (
     <View style={styles.productCard}>
@@ -525,7 +526,7 @@ const pickImage = async () => {
             ₹{item.cost_per_unit} • Stock: {item.stock_available}
           </Text>
         )}
-        {isMaster && Array.isArray(variantMap[item.id]) && variantMap[item.id].length ? (
+        {canSeeVariants && Array.isArray(variantMap[item.id]) && variantMap[item.id].length ? (
           <View style={{ marginTop: 4 }}>
             {variantMap[item.id].map((v:any) => {
               const label = String(v.label || '');
@@ -636,19 +637,22 @@ const pickImage = async () => {
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <Ionicons name="add" size={24} color="#fff" />
-          <Text style={styles.addButtonText} numberOfLines={2}>Add Product</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={openAddModal}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+          <Text style={styles.addButtonText} numberOfLines={1}>Add Product</Text>
         </TouchableOpacity>
 
         {isMaster && (
-          <>
+          <View style={styles.secondaryButtonsRow}>
             <TouchableOpacity
-              style={[styles.sampleButton, { backgroundColor: '#607d8b' }]}
+              style={styles.secondaryButton}
               onPress={() => router.push('/pending-products')}
             >
-              <View style={{ position:'relative', marginRight: 6 }}>
-                <Ionicons name="time" size={24} color="#fff" />
+              <View style={{ position: 'relative', marginRight: 6 }}>
+                <Ionicons name="time" size={22} color="#fff" />
                 {pendingProducts.length > 0 && (
                   <View style={styles.pendingBadge}>
                     <Text style={styles.pendingBadgeText}>
@@ -657,29 +661,17 @@ const pickImage = async () => {
                   </View>
                 )}
               </View>
-              <Text style={styles.sampleButtonText} numberOfLines={2}>
-                Review products
-              </Text>
+              <Text style={styles.secondaryButtonText} numberOfLines={2}>Review products</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={styles.sampleButton}
-              onPress={handleAddSampleProducts}
-            >
-              <Ionicons name="leaf" size={24} color="#fff" />
-              <Text style={styles.sampleButtonText} numberOfLines={2}>
-                Add Sample Products
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.sampleButton, { backgroundColor: '#00bcd4' }]}
+              style={styles.secondaryButton}
               onPress={() => setKeywordModalVisible(true)}
             >
-              <Ionicons name="pricetags" size={24} color="#fff" />
-              <Text style={styles.sampleButtonText} numberOfLines={2}>
-                Manage Keywords
-              </Text>
+              <Ionicons name="pricetags" size={22} color="#fff" />
+              <Text style={styles.secondaryButtonText} numberOfLines={2}>Manage Keywords</Text>
             </TouchableOpacity>
-          </>
+          </View>
         )}
       </View>
 
@@ -1290,8 +1282,6 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   buttonContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     padding: 16,
     gap: 12,
   },
@@ -1300,30 +1290,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexBasis: '48%',
-    paddingVertical: 16,
-    borderRadius: 8,
+    paddingVertical: 18,
+    borderRadius: 10,
   },
   addButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 10,
     textAlign: 'center',
-    flexShrink: 1,
   },
-  sampleButton: {
-    backgroundColor: '#ff9800',
+  secondaryButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  secondaryButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexBasis: '48%',
-    paddingVertical: 16,
+    backgroundColor: '#607d8b',
+    paddingVertical: 12,
     borderRadius: 8,
   },
-  sampleButtonText: {
+  secondaryButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
   },

@@ -562,9 +562,16 @@ export default function Orders() {
                                   {step[0].toUpperCase()+step.slice(1)}
                                 </Text>
                                 <Text style={styles.timelineMeta}>{display}</Text>
-                                {done && match?.note ? (
-                                  <Text style={styles.timelineNote}>{match.note}</Text>
-                                ) : null}
+                                {(() => {
+                                  if (!done || !match?.note) return null;
+                                  const raw = String(match.note);
+                                  const lower = raw.toLowerCase();
+                                  // Hide sensitive payment/transaction ids from status timeline
+                                  if (lower.includes('transaction id') || lower.includes('txn id') || lower.includes('transaction:')) {
+                                    return null;
+                                  }
+                                  return <Text style={styles.timelineNote}>{raw}</Text>;
+                                })()}
                               </View>
                             </View>
                           );

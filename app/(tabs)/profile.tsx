@@ -1,13 +1,15 @@
 import React, { useContext } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View, ScrollView, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserContext } from '../../context/UserContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { router } from 'expo-router';
 import TopBar from '../../components/TopBar';
 
 export default function Profile() {
   const { user } = useContext(UserContext);
+  const { t } = useLanguage();
 
   const name = user?.full_name || 'User';
 
@@ -58,6 +60,17 @@ export default function Profile() {
           <View style={styles.tileLeft}>
             <Ionicons name="call" size={20} color="#4caf50" />
             <Text style={styles.tileTitle}>Contact us</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#2d5016" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tileRow}
+          onPress={() => Linking.openURL('mailto:kvktvmalai91@gmail.com')}
+        >
+          <View style={styles.tileLeft}>
+            <Ionicons name="mail" size={20} color="#4caf50" />
+            <Text style={styles.tileTitle}>{t('account.forSaleContact')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
