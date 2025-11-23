@@ -249,14 +249,6 @@ export default function AdminOrders() {
           <Ionicons name="create" size={18} color="#4caf50" />
           <Text style={styles.updateButtonText}>Update</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={() => handleDeleteOrder(item)}
-        >
-          <Ionicons name="trash" size={18} color="#f44336" />
-          <Text style={styles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -529,19 +521,6 @@ export default function AdminOrders() {
 
           <View style={styles.modalFooter}>
             <TouchableOpacity
-              style={styles.deleteOrderButton}
-              onPress={() => {
-                setModalVisible(false);
-                if (selectedOrder) {
-                  handleDeleteOrder(selectedOrder);
-                }
-              }}
-            >
-              <Ionicons name="trash" size={20} color="#fff" />
-              <Text style={styles.deleteOrderButtonText}>Delete Order</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
               style={styles.saveButton}
               onPress={handleSaveStatus}
             >
@@ -673,21 +652,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#4caf50',
-  },
-  deleteButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffebee',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 4,
-  },
-  deleteButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#f44336',
   },
   emptyContainer: {
     flex: 1,
@@ -908,21 +872,6 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-  },
-  deleteOrderButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#f44336',
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  deleteOrderButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   saveButton: {
     flex: 1,

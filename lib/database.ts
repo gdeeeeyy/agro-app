@@ -1433,13 +1433,15 @@ export async function getAllKeywords() {
 
 export async function addKeyword(name: string) {
   try {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
     if (API_URL) {
-      const res = await api.post('/keywords', { name: name.toLowerCase().trim() });
+      const res = await api.post('/keywords', { name: trimmed });
       return (res as any).id || null;
     }
     const result = await db.runAsync(
       "INSERT INTO keywords (name) VALUES (?)",
-      name.toLowerCase().trim()
+      trimmed
     );
     return result.lastInsertRowId;
   } catch (err) {

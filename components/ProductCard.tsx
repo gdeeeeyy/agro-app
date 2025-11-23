@@ -83,6 +83,8 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
   const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
   const minVariant = variants.reduce((acc: any, v: any) => acc && acc.price <= v.price ? acc : v, variants[0]);
+  const selectedVariantStock = selectedVariant ? Number(selectedVariant.stock_available ?? 0) : 0;
+  const anyVariantInStock = variants.some(v => Number(v.stock_available ?? 0) > 0);
   const serverMinPrice = (product as any).min_price != null ? Number((product as any).min_price) : undefined;
   const serverMinLabel = (product as any).min_label as string | undefined;
   const selParsed = parseVariantLabel(selectedVariant?.label);
@@ -190,11 +192,19 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
-                style={[styles.fabAdd, compact && styles.fabAddCompact, (variants.length===0 && product.stock_available <= 0) && styles.addButtonDisabled]}
+                style={[
+                  styles.fabAdd,
+                  compact && styles.fabAddCompact,
+                  (variants.length === 0 && product.stock_available <= 0) && styles.addButtonDisabled
+                ]}
                 onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
-                disabled={(variants.length===0 && product.stock_available <= 0)}
+                disabled={(variants.length === 0 && product.stock_available <= 0)}
               >
-                <Ionicons name="add" size={20} color={(variants.length===0 && product.stock_available <= 0) ? '#999' : '#fff'} />
+                <Ionicons
+                  name="add"
+                  size={20}
+                  color={(variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff'}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -226,11 +236,19 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
-                style={[styles.fabAdd, { width: 36, height: 36, borderRadius: 18 }, (variants.length===0 && product.stock_available <= 0) && styles.addButtonDisabled]}
+                style={[
+                  styles.fabAdd,
+                  { width: 36, height: 36, borderRadius: 18 },
+                  (variants.length === 0 && product.stock_available <= 0) && styles.addButtonDisabled,
+                ]}
                 onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
-                disabled={(variants.length===0 && product.stock_available <= 0)}
+                disabled={(variants.length === 0 && product.stock_available <= 0)}
               >
-                <Ionicons name="add" size={18} color={(variants.length===0 && product.stock_available <= 0) ? '#999' : '#fff'} />
+                <Ionicons
+                  name="add"
+                  size={18}
+                  color={(variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff'}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -359,16 +377,45 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                         <Ionicons name="remove" size={18} color="#2d5016" />
                       </TouchableOpacity>
                       <Text style={[styles.qtyText, { fontSize: 18 }]}>{selectedQuantity}</Text>
-                      <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.min(product.stock_available, q + 1))}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (variants.length > 0) {
+                            // If using variants, cap by selected variant stock (if selected)
+                            if (selectedVariant) {
+                              setSelectedQuantity(q => Math.min(selectedVariantStock || 0, q + 1));
+                            } else {
+                              setSelectedQuantity(q => q + 1);
+                            }
+                          } else {
+                            setSelectedQuantity(q => Math.min(product.stock_available, q + 1));
+                          }
+                        }}
+                      >
                         <Ionicons name="add" size={18} color="#2d5016" />
                       </TouchableOpacity>
                     </View>
                     <TouchableOpacity
-                      style={[styles.fabAdd, product.stock_available <= 0 && styles.addButtonDisabled]}
+                      style={[
+                        styles.fabAdd,
+                        (variants.length === 0 && product.stock_available <= 0) && styles.addButtonDisabled,
+                        (variants.length > 0 && !anyVariantInStock) && styles.addButtonDisabled,
+                      ]}
                       onPress={handleAddToCart}
-                      disabled={product.stock_available <= 0}
+                      disabled={
+                        (variants.length === 0 && product.stock_available <= 0) ||
+                        (variants.length > 0 && !anyVariantInStock)
+                      }
                     >
-                      <Ionicons name="add" size={22} color={product.stock_available <= 0 ? '#999' : '#fff'} />
+                      <Ionicons
+                        name="add"
+                        size={22}
+                        color={
+                          (variants.length === 0 && product.stock_available <= 0) ||
+                          (variants.length > 0 && !anyVariantInStock)
+                            ? '#999'
+                            : '#fff'
+                        }
+                      />
                     </TouchableOpacity>
                   </View>
                 </ScrollView>

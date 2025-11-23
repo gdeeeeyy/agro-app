@@ -223,6 +223,7 @@ export default function UserManager() {
           contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
           renderItem={({ item }) => {
             const roleLabel = getRoleLabel(item.is_admin);
+            const displayUserId = `U${String(item.id).padStart(4, '0')}`;
             return (
               <View style={styles.card}>
                 <View
@@ -237,6 +238,9 @@ export default function UserManager() {
                       {item.full_name || 'User'}
                     </Text>
                     <Text style={{ color: '#666' }}>{item.number}</Text>
+                    <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                      User ID: {displayUserId}
+                    </Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text

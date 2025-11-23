@@ -666,7 +666,7 @@ const pickImage = async () => {
 
             <TouchableOpacity
               style={styles.secondaryButton}
-              onPress={() => setKeywordModalVisible(true)}
+              onPress={() => router.push('/keywords')}
             >
               <Ionicons name="pricetags" size={22} color="#fff" />
               <Text style={styles.secondaryButtonText} numberOfLines={2}>Manage Keywords</Text>
@@ -1048,7 +1048,7 @@ const pickImage = async () => {
                 placeholder="Add new keyword"
                 value={newKeywordName}
                 onChangeText={setNewKeywordName}
-                autoCapitalize="none"
+                autoCapitalize="sentences"
               />
               <TouchableOpacity
                 style={styles.addKeywordButton}

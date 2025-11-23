@@ -802,7 +802,10 @@ app.delete('/diseases/:id', async (req, res) => {
 
 app.post('/keywords', async (req, res) => {
   try {
-    const r = await one('INSERT INTO keywords (name) VALUES ($1) RETURNING id', [String(req.body?.name || '').toLowerCase().trim()]);
+    // Preserve original casing; only trim whitespace
+    const raw = String(req.body?.name || '').trim();
+    if (!raw) return res.status(400).json({ error: 'name required' });
+    const r = await one('INSERT INTO keywords (name) VALUES ($1) RETURNING id', [raw]);
     res.json(r);
   } catch (e) {
     if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'exists' });
