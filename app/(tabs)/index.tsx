@@ -86,19 +86,27 @@ export default function Home() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setWeather(null);
+        setLocationLabel('Location permission not granted');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Lowest });
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced } as any);
       const lat = loc.coords.latitude;
       const lon = loc.coords.longitude;
-      // reverse geocode for location label
+      // reverse geocode for location label (may be approximate based on network/GPS)
       try {
         const place = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
         if (place && place[0]) {
           const p = place[0];
-          setLocationLabel([p.city || p.subregion || p.district, p.region, p.country].filter(Boolean).join(', '));
+          const label = [p.city || p.subregion || p.district, p.region, p.country]
+            .filter(Boolean)
+            .join(', ');
+          setLocationLabel(label || 'Approximate location');
+        } else {
+          setLocationLabel('Approximate location');
         }
-      } catch {}
+      } catch {
+        setLocationLabel('Approximate location');
+      }
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto`;
       const res = await fetch(url);
       const data: any = await res.json();
@@ -114,20 +122,21 @@ export default function Home() {
       const hourStr = `${dateStr}T${pad(now.getHours())}`; // YYYY-MM-DDTHH
       const h = data?.hourly || {};
       const times: string[] = h.time || [];
-      const list = times.map((t: string, idx: number) => ({
-        time: t,
-        temperature: typeof h.temperature_2m?.[idx] === 'number' ? h.temperature_2m[idx] : NaN,
-        code: h.weather_code?.[idx],
-      }))
-      .filter((row: any) => String(row.time).slice(0,10) === dateStr && String(row.time).slice(0,13) >= hourStr);
+      const list = times
+        .map((t: string, idx: number) => ({
+          time: t,
+          temperature: typeof h.temperature_2m?.[idx] === 'number' ? h.temperature_2m[idx] : NaN,
+          code: h.weather_code?.[idx],
+        }))
+        .filter((row: any) => String(row.time).slice(0,10) === dateStr && String(row.time).slice(0,13) >= hourStr);
       setHourly(list);
     } catch {
       setWeather(null);
+      setLocationLabel('Weather unavailable');
     } finally {
       setWeatherLoading(false);
     }
   };
-
   useEffect(() => {
     (async () => {
       try {
@@ -308,13 +317,10 @@ export default function Home() {
         )}
       </View>
 
-      {/* Crop Doctor */}
+      {/* Crop Doctor / Improved Techniques */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Cultivation Guide</Text>
-          <TouchableOpacity onPress={() => setCropModalVisible(true)} style={{ backgroundColor: '#4caf50', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>{t('home.manageCrops')}</Text>
-          </TouchableOpacity>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Improved Techniques</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12, paddingRight: 12 }}>
           {selectedCrops.map(id => {
@@ -373,18 +379,21 @@ export default function Home() {
         </ScrollView>
       </View>
 
-      {/* Agricultural News */}
+      {/* Highlights */}
       <View style={{ backgroundColor:'#fff', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-          <Text style={{ fontSize:20, fontWeight:'700', color:'#2d5016' }}>Agricultural News</Text>
+          <Text style={{ fontSize:20, fontWeight:'700', color:'#2d5016' }}>Highlights</Text>
           <TouchableOpacity onPress={fetchNews} style={{ paddingHorizontal:8, paddingVertical:6, borderRadius:8 }}>
             <Ionicons name="refresh" size={18} color="#2d5016" />
           </TouchableOpacity>
         </View>
+        <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>
+          Covering agricultural farming, animal rearing, and agricultural value added products.
+        </Text>
         {newsLoading ? (
           <Text style={{ color:'#666', marginTop:8 }}>Loading...</Text>
         ) : news.length === 0 ? (
-          <Text style={{ color:'#666', marginTop:8 }}>No news available</Text>
+          <Text style={{ color:'#666', marginTop:8 }}>No highlights available</Text>
         ) : (
           <View style={{ marginTop: 12 }}>
             {news.slice(0,10).map((n, idx) => (

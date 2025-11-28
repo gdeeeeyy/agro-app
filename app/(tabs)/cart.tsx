@@ -377,8 +377,37 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
               <Text style={styles.modalTitle}>{t('payment.title')}</Text>
             </View>
 
+            <View style={styles.zomatoLikeHeader}>
+              <View>
+                <Text style={styles.zomatoSavingText}>{t('cart.total')}: ₹{cartTotal.toFixed(2)}</Text>
+                {selectedPayment ? (
+                  <Text style={styles.zomatoPayUsingLabel}>
+                    Pay using {selectedPayment === 'online' ? 'UPI / Card (Razorpay)' : t('payment.cod')}
+                  </Text>
+                ) : (
+                  <Text style={styles.zomatoPayUsingLabel}>{t('payment.required')}</Text>
+                )}
+              </View>
+            </View>
+
             <ScrollView style={styles.modalContent}>
-              <Text style={styles.orderSummary}>{t('payment.orderTotal')}: ₹{cartTotal.toFixed(2)}</Text>
+              {deliveryAddress && (
+                <View style={styles.addressSection}>
+                  <Text style={styles.addressLabel}>{t('address.deliveryAddress')}</Text>
+                  <Text style={styles.addressText}>{deliveryAddress}</Text>
+                  <TouchableOpacity 
+                    style={styles.changeAddressButton}
+                    onPress={() => {
+                      setPaymentModalVisible(false);
+                      setAddressModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.changeAddressText}>{t('address.changeAddress')}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <Text style={[styles.orderSummary, { marginTop: 4 }]}>{t('payment.orderTotal')}: ₹{cartTotal.toFixed(2)}</Text>
               
               {deliveryAddress && (
                 <View style={styles.addressSection}>
@@ -765,6 +794,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#333',
+  },
+  zomatoLikeHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff9e6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffe0b2',
+  },
+  zomatoSavingText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#e65100',
+  },
+  zomatoPayUsingLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#555',
   },
   modalContent: {
     padding: 20,

@@ -163,10 +163,10 @@ export default function Masters() {
           ) : (
             <>
               {/* Masters only in required order */}
-              {/* 1. Crop Data */}
+              {/* 1. Improved Technologies (Crop Data) */}
               <TouchableOpacity style={styles.masterBtn} onPress={() => setGuideModalVisible(true)}>
                 <Ionicons name="book" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Crop Data</Text>
+                <Text style={styles.masterBtnText}>Improved Technologies</Text>
               </TouchableOpacity>
 
               {/* 2. User Manager */}
@@ -222,7 +222,7 @@ export default function Masters() {
           <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crop Data</Text>
+          <Text style={styles.headerTitle}>Improved Technologies</Text>
           <View style={{ width: 24 }} />
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16 }}>
