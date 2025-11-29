@@ -317,66 +317,20 @@ export default function Home() {
         )}
       </View>
 
-      {/* Crop Doctor / Improved Techniques */}
+      {/* Improved Technologies entry point */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Improved Techniques</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Improved Technologies</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 12, paddingRight: 12 }}>
-          {selectedCrops.map(id => {
-            const crop = allCrops.find((c:any) => Number(c.id) === Number(id));
-            if (!crop) return null;
-            return (
-              <TouchableOpacity key={id} activeOpacity={0.9} onPress={() => {
-                const lang = currentLanguage === 'ta' ? 'ta' : 'en';
-
-                // Open fast with cached/empty data, then fetch details
-                setSheetCropId(Number(id));
-                setSheetCrop(crop);
-                setSheetGuide(guideCache[id] ?? null);
-                setSheetPests([]);
-                setSheetDiseases([]);
-                setSheetPestImages({});
-                setSheetDiseaseImages({});
-                setSheetLoading(true);
-                setSheetVisible(true);
-
-                InteractionManager.runAfterInteractions(async () => {
-                  try {
-                    const [g, pests, diseases] = await Promise.all([
-                      getCropGuide(Number(id), lang),
-                      listCropPests(Number(id), lang) as any,
-                      listCropDiseases(Number(id), lang) as any,
-                    ]);
-                    setSheetGuide((g as any)?.cultivation_guide || null);
-                    const pestArr = Array.isArray(pests) ? pests : [];
-                    const diseaseArr = Array.isArray(diseases) ? diseases : [];
-                    setSheetPests(pestArr);
-                    setSheetDiseases(diseaseArr);
-
-                    // Fetch images after content is shown
-                    const pestImgsEntries = await Promise.all(pestArr.map(async (p: any) => [p.id, await listCropPestImages(Number(p.id))] as const));
-                    const diseaseImgsEntries = await Promise.all(diseaseArr.map(async (d: any) => [d.id, await listCropDiseaseImages(Number(d.id))] as const));
-                    const pim: Record<number, any[]> = {}; pestImgsEntries.forEach(([pid, imgs]) => { pim[pid] = imgs as any[]; });
-                    const dim: Record<number, any[]> = {}; diseaseImgsEntries.forEach(([did, imgs]) => { dim[did] = imgs as any[]; });
-                    setSheetPestImages(pim);
-                    setSheetDiseaseImages(dim);
-                  } finally {
-                    setSheetLoading(false);
-                  }
-                });
-              }} style={{ width: 240, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e0e0e0', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6 }}>
-                <Image source={crop.image ? { uri: crop.image } : require('../../assets/images/icon.png')} style={{ width: '100%', height: 140 }} />
-                <View style={{ padding: 12 }}>
-                  <Text style={{ color: '#2d5016', fontWeight: '700', fontSize: 16 }} numberOfLines={1}>{currentLanguage==='ta' && crop.name_ta ? crop.name_ta : crop.name}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-          {selectedCrops.length === 0 && (
-            <Text style={{ color: '#666' }}>{t('home.tapManage')}</Text>
-          )}
-        </ScrollView>
+        <Text style={{ marginTop: 8, color: '#666', fontSize: 14 }}>
+          Bilingual improved practices for agronomy, horticulture, animal husbandry and post-harvest technologies.
+        </Text>
+        <TouchableOpacity
+          style={{ marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#4caf50', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 20 }}
+          onPress={() => router.push('/improved-technologies')}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>View Improved Technologies</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Highlights */}

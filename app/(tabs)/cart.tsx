@@ -488,6 +488,16 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
             </ScrollView>
 
             <View style={styles.modalFooter}>
+              <View style={styles.payUsingRow}>
+                <Text style={styles.payUsingLabel}>PAY USING</Text>
+                <Text style={styles.payUsingMethod}>
+                  {selectedPayment === 'online'
+                    ? 'Razorpay UPI / Card'
+                    : selectedPayment === 'cod'
+                    ? t('payment.cod')
+                    : t('payment.required')}
+                </Text>
+              </View>
               <TouchableOpacity
                 style={[
                   styles.confirmButton,
@@ -496,7 +506,8 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 onPress={handleConfirmOrder}
                 disabled={!selectedPayment}
               >
-                <Text style={styles.confirmButtonText}>{t('payment.confirmOrder')}</Text>
+                <Text style={styles.confirmButtonAmount}>₹{cartTotal.toFixed(2)}</Text>
+                <Text style={styles.confirmButtonText}>Place Order</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -862,23 +873,49 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   modalFooter: {
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
+  payUsingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  payUsingLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#777',
+    textTransform: 'uppercase',
+  },
+  payUsingMethod: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
   confirmButton: {
-    backgroundColor: '#4caf50',
-    paddingVertical: 16,
+    marginTop: 4,
+    backgroundColor: '#e53935',
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
   confirmButtonDisabled: {
-    backgroundColor: '#a5d6a7',
+    backgroundColor: '#ffcdd2',
+  },
+  confirmButtonAmount: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   addressSection: {
     backgroundColor: '#f1f8f4',

@@ -132,3 +132,35 @@ CREATE TABLE IF NOT EXISTS crop_disease_images (
   caption_ta TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Improved Technologies: categories and bilingual articles with multiple images
+CREATE TABLE IF NOT EXISTS improved_categories (
+  id BIGSERIAL PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  name_en TEXT NOT NULL,
+  name_ta TEXT
+);
+
+CREATE TABLE IF NOT EXISTS improved_articles (
+  id BIGSERIAL PRIMARY KEY,
+  category_id BIGINT NOT NULL REFERENCES improved_categories(id) ON DELETE CASCADE,
+  heading_en TEXT NOT NULL,
+  heading_ta TEXT,
+  subheading_en TEXT,
+  subheading_ta TEXT,
+  body_en TEXT,
+  body_ta TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS improved_article_images (
+  id BIGSERIAL PRIMARY KEY,
+  article_id BIGINT NOT NULL REFERENCES improved_articles(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  public_id TEXT,
+  caption_en TEXT,
+  caption_ta TEXT,
+  position INTEGER,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

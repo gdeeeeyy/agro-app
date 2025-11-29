@@ -14,6 +14,7 @@ import {
   ActionSheetIOS,
   Platform,
   KeyboardAvoidingView,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -39,6 +40,7 @@ export default function App() {
   const [result, setResult] = useState<any>(null);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [disclaimerVisible, setDisclaimerVisible] = useState(true);
   const { user } = useContext(UserContext);
 
   // Function to extract relevant keywords from analysis
@@ -204,24 +206,7 @@ mediaTypes: ['images'] as any,
         <AppHeader />
 
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>{t('scanner.plantName')}</Text>
-          <TouchableOpacity
-            style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-            onPress={() => setPickerVisible(true)}
-          >
-            <Text style={{ color: plantName ? '#333' : '#999' }}>{plantName || t('scanner.selectFromMasters')}</Text>
-            <Ionicons name="chevron-down" size={18} color="#666" />
-          </TouchableOpacity>
-          <TextInput
-            style={[styles.input, { marginTop: 10 }]}
-            placeholder={t('scanner.optionalNote')}
-            value={plantNote}
-            onChangeText={setPlantNote}
-            placeholderTextColor="#999"
-          />
-        </View>
-
+        {/* 1. First ask user to take / pick a photo */}
         <View style={styles.imagePickerSection}>
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.actionButton} onPress={async () => {
@@ -245,6 +230,27 @@ mediaTypes: ['images'] as any,
         </View>
 
         {image && <Image source={{ uri: image }} style={styles.image} />}
+
+        {/* 2. After photo is present, show crop name + note inputs */}
+        {image && (
+        <View style={styles.inputSection}>
+          <Text style={styles.label}>{t('scanner.plantName')}</Text>
+          <TouchableOpacity
+            style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+            onPress={() => setPickerVisible(true)}
+          >
+            <Text style={{ color: plantName ? '#333' : '#999' }}>{plantName || t('scanner.selectFromMasters')}</Text>
+            <Ionicons name="chevron-down" size={18} color="#666" />
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.input, { marginTop: 10 }]}
+            placeholder={t('scanner.optionalNote')}
+            value={plantNote}
+            onChangeText={setPlantNote}
+            placeholderTextColor="#999"
+          />
+        </View>
+        )}
 
         <TouchableOpacity
           style={[styles.analyzeButton, (!image || !plantName || loading) && styles.analyzeButtonDisabled]}
@@ -275,6 +281,34 @@ mediaTypes: ['images'] as any,
         </ScrollView>
         <View style={{ height: 10 }} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
+
+      {/* Sample disclaimer popup */}
+      <Modal
+        visible={disclaimerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDisclaimerVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setDisclaimerVisible(false)}>
+          <View style={styles.disclaimerOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.disclaimerCard}>
+                <Text style={styles.disclaimerTitle}>Disclaimer</Text>
+                <Text style={styles.disclaimerText}>
+                  This plant diagnosis is AI-generated and should be used as a guide only.
+                  Always consult a qualified agronomist or expert before taking critical decisions.
+                </Text>
+                <TouchableOpacity
+                  style={styles.disclaimerButton}
+                  onPress={() => setDisclaimerVisible(false)}
+                >
+                  <Text style={styles.disclaimerButtonText}>OK, I Understand</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Plant picker modal */}
       <Modal
@@ -476,5 +510,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 16,
+  },
+  disclaimerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  disclaimerCard: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 18,
+    elevation: 4,
+  },
+  disclaimerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d5016',
+    marginBottom: 8,
+  },
+  disclaimerText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 16,
+  },
+  disclaimerButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#4caf50',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  disclaimerButtonText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });

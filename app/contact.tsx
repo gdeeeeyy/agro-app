@@ -18,10 +18,10 @@ export default function Contact() {
   };
 
   return (
-    <SafeAreaView style={{ flex:1, backgroundColor:'#fff' }}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <TopBar title="Contact us" showBack onBack={() => router.back()} />
 
-      <View style={{ padding: 16, gap: 12 }}>
+      <View style={styles.content}>
         <Text style={{ color:'#2d5016', fontWeight:'700', fontSize: 16 }}>We’re here to help</Text>
         <TouchableOpacity style={styles.masterBtn} onPress={call}>
           <Ionicons name="call" size={18} color="#4caf50" />
@@ -37,6 +37,17 @@ export default function Contact() {
 }
 
 const styles = StyleSheet.create({
-  masterBtn: { backgroundColor: '#f1f8f4', borderWidth: 1, borderColor: '#c8e6c9', padding: 12, borderRadius: 8, flexDirection: 'row', gap: 8, alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { padding: 16, gap: 12 },
+  masterBtn: {
+    backgroundColor: '#f1f8f4',
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
   masterBtnText: { color: '#2d5016', fontWeight: '600' },
 });

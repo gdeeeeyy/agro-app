@@ -13,25 +13,20 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#fff',
-        tabBarInactiveTintColor: '#c8e6c9',
+        tabBarActiveTintColor: '#ffffff',
+        tabBarInactiveTintColor: '#e0f2f1',
         tabBarStyle: {
           backgroundColor: '#4caf50',
           borderTopWidth: 0,
-        },
-        tabBarItemStyle: {
-          paddingVertical: 4,
-        },
-        tabBarIconStyle: {
-          backgroundColor: '#66bb6a',
-          borderRadius: 16,
-          paddingHorizontal: 10,
-          paddingVertical: 6,
+          height: 60,
+          paddingBottom: 6,
         },
         tabBarLabelStyle: {
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
         },
       }}
+      sceneContainerStyle={{ backgroundColor: '#f5f5f5' }}
     >
       <Tabs.Screen
         name="index"
@@ -98,7 +93,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Account',
+          title: t('account.title'),
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="person" size={size + 6} color={color} />
           ),

@@ -30,8 +30,6 @@ const translations = {
     'common.back': 'Back',
     'common.next': 'Next',
     'common.done': 'Done',
-    'common.retry': 'Retry',
-'common.ok': 'OK',
 
     // Permissions
     'permissions.cameraRequiredTitle': 'Permission Required',
@@ -39,7 +37,7 @@ const translations = {
     
     // Navigation
     'nav.home': 'Home',
-    'nav.scan': 'Scan',
+    'nav.scan': 'Diagnose',
     'nav.store': 'Store',
     'nav.cart': 'Cart',
     'nav.orders': 'Orders',
@@ -292,8 +290,6 @@ const translations = {
     'common.back': 'பின்',
     'common.next': 'அடுத்து',
     'common.done': 'முடிந்தது',
-    'common.retry': 'மீண்டும் முயல்',
-'common.ok': 'சரி',
 
     // Permissions
     'permissions.cameraRequiredTitle': 'அனுமதி தேவையானது',
@@ -301,7 +297,7 @@ const translations = {
     
     // Navigation
     'nav.home': 'முகப்பு',
-    'nav.scan': 'ஸ்கேன்',
+    'nav.scan': 'பரிசோதி',
     'nav.store': 'கடை',
     'nav.cart': 'கார்ட்',
     'nav.orders': 'ஆர்டர்கள்',
@@ -310,9 +306,9 @@ const translations = {
 'nav.profile': 'சுயவிவரம்',
 
     // Account/Profile
-    'account.title': 'கணக்கு',
+    'account.title': 'அக்கௌன்ட்‌',
     'account.profile': 'சுயவிவரம்',
-    'account.forSaleContact': 'விற்பனை தொடர்புக்கு எங்களை தொடர்பு கொள்ளவும்',
+    'account.forSaleContact': 'விற்பனை தொடர்பு',
     'profile.masterControls': 'மாஸ்டர் கட்டுப்பாடுகள்',
     
     // Authentication

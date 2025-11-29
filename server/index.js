@@ -310,6 +310,49 @@ async function runMigrations() {
     // Ratings & reviews per ordered product
     await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS rating INTEGER');
     await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS review TEXT');
+
+    // Improved Technologies: categories and articles
+    await pool.query(`CREATE TABLE IF NOT EXISTS improved_categories (
+      id BIGSERIAL PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      name_en TEXT NOT NULL,
+      name_ta TEXT
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS improved_articles (
+      id BIGSERIAL PRIMARY KEY,
+      category_id BIGINT NOT NULL REFERENCES improved_categories(id) ON DELETE CASCADE,
+      heading_en TEXT NOT NULL,
+      heading_ta TEXT,
+      subheading_en TEXT,
+      subheading_ta TEXT,
+      body_en TEXT,
+      body_ta TEXT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS improved_article_images (
+      id BIGSERIAL PRIMARY KEY,
+      article_id BIGINT NOT NULL REFERENCES improved_articles(id) ON DELETE CASCADE,
+      image_url TEXT NOT NULL,
+      public_id TEXT,
+      caption_en TEXT,
+      caption_ta TEXT,
+      position INTEGER,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )`);
+
+    // Seed fixed Improved Technology categories (idempotent)
+    await pool.query(`INSERT INTO improved_categories (slug, name_en, name_ta)
+      VALUES
+        ('agronomy', 'Agronomy Crops', 'வளர்ப்பு பயிர்கள்'),
+        ('horticulture', 'Horticulture Crops', 'தோட்டக்கலைப் பயிர்கள்'),
+        ('animal_husbandry', 'Animal Husbandry', 'கால்நடை வளர்ப்பு'),
+        ('post_harvest', 'Post Harvest Technologies', 'அறுவடை பிந்தைய தொழில்நுட்பங்கள்')
+      ON CONFLICT (slug) DO UPDATE SET
+        name_en = EXCLUDED.name_en,
+        name_ta = EXCLUDED.name_ta`);
   } catch (e) {
     console.warn('Startup migration warning:', e.message);
   } finally {
@@ -834,6 +877,88 @@ app.post('/scan-plants', async (req, res) => {
 });
 app.delete('/scan-plants/:id', async (req, res) => {
   await pool.query('DELETE FROM scan_plants WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Improved Technologies: public API
+app.get('/improved-categories', async (req, res) => {
+  const rows = await all('SELECT * FROM improved_categories ORDER BY id', []);
+  res.json(rows);
+});
+
+app.get('/improved-articles', async (req, res) => {
+  const slug = String(req.query.categorySlug || '').trim();
+  const lang = String(req.query.lang || 'en').toLowerCase() === 'ta' ? 'ta' : 'en';
+  if (!slug) return res.status(400).json({ error: 'categorySlug required' });
+  const cat = await one('SELECT id FROM improved_categories WHERE slug=$1', [slug]);
+  if (!cat) return res.json([]);
+  const rows = await all('SELECT * FROM improved_articles WHERE category_id=$1 ORDER BY created_at DESC', [cat.id]);
+  // No extra processing; client picks language-specific fields
+  res.json(rows);
+});
+
+app.get('/improved-articles/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+  const art = await one('SELECT * FROM improved_articles WHERE id=$1', [id]);
+  if (!art) return res.status(404).json({ error: 'not_found' });
+  const images = await all('SELECT * FROM improved_article_images WHERE article_id=$1 ORDER BY COALESCE(position,9999), id', [id]);
+  res.json({ ...art, images });
+});
+
+// Improved Technologies: admin API (no strict auth yet, rely on app-side role)
+app.post('/improved-articles', async (req, res) => {
+  const { categorySlug, heading_en, heading_ta, subheading_en, subheading_ta, body_en, body_ta } = req.body || {};
+  const slug = String(categorySlug || '').trim();
+  if (!slug || !heading_en) return res.status(400).json({ error: 'categorySlug and heading_en required' });
+  const cat = await one('SELECT id FROM improved_categories WHERE slug=$1', [slug]);
+  if (!cat) return res.status(400).json({ error: 'invalid categorySlug' });
+  const r = await one(
+    `INSERT INTO improved_articles (category_id, heading_en, heading_ta, subheading_en, subheading_ta, body_en, body_ta)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [cat.id, heading_en, heading_ta || null, subheading_en || null, subheading_ta || null, body_en || null, body_ta || null]
+  );
+  res.json(r);
+});
+
+app.patch('/improved-articles/:id', async (req, res) => {
+  const allowed = ['heading_en','heading_ta','subheading_en','subheading_ta','body_en','body_ta'];
+  const set=[]; const vals=[]; let i=1;
+  for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE improved_articles SET ${set.join(', ')}, updated_at=now() WHERE id=$${i}`, vals);
+  res.json({ ok: true });
+});
+
+app.delete('/improved-articles/:id', async (req, res) => {
+  await pool.query('DELETE FROM improved_article_images WHERE article_id=$1', [req.params.id]);
+  await pool.query('DELETE FROM improved_articles WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+app.post('/improved-articles/:id/images', async (req, res) => {
+  const { image, public_id, caption_en, caption_ta, position } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'image required' });
+  const r = await one(
+    'INSERT INTO improved_article_images (article_id, image_url, public_id, caption_en, caption_ta, position) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+    [req.params.id, image, public_id || null, caption_en || null, caption_ta || null, position != null ? Number(position) : null]
+  );
+  res.json(r);
+});
+
+app.patch('/improved-article-images/:id', async (req, res) => {
+  const allowed = ['caption_en','caption_ta','position'];
+  const set=[]; const vals=[]; let i=1;
+  for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE improved_article_images SET ${set.join(', ')} WHERE id=$${i}`, vals);
+  res.json({ ok: true });
+});
+
+app.delete('/improved-article-images/:id', async (req, res) => {
+  await pool.query('DELETE FROM improved_article_images WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
 

@@ -110,13 +110,17 @@ export default function Login() {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity onPress={() => setLangVisible(true)} accessibilityLabel="Change Language" style={styles.langButton}>
+        <TouchableOpacity
+          onPress={() => setLangVisible(true)}
+          accessibilityLabel="Change Language"
+          style={styles.langButton}
+        >
           <Ionicons name="globe-outline" size={18} color="#4caf50" />
           <Text style={styles.langButtonText}>Language</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Language modal */}
+      {/* Language picker */}
       <Modal visible={langVisible} transparent animationType="fade" onRequestClose={() => setLangVisible(false)}>
         <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center' }}>
           <View style={{ width: '80%', backgroundColor:'#fff', borderRadius: 12, overflow:'hidden' }}>
@@ -127,11 +131,17 @@ export default function Login() {
               </TouchableOpacity>
             </View>
             <View style={{ padding: 10 }}>
-              <TouchableOpacity onPress={() => changeLang('en')} style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='en'?'#4caf50':'#eee', backgroundColor: currentLanguage==='en'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+              <TouchableOpacity
+                onPress={() => changeLang('en')}
+                style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='en'?'#4caf50':'#eee', backgroundColor: currentLanguage==='en'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}
+              >
                 <Text style={{ color:'#333', fontWeight:'600' }}>English</Text>
                 {currentLanguage==='en' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => changeLang('ta')} style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='ta'?'#4caf50':'#eee', backgroundColor: currentLanguage==='ta'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <TouchableOpacity
+                onPress={() => changeLang('ta')}
+                style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage==='ta'?'#4caf50':'#eee', backgroundColor: currentLanguage==='ta'?'#f1f8f4':'#fff', flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}
+              >
                 <Text style={{ color:'#333', fontWeight:'600' }}>தமிழ்</Text>
                 {currentLanguage==='ta' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
               </TouchableOpacity>

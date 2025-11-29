@@ -15,14 +15,14 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <TopBar title="Account" />
+      <TopBar title={t('account.title')} />
       <ScrollView contentContainerStyle={styles.menuContainer}>
-        <Text style={styles.title}>Mr. {name}</Text>
+        <Text style={styles.title}>{t('home.welcome')} {name}</Text>
 
         <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/profileDetails')}>
           <View style={styles.tileLeft}>
             <Ionicons name="person-circle" size={20} color="#4caf50" />
-            <Text style={styles.tileTitle}>Profile</Text>
+            <Text style={styles.tileTitle}>{t('account.profile')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
@@ -32,7 +32,7 @@ export default function Profile() {
             <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/masters')}>
               <View style={styles.tileLeft}>
                 <Ionicons name="construct" size={20} color="#4caf50" />
-                <Text style={styles.tileTitle}>Master</Text>
+                <Text style={styles.tileTitle}>{t('profile.masterControls')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#2d5016" />
             </TouchableOpacity>
@@ -40,7 +40,7 @@ export default function Profile() {
               <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/adminOrders')}>
                 <View style={styles.tileLeft}>
                   <Ionicons name="receipt" size={20} color="#4caf50" />
-                  <Text style={styles.tileTitle}>Manage Orders</Text>
+                  <Text style={styles.tileTitle}>{t('nav.manage')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#2d5016" />
               </TouchableOpacity>
@@ -51,7 +51,7 @@ export default function Profile() {
         <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/orders?from=profile')}>
           <View style={styles.tileLeft}>
             <Ionicons name="receipt" size={20} color="#4caf50" />
-            <Text style={styles.tileTitle}>Order history</Text>
+            <Text style={styles.tileTitle}>{t('orders.title')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
@@ -59,7 +59,7 @@ export default function Profile() {
         <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/contact')}>
           <View style={styles.tileLeft}>
             <Ionicons name="call" size={20} color="#4caf50" />
-            <Text style={styles.tileTitle}>Contact us</Text>
+            <Text style={styles.tileTitle} numberOfLines={2}>{t('account.forSaleContact')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
@@ -70,7 +70,7 @@ export default function Profile() {
         >
           <View style={styles.tileLeft}>
             <Ionicons name="mail" size={20} color="#4caf50" />
-            <Text style={styles.tileTitle}>{t('account.forSaleContact')}</Text>
+            <Text style={styles.tileTitle} numberOfLines={2}>{t('account.forSaleContact')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  tileLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  tileTitle: { color: '#2d5016', fontWeight: '700', fontSize: 18, letterSpacing: 0.2 },
+  tileLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  tileTitle: { color: '#2d5016', fontWeight: '700', fontSize: 18, letterSpacing: 0.2, flexShrink: 1, flexWrap: 'wrap' },
 });

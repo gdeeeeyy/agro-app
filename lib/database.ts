@@ -205,6 +205,38 @@ if (Platform.OS !== 'web') (async () => {
       name_ta TEXT
     );
 
+    -- Improved Technologies: categories and bilingual articles with multiple images
+    CREATE TABLE IF NOT EXISTS improved_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT UNIQUE NOT NULL,
+      name_en TEXT NOT NULL,
+      name_ta TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS improved_articles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      heading_en TEXT NOT NULL,
+      heading_ta TEXT,
+      subheading_en TEXT,
+      subheading_ta TEXT,
+      body_en TEXT,
+      body_ta TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS improved_article_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id INTEGER NOT NULL,
+      image TEXT NOT NULL,
+      public_id TEXT,
+      caption_en TEXT,
+      caption_ta TEXT,
+      position INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS notifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -320,6 +352,38 @@ if (Platform.OS !== 'web') (async () => {
     if (!disImgColNames.includes('public_id')) {
       await db.runAsync('ALTER TABLE crop_disease_images ADD COLUMN public_id TEXT');
     }
+
+    // Ensure Improved Technologies tables exist (for upgrades)
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS improved_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT UNIQUE NOT NULL,
+        name_en TEXT NOT NULL,
+        name_ta TEXT
+      );
+      CREATE TABLE IF NOT EXISTS improved_articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL,
+        heading_en TEXT NOT NULL,
+        heading_ta TEXT,
+        subheading_en TEXT,
+        subheading_ta TEXT,
+        body_en TEXT,
+        body_ta TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS improved_article_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_id INTEGER NOT NULL,
+        image TEXT NOT NULL,
+        public_id TEXT,
+        caption_en TEXT,
+        caption_ta TEXT,
+        position INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
 
     // bilingual columns for pests/diseases (local fallback compatibility)
     const pestCols = await db.getAllAsync("PRAGMA table_info(crop_pests)");
@@ -445,6 +509,147 @@ export async function publishSystemNotification(title: string, message: string, 
     const r = await db.runAsync('INSERT INTO notifications (title, message, title_ta, message_ta, user_id) VALUES (?, ?, ?, ?, NULL)', title, message, title_ta || null, message_ta || null);
     return r.lastInsertRowId;
   } catch (err) { console.error('SQLite insert error:', err); return null; }
+}
+
+// Improved Technologies helpers
+export async function listImprovedCategories() {
+  try {
+    if (API_URL) {
+      try { return await api.get('/improved-categories'); } catch (e) { /* fall back */ }
+    }
+    return await db.getAllAsync('SELECT * FROM improved_categories ORDER BY id');
+  } catch (err) { console.error('SQLite fetch error (categories):', err); return []; }
+}
+
+export async function listImprovedArticles(categorySlug: string, language: 'en'|'ta' = 'en') {
+  try {
+    if (API_URL) {
+      try { return await api.get(`/improved-articles?categorySlug=${encodeURIComponent(categorySlug)}&lang=${language}`); } catch (e) { /* fall back */ }
+    }
+    const cat = await db.getFirstAsync?.('SELECT id FROM improved_categories WHERE slug = ?', categorySlug);
+    if (!cat) return [];
+    const rows = await db.getAllAsync(
+      'SELECT * FROM improved_articles WHERE category_id = ? ORDER BY created_at DESC',
+      (cat as any).id
+    );
+    return rows;
+  } catch (err) { console.error('SQLite fetch error (articles):', err); return []; }
+}
+
+export async function getImprovedArticle(id: number) {
+  try {
+    if (API_URL) {
+      try { return await api.get(`/improved-articles/${id}`); } catch (e) { /* fall back */ }
+    }
+    const article = await db.getFirstAsync?.('SELECT * FROM improved_articles WHERE id = ?', id);
+    if (!article) return null;
+    const images = await db.getAllAsync(
+      'SELECT * FROM improved_article_images WHERE article_id = ? ORDER BY COALESCE(position, 9999), id',
+      id
+    );
+    return { ...(article as any), images };
+  } catch (err) { console.error('SQLite fetch error (article):', err); return null; }
+}
+
+export async function createImprovedArticle(input: {
+  categorySlug: string;
+  heading_en: string;
+  heading_ta?: string;
+  subheading_en?: string;
+  subheading_ta?: string;
+  body_en?: string;
+  body_ta?: string;
+}) {
+  try {
+    if (API_URL) {
+      try { const res = await api.post('/improved-articles', input); return (res as any)?.id || null; } catch (e) { /* fall back */ }
+    }
+    const cat = await db.getFirstAsync?.('SELECT id FROM improved_categories WHERE slug = ?', input.categorySlug);
+    if (!cat) return null;
+    const r = await db.runAsync(
+      'INSERT INTO improved_articles (category_id, heading_en, heading_ta, subheading_en, subheading_ta, body_en, body_ta) VALUES (?,?,?,?,?,?,?)',
+      (cat as any).id,
+      input.heading_en,
+      input.heading_ta || null,
+      input.subheading_en || null,
+      input.subheading_ta || null,
+      input.body_en || null,
+      input.body_ta || null
+    );
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error (article):', err); return null; }
+}
+
+export async function updateImprovedArticle(id: number, input: {
+  heading_en?: string;
+  heading_ta?: string;
+  subheading_en?: string;
+  subheading_ta?: string;
+  body_en?: string;
+  body_ta?: string;
+}) {
+  try {
+    if (API_URL) {
+      try { await api.patch(`/improved-articles/${id}`, input); return true; } catch (e) { /* fall back */ }
+    }
+    const fields: string[] = []; const vals: any[] = [];
+    Object.entries(input).forEach(([k,v]) => { if (v !== undefined) { fields.push(`${k} = ?`); vals.push(v); } });
+    if (!fields.length) return true;
+    vals.push(id);
+    await db.runAsync(
+      `UPDATE improved_articles SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ...vals
+    );
+    return true;
+  } catch (err) { console.error('SQLite update error (article):', err); return false; }
+}
+
+export async function deleteImprovedArticle(id: number) {
+  try {
+    if (API_URL) {
+      try { await api.del(`/improved-articles/${id}`); return true; } catch (e) { /* fall back */ }
+    }
+    await db.runAsync('DELETE FROM improved_article_images WHERE article_id = ?', id);
+    await db.runAsync('DELETE FROM improved_articles WHERE id = ?', id);
+    return true;
+  } catch (err) { console.error('SQLite delete error (article):', err); return false; }
+}
+
+export async function addImprovedArticleImage(articleId: number, image: string, public_id?: string, caption_en?: string, caption_ta?: string, position?: number) {
+  try {
+    if (API_URL) {
+      try { const res = await api.post(`/improved-articles/${articleId}/images`, { image, public_id, caption_en, caption_ta, position }); return (res as any)?.id || null; } catch (e) { /* fall back */ }
+    }
+    const r = await db.runAsync(
+      'INSERT INTO improved_article_images (article_id, image, public_id, caption_en, caption_ta, position) VALUES (?,?,?,?,?,?)',
+      articleId, image, public_id || null, caption_en || null, caption_ta || null, position ?? null
+    );
+    return r.lastInsertRowId;
+  } catch (err) { console.error('SQLite insert error (article image):', err); return null; }
+}
+
+export async function updateImprovedArticleImage(id: number, fields: { caption_en?: string; caption_ta?: string; position?: number; }) {
+  try {
+    if (API_URL) {
+      try { await api.patch(`/improved-article-images/${id}`, fields); return true; } catch (e) { /* fall back */ }
+    }
+    const sets: string[] = []; const vals: any[] = [];
+    Object.entries(fields).forEach(([k,v]) => { if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); } });
+    if (!sets.length) return true;
+    vals.push(id);
+    await db.runAsync(`UPDATE improved_article_images SET ${sets.join(', ')} WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) { console.error('SQLite update error (article image):', err); return false; }
+}
+
+export async function deleteImprovedArticleImage(id: number) {
+  try {
+    if (API_URL) {
+      try { await api.del(`/improved-article-images/${id}`); return true; } catch (e) { /* fall back */ }
+    }
+    await db.runAsync('DELETE FROM improved_article_images WHERE id = ?', id);
+    return true;
+  } catch (err) { console.error('SQLite delete error (article image):', err); return false; }
 }
 
 export async function getAllProducts() {

@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification } from '../lib/database';
+import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
 import { uploadImage } from '../lib/upload';
 import { emitNotificationsChanged } from '../lib/notifBus';
 import { UserContext } from '../context/UserContext';
+import { useLanguage } from '../context/LanguageContext';
 
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
@@ -14,6 +15,7 @@ import * as Sharing from 'expo-sharing';
 
 export default function Masters() {
   const { user } = useContext(UserContext);
+  const { t, currentLanguage } = useLanguage();
   const isAdmin = (user?.is_admin ?? 0) === 1;
   const isMaster = (user?.is_admin ?? 0) === 2;
 
@@ -104,6 +106,23 @@ export default function Masters() {
   const [notifMessageTa, setNotifMessageTa] = useState('');
   const [notifModalVisible, setNotifModalVisible] = useState(false);
 
+  // Improved Technologies admin state
+  const [improvedModalVisible, setImprovedModalVisible] = useState(false);
+  const [improvedCategories, setImprovedCategories] = useState<any[]>([]);
+  const [improvedCategorySlug, setImprovedCategorySlug] = useState<string>('agronomy');
+  const [improvedArticles, setImprovedArticles] = useState<any[]>([]);
+  const [improvedLoading, setImprovedLoading] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState<number | null>(null);
+  const [articleHeadingEn, setArticleHeadingEn] = useState('');
+  const [articleHeadingTa, setArticleHeadingTa] = useState('');
+  const [articleSubEn, setArticleSubEn] = useState('');
+  const [articleSubTa, setArticleSubTa] = useState('');
+  const [articleBodyEn, setArticleBodyEn] = useState('');
+  const [articleBodyTa, setArticleBodyTa] = useState('');
+  const [articleImages, setArticleImages] = useState<any[]>([]);
+  const [articleImgCaptionEn, setArticleImgCaptionEn] = useState('');
+  const [articleImgCaptionTa, setArticleImgCaptionTa] = useState('');
+
   useEffect(() => { (async ()=>{ const all = await getAllCrops() as any[]; setCrops(all); if (all[0]) setSelectedCropId(Number(all[0].id)); })(); }, []);
   const [cropPickerOpen, setCropPickerOpen] = useState(false);
 
@@ -133,6 +152,137 @@ export default function Masters() {
     })();
   }, [selectedCropId]);
 
+  const loadImprovedCategoriesAndArticles = async (slug?: string) => {
+    try {
+      setImprovedLoading(true);
+      const cats = await listImprovedCategories();
+      const arr = Array.isArray(cats) ? cats : [];
+      setImprovedCategories(arr);
+      const firstSlug = slug || improvedCategorySlug || (arr[0]?.slug || 'agronomy');
+      setImprovedCategorySlug(firstSlug);
+      const arts = await listImprovedArticles(firstSlug, currentLanguage === 'ta' ? 'ta' : 'en');
+      setImprovedArticles(Array.isArray(arts) ? arts : []);
+    } catch (e) {
+      setImprovedArticles([]);
+    } finally {
+      setImprovedLoading(false);
+    }
+  };
+
+  const resetArticleForm = () => {
+    setEditingArticleId(null);
+    setArticleHeadingEn('');
+    setArticleHeadingTa('');
+    setArticleSubEn('');
+    setArticleSubTa('');
+    setArticleBodyEn('');
+    setArticleBodyTa('');
+    setArticleImages([]);
+    setArticleImgCaptionEn('');
+    setArticleImgCaptionTa('');
+  };
+
+  const openArticleForEdit = async (article: any) => {
+    try {
+      setEditingArticleId(Number(article.id));
+      setArticleHeadingEn(article.heading_en || '');
+      setArticleHeadingTa(article.heading_ta || '');
+      setArticleSubEn(article.subheading_en || '');
+      setArticleSubTa(article.subheading_ta || '');
+      setArticleBodyEn(article.body_en || '');
+      setArticleBodyTa(article.body_ta || '');
+      const full = await getImprovedArticle(Number(article.id));
+      setArticleImages(Array.isArray((full as any)?.images) ? (full as any).images : []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const saveArticle = async () => {
+    if (!articleHeadingEn.trim()) {
+      Alert.alert('Error', 'Enter English heading');
+      return;
+    }
+    try {
+      if (editingArticleId == null) {
+        const id = await createImprovedArticle({
+          categorySlug: improvedCategorySlug,
+          heading_en: articleHeadingEn.trim(),
+          heading_ta: articleHeadingTa.trim() || undefined,
+          subheading_en: articleSubEn.trim() || undefined,
+          subheading_ta: articleSubTa.trim() || undefined,
+          body_en: articleBodyEn.trim() || undefined,
+          body_ta: articleBodyTa.trim() || undefined,
+        });
+        if (id) {
+          await loadImprovedCategoriesAndArticles(improvedCategorySlug);
+          const created = (await getImprovedArticle(Number(id))) as any;
+          if (created) await openArticleForEdit(created);
+          Alert.alert('Saved', 'Article created');
+        }
+      } else {
+        const ok = await updateImprovedArticle(editingArticleId, {
+          heading_en: articleHeadingEn.trim() || undefined,
+          heading_ta: articleHeadingTa.trim() || undefined,
+          subheading_en: articleSubEn.trim() || undefined,
+          subheading_ta: articleSubTa.trim() || undefined,
+          body_en: articleBodyEn.trim() || undefined,
+          body_ta: articleBodyTa.trim() || undefined,
+        });
+        if (ok) {
+          await loadImprovedCategoriesAndArticles(improvedCategorySlug);
+          const full = await getImprovedArticle(editingArticleId);
+          if (full) setArticleImages(Array.isArray((full as any).images) ? (full as any).images : []);
+          Alert.alert('Saved', 'Article updated');
+        }
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to save article');
+    }
+  };
+
+  const addArticleImage = async () => {
+    if (!editingArticleId) {
+      Alert.alert('Save article first', 'Create the article before adding images.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') {
+      Alert.alert('Permission required', 'Allow photo library access');
+      return;
+    }
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
+    if (r.canceled) return;
+    try {
+      const up = await uploadImage(r.assets[0].uri);
+      const pos = (articleImages?.length || 0) + 1;
+      await addImprovedArticleImage(editingArticleId, up.url, up.publicId, articleImgCaptionEn.trim() || undefined, articleImgCaptionTa.trim() || undefined, pos);
+      const full = await getImprovedArticle(editingArticleId);
+      if (full) setArticleImages(Array.isArray((full as any).images) ? (full as any).images : []);
+      setArticleImgCaptionEn('');
+      setArticleImgCaptionTa('');
+      Alert.alert('Saved', 'Image added');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to add image');
+    }
+  };
+
+  const removeArticleImage = async (imgId: number) => {
+    Alert.alert('Delete Image', 'Delete this image?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteImprovedArticleImage(imgId);
+          if (editingArticleId) {
+            const full = await getImprovedArticle(editingArticleId);
+            if (full) setArticleImages(Array.isArray((full as any).images) ? (full as any).images : []);
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -145,14 +295,14 @@ export default function Masters() {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Masters</Text>
+          <Text style={styles.headerTitle}>{t('profile.masterControls')}</Text>
           <View style={{ width: 24 }} />
         </View>
       </View>
 
       {/* Main content area with light background */}
       <View style={{ flex: 1, backgroundColor: '#f5f5f5', paddingHorizontal: 12, paddingTop: 12 }}>
-        <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Masters</Text>
+        <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>{t('profile.masterControls')}</Text>
         <View style={{ gap: 10 }}>
           {/* Vendors: show only Products */}
           {isAdmin && !isMaster ? (
@@ -163,8 +313,8 @@ export default function Masters() {
           ) : (
             <>
               {/* Masters only in required order */}
-              {/* 1. Improved Technologies (Crop Data) */}
-              <TouchableOpacity style={styles.masterBtn} onPress={() => setGuideModalVisible(true)}>
+              {/* 1. Improved Technologies */}
+              <TouchableOpacity style={styles.masterBtn} onPress={async () => { resetArticleForm(); setImprovedModalVisible(true); await loadImprovedCategoriesAndArticles(); }}>
                 <Ionicons name="book" size={18} color="#4caf50" />
                 <Text style={styles.masterBtnText}>Improved Technologies</Text>
               </TouchableOpacity>
@@ -172,13 +322,13 @@ export default function Masters() {
               {/* 2. User Manager */}
               <TouchableOpacity style={styles.masterBtn} onPress={async ()=> { router.push('/user-manager'); }}>
                 <Ionicons name="people" size={20} color="#4caf50" />
-                <Text style={styles.masterBtnText}>User Manager</Text>
+                <Text style={styles.masterBtnText}>{t('nav.manage')}</Text>
               </TouchableOpacity>
 
               {/* 3. Products */}
               <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
                 <Ionicons name="pricetags" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Products</Text>
+                <Text style={styles.masterBtnText}>{t('admin.title')}</Text>
               </TouchableOpacity>
 
               {/* 4. Export data */}
@@ -214,7 +364,7 @@ export default function Masters() {
         </View>
       </View>
 
-      {/* Crop Doctor Manager */}
+      {/* Crop Doctor Manager (legacy, kept for now) */}
       <Modal visible={guideModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGuideModalVisible(false)}>
         <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
@@ -303,10 +453,10 @@ export default function Masters() {
                 </View>
               </Modal>
 
-              {/* Cultivation guide - toggled by EN/TA */}
+              {/* Improved Technologies text body (still using cultivation_guide storage) */}
               <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop: 8 }}>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
-                  <Text style={{ color: '#2d5016', fontWeight: '700' }}>Cultivation Guide</Text>
+                  <Text style={{ color: '#2d5016', fontWeight: '700' }}>Improved Technologies</Text>
                   {!(guideLang==='en'?guideEditableEn:guideEditableTa) && (
                     <TouchableOpacity onPress={()=> guideLang==='en'? setGuideEditableEn(true) : setGuideEditableTa(true)} accessibilityLabel="Edit Guide">
                       <Ionicons name="create" size={16} color="#4caf50" />
@@ -666,6 +816,164 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
 
         <View style={{ height: 10 }} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
+      </Modal>
+
+      {/* Improved Technologies Admin */}
+      <Modal visible={improvedModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setImprovedModalVisible(false); }}>
+        <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
+        {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setImprovedModalVisible(false)}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Improved Technologies</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+          {/* Category selector */}
+          <Text style={{ color:'#2d5016', fontWeight:'700' }}>Categories</Text>
+          <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:8 }}>
+            {improvedCategories.map((c:any) => {
+              const active = c.slug === improvedCategorySlug;
+              const label = currentLanguage === 'ta' && c.name_ta ? c.name_ta : c.name_en;
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={async () => { setImprovedCategorySlug(c.slug); resetArticleForm(); await loadImprovedCategoriesAndArticles(c.slug); }}
+                  style={{ paddingVertical:8, paddingHorizontal:14, borderRadius:20, borderWidth:2, borderColor: active ? '#4caf50' : '#e0e0e0', backgroundColor: active ? '#f1f8f4' : '#f9f9f9' }}
+                >
+                  <Text style={{ color: active ? '#4caf50' : '#333', fontWeight:'600' }}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Articles list */}
+          <View style={{ marginTop:16 }}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>Articles</Text>
+              <TouchableOpacity style={[styles.masterBtn, { paddingVertical:8, paddingHorizontal:12 }]} onPress={resetArticleForm}>
+                <Ionicons name="add" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>New Article</Text>
+              </TouchableOpacity>
+            </View>
+            {improvedLoading ? (
+              <Text style={{ color:'#666', marginTop:8 }}>Loading...</Text>
+            ) : (
+              improvedArticles.length === 0 ? (
+                <Text style={{ color:'#666', marginTop:8 }}>No articles yet.</Text>
+              ) : (
+                improvedArticles.map((a:any) => {
+                  const title = currentLanguage === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en;
+                  return (
+                    <View key={a.id} style={{ marginTop:10, padding:12, borderRadius:10, borderWidth:1, borderColor:'#e0e0e0', backgroundColor:'#fff' }}>
+                      <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                        <Text style={{ flex:1, color:'#2d5016', fontWeight:'700' }} numberOfLines={2}>{title}</Text>
+                        <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+                          <TouchableOpacity onPress={async () => { await openArticleForEdit(a); }} style={{ padding:6, backgroundColor:'#eaf6ec', borderRadius:8 }}>
+                            <Ionicons name="create" size={18} color="#2d5016" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => {
+                            Alert.alert('Delete Article', 'Delete this article?', [
+                              { text:'Cancel', style:'cancel' },
+                              { text:'Delete', style:'destructive', onPress: async () => { await deleteImprovedArticle(Number(a.id)); await loadImprovedCategoriesAndArticles(improvedCategorySlug); if (editingArticleId === Number(a.id)) resetArticleForm(); } },
+                            ]);
+                          }} style={{ padding:6, backgroundColor:'#fdecea', borderRadius:8 }}>
+                            <Ionicons name="trash" size={18} color="#d32f2f" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              )
+            )}
+          </View>
+
+          {/* Article editor */}
+          <View style={{ marginTop:20 }}>
+            <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>{editingArticleId ? 'Edit Article' : 'New Article'}</Text>
+            <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>Heading will be used as the article title.</Text>
+
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (EN)</Text>
+            <TextInput style={styles.input} value={articleHeadingEn} onChangeText={setArticleHeadingEn} placeholder="Heading in English" placeholderTextColor="#999" />
+
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (TA)</Text>
+            <TextInput style={styles.input} value={articleHeadingTa} onChangeText={setArticleHeadingTa} placeholder="தலைப்பு (Tamil)" placeholderTextColor="#999" />
+
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Subheading (EN)</Text>
+            <TextInput style={styles.input} value={articleSubEn} onChangeText={setArticleSubEn} placeholder="Subheading in English" placeholderTextColor="#999" />
+
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Subheading (TA)</Text>
+            <TextInput style={styles.input} value={articleSubTa} onChangeText={setArticleSubTa} placeholder="துணை தலைப்பு (Tamil)" placeholderTextColor="#999" />
+
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Body (EN)</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 120, textAlignVertical:'top', textAlign:'justify' }]}
+              value={articleBodyEn}
+              onChangeText={setArticleBodyEn}
+              multiline
+              placeholder="Article body in English (use blank lines between paragraphs)"
+              placeholderTextColor="#999"
+            />
+
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Body (TA)</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 120, textAlignVertical:'top', textAlign:'justify' }]}
+              value={articleBodyTa}
+              onChangeText={setArticleBodyTa}
+              multiline
+              placeholder="உள்ளடக்கம் (Tamil)"
+              placeholderTextColor="#999"
+            />
+
+            <TouchableOpacity style={[styles.savePrimaryBtn, { marginTop: 14 }]} onPress={saveArticle}>
+              <Ionicons name="save" size={18} color="#fff" />
+              <Text style={{ color:'#fff', fontWeight:'700' }}>{editingArticleId ? 'Update Article' : 'Save Article'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Images manager */}
+          <View style={{ marginTop:24 }}>
+            <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>Images</Text>
+            <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>Attach multiple images with captions.</Text>
+
+            <View style={{ marginTop:10 }}>
+              <Text style={{ color:'#2d5016', fontWeight:'700' }}>Caption (EN)</Text>
+              <TextInput style={styles.input} value={articleImgCaptionEn} onChangeText={setArticleImgCaptionEn} placeholder="Caption in English" placeholderTextColor="#999" />
+              <Text style={{ marginTop:8, color:'#2d5016', fontWeight:'700' }}>Caption (TA)</Text>
+              <TextInput style={styles.input} value={articleImgCaptionTa} onChangeText={setArticleImgCaptionTa} placeholder="விளக்கம் (Tamil)" placeholderTextColor="#999" />
+
+              <TouchableOpacity style={[styles.masterBtn, { marginTop:10, justifyContent:'center' }]} onPress={addArticleImage}>
+                <Ionicons name="image" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Add Image</Text>
+              </TouchableOpacity>
+            </View>
+
+            {Array.isArray(articleImages) && articleImages.length > 0 && (
+              <View style={{ marginTop:14 }}>
+                {articleImages.map((img:any) => (
+                  <View key={img.id} style={{ flexDirection:'row', alignItems:'center', marginBottom:10 }}>
+                    <Image source={{ uri: img.image_url || img.image }} style={{ width:64, height:64, borderRadius:8, marginRight:10 }} />
+                    <View style={{ flex:1 }}>
+                      {(img.caption_en || img.caption_ta) ? (
+                        <Text style={{ color:'#333', fontSize:13 }} numberOfLines={2}>
+                          {currentLanguage==='ta' && img.caption_ta ? img.caption_ta : img.caption_en}
+                        </Text>
+                      ) : (
+                        <Text style={{ color:'#999', fontSize:12 }}>No caption</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity onPress={() => removeArticleImage(Number(img.id))} style={{ padding:6, backgroundColor:'#fdecea', borderRadius:8 }}>
+                      <Ionicons name="trash" size={18} color="#d32f2f" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor:'#fff' }} />
       </Modal>
 
       {/* Top-level image modals to stack above Saved sheets */}
