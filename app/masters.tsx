@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
+import { uploadImprovedArticleDoc } from '../lib/supabase';
 import { uploadImage } from '../lib/upload';
 import { emitNotificationsChanged } from '../lib/notifBus';
 import { UserContext } from '../context/UserContext';
@@ -115,8 +116,6 @@ export default function Masters() {
   const [editingArticleId, setEditingArticleId] = useState<number | null>(null);
   const [articleHeadingEn, setArticleHeadingEn] = useState('');
   const [articleHeadingTa, setArticleHeadingTa] = useState('');
-  const [articleSubEn, setArticleSubEn] = useState('');
-  const [articleSubTa, setArticleSubTa] = useState('');
   const [articleBodyEn, setArticleBodyEn] = useState('');
   const [articleBodyTa, setArticleBodyTa] = useState('');
   const [articleImages, setArticleImages] = useState<any[]>([]);
@@ -173,8 +172,6 @@ export default function Masters() {
     setEditingArticleId(null);
     setArticleHeadingEn('');
     setArticleHeadingTa('');
-    setArticleSubEn('');
-    setArticleSubTa('');
     setArticleBodyEn('');
     setArticleBodyTa('');
     setArticleImages([]);
@@ -187,8 +184,6 @@ export default function Masters() {
       setEditingArticleId(Number(article.id));
       setArticleHeadingEn(article.heading_en || '');
       setArticleHeadingTa(article.heading_ta || '');
-      setArticleSubEn(article.subheading_en || '');
-      setArticleSubTa(article.subheading_ta || '');
       setArticleBodyEn(article.body_en || '');
       setArticleBodyTa(article.body_ta || '');
       const full = await getImprovedArticle(Number(article.id));
@@ -209,14 +204,26 @@ export default function Masters() {
           categorySlug: improvedCategorySlug,
           heading_en: articleHeadingEn.trim(),
           heading_ta: articleHeadingTa.trim() || undefined,
-          subheading_en: articleSubEn.trim() || undefined,
-          subheading_ta: articleSubTa.trim() || undefined,
           body_en: articleBodyEn.trim() || undefined,
           body_ta: articleBodyTa.trim() || undefined,
         });
         if (id) {
+          const articleId = Number(id);
+
+          // Also upload the English / Tamil bodies as text docs to Supabase Storage.
+          try {
+            if (articleBodyEn.trim()) {
+              await uploadImprovedArticleDoc(articleId, 'en', articleBodyEn);
+            }
+            if (articleBodyTa.trim()) {
+              await uploadImprovedArticleDoc(articleId, 'ta', articleBodyTa);
+            }
+          } catch {
+            // Ignore Supabase errors so normal DB save still succeeds
+          }
+
           await loadImprovedCategoriesAndArticles(improvedCategorySlug);
-          const created = (await getImprovedArticle(Number(id))) as any;
+          const created = (await getImprovedArticle(articleId)) as any;
           if (created) await openArticleForEdit(created);
           Alert.alert('Saved', 'Article created');
         }
@@ -224,12 +231,22 @@ export default function Masters() {
         const ok = await updateImprovedArticle(editingArticleId, {
           heading_en: articleHeadingEn.trim() || undefined,
           heading_ta: articleHeadingTa.trim() || undefined,
-          subheading_en: articleSubEn.trim() || undefined,
-          subheading_ta: articleSubTa.trim() || undefined,
           body_en: articleBodyEn.trim() || undefined,
           body_ta: articleBodyTa.trim() || undefined,
         });
-        if (ok) {
+        if (ok && editingArticleId != null) {
+          // Re‑upload docs for this article ID so Supabase stays in sync
+          try {
+            if (articleBodyEn.trim()) {
+              await uploadImprovedArticleDoc(editingArticleId, 'en', articleBodyEn);
+            }
+            if (articleBodyTa.trim()) {
+              await uploadImprovedArticleDoc(editingArticleId, 'ta', articleBodyTa);
+            }
+          } catch {
+            // Ignore Supabase errors
+          }
+
           await loadImprovedCategoriesAndArticles(improvedCategorySlug);
           const full = await getImprovedArticle(editingArticleId);
           if (full) setArticleImages(Array.isArray((full as any).images) ? (full as any).images : []);
@@ -308,7 +325,7 @@ export default function Masters() {
           {isAdmin && !isMaster ? (
             <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
               <Ionicons name="pricetags" size={18} color="#4caf50" />
-              <Text style={styles.masterBtnText}>Products</Text>
+              <Text style={styles.masterBtnText}>Manage Products</Text>
             </TouchableOpacity>
           ) : (
             <>
@@ -325,10 +342,10 @@ export default function Masters() {
                 <Text style={styles.masterBtnText}>{t('nav.manage')}</Text>
               </TouchableOpacity>
 
-              {/* 3. Products */}
+              {/* 3. Manage Products */}
               <TouchableOpacity style={styles.masterBtn} onPress={() => router.push('/(tabs)/admin')}>
                 <Ionicons name="pricetags" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>{t('admin.title')}</Text>
+                <Text style={styles.masterBtnText}>Manage Products</Text>
               </TouchableOpacity>
 
               {/* 4. Export data */}
@@ -835,7 +852,19 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:8 }}>
             {improvedCategories.map((c:any) => {
               const active = c.slug === improvedCategorySlug;
-              const label = currentLanguage === 'ta' && c.name_ta ? c.name_ta : c.name_en;
+              // Force exact category labels the user requested, regardless of DB seed state
+              let labelEn = c.name_en;
+              let labelTa = c.name_ta;
+              if (c.slug === 'agronomy') {
+                labelEn = 'Agronomy crops';
+              } else if (c.slug === 'horticulture') {
+                labelEn = 'Horticulture crops';
+              } else if (c.slug === 'animal') {
+                labelEn = 'Animal Husbandary';
+              } else if (c.slug === 'post-harvest') {
+                labelEn = 'Post Harvest technologies';
+              }
+              const label = currentLanguage === 'ta' && labelTa ? labelTa : labelEn;
               return (
                 <TouchableOpacity
                   key={c.id}
@@ -892,22 +921,16 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
 
           {/* Article editor */}
           <View style={{ marginTop:20 }}>
-            <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>{editingArticleId ? 'Edit Article' : 'New Article'}</Text>
-            <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>Heading will be used as the article title.</Text>
+          <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>{editingArticleId ? 'Edit Article' : 'New Article'}</Text>
+          <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>Heading will be used as the article title. Below that you can type content like in a Word document (paragraphs, sub-headings, etc.).</Text>
 
-            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (EN)</Text>
-            <TextInput style={styles.input} value={articleHeadingEn} onChangeText={setArticleHeadingEn} placeholder="Heading in English" placeholderTextColor="#999" />
+          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (EN)</Text>
+          <TextInput style={styles.input} value={articleHeadingEn} onChangeText={setArticleHeadingEn} placeholder="Heading in English" placeholderTextColor="#999" />
 
-            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (TA)</Text>
-            <TextInput style={styles.input} value={articleHeadingTa} onChangeText={setArticleHeadingTa} placeholder="தலைப்பு (Tamil)" placeholderTextColor="#999" />
+          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (TA)</Text>
+          <TextInput style={styles.input} value={articleHeadingTa} onChangeText={setArticleHeadingTa} placeholder="தலைப்பு (Tamil)" placeholderTextColor="#999" />
 
-            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Subheading (EN)</Text>
-            <TextInput style={styles.input} value={articleSubEn} onChangeText={setArticleSubEn} placeholder="Subheading in English" placeholderTextColor="#999" />
-
-            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Subheading (TA)</Text>
-            <TextInput style={styles.input} value={articleSubTa} onChangeText={setArticleSubTa} placeholder="துணை தலைப்பு (Tamil)" placeholderTextColor="#999" />
-
-            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Body (EN)</Text>
+          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Content (EN)</Text>
             <TextInput
               style={[styles.input, { minHeight: 120, textAlignVertical:'top', textAlign:'justify' }]}
               value={articleBodyEn}
@@ -917,7 +940,7 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
               placeholderTextColor="#999"
             />
 
-            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Body (TA)</Text>
+          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Content (TA)</Text>
             <TextInput
               style={[styles.input, { minHeight: 120, textAlignVertical:'top', textAlign:'justify' }]}
               value={articleBodyTa}

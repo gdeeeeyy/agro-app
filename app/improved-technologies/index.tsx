@@ -20,7 +20,21 @@ export default function ImprovedTechnologiesHome() {
     })();
   }, []);
 
-  const labelFor = (c: any) => currentLanguage === 'ta' && c.name_ta ? c.name_ta : c.name_en;
+  const labelFor = (c: any) => {
+    // Force exact English labels the user requested, regardless of DB seed state
+    let labelEn = c.name_en;
+    let labelTa = c.name_ta;
+    if (c.slug === 'agronomy') {
+      labelEn = 'Agronomy crops';
+    } else if (c.slug === 'horticulture') {
+      labelEn = 'Horticulture crops';
+    } else if (c.slug === 'animal') {
+      labelEn = 'Animal Husbandary';
+    } else if (c.slug === 'post-harvest') {
+      labelEn = 'Post Harvest technologies';
+    }
+    return currentLanguage === 'ta' && labelTa ? labelTa : labelEn;
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>

@@ -346,10 +346,10 @@ async function runMigrations() {
     // Seed fixed Improved Technology categories (idempotent)
     await pool.query(`INSERT INTO improved_categories (slug, name_en, name_ta)
       VALUES
-        ('agronomy', 'Agronomy Crops', 'வளர்ப்பு பயிர்கள்'),
-        ('horticulture', 'Horticulture Crops', 'தோட்டக்கலைப் பயிர்கள்'),
-        ('animal_husbandry', 'Animal Husbandry', 'கால்நடை வளர்ப்பு'),
-        ('post_harvest', 'Post Harvest Technologies', 'அறுவடை பிந்தைய தொழில்நுட்பங்கள்')
+        ('agronomy', 'Agronomy crops', 'வளர்ப்பு பயிர்கள்'),
+        ('horticulture', 'Horticulture crops', 'தோட்டக்கலைப் பயிர்கள்'),
+        ('animal_husbandry', 'Animal Husbandary', 'கால்நடை வளர்ப்பு'),
+        ('post_harvest', 'Post Harvest technologies', 'அறுவடை பிந்தைய தொழில்நுட்பங்கள்')
       ON CONFLICT (slug) DO UPDATE SET
         name_en = EXCLUDED.name_en,
         name_ta = EXCLUDED.name_ta`);
