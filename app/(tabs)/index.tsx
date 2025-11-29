@@ -319,17 +319,12 @@ export default function Home() {
 
       {/* Improved Technologies entry point */}
       <View style={{ backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Improved Technologies</Text>
-        </View>
-        <Text style={{ marginTop: 8, color: '#666', fontSize: 14 }}>
-          Bilingual improved practices for agronomy, horticulture, animal husbandry and post-harvest technologies.
-        </Text>
         <TouchableOpacity
-          style={{ marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#4caf50', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 20 }}
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
           onPress={() => router.push('/improved-technologies')}
         >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>View Improved Technologies</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Improved Technologies</Text>
+          <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
       </View>
 

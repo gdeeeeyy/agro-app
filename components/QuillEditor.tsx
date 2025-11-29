@@ -1,13 +1,14 @@
 import React, { useMemo, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface Props {
   value: string;
   onChange: (html: string) => void;
+  style?: StyleProp<ViewStyle>;
 }
 
-export default function QuillEditor({ value, onChange }: Props) {
+export default function QuillEditor({ value, onChange, style }: Props) {
   const webviewRef = useRef<WebView>(null);
 
   const html = useMemo(
@@ -75,17 +76,6 @@ export default function QuillEditor({ value, onChange }: Props) {
         const html = editor.root.innerHTML;
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'change', html }));
       });
-
-      document.addEventListener('message', function(event) {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'setHtml') {
-            const tmp = document.createElement('div');
-            tmp.innerHTML = msg.html || '';
-            editor.setContents(editor.clipboard.convert(tmp.innerHTML));
-          }
-        } catch (e) {}
-      });
     </script>
   </body>
 </html>`,
@@ -93,7 +83,7 @@ export default function QuillEditor({ value, onChange }: Props) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <WebView
         ref={webviewRef}
         originWhitelist={["*"]}

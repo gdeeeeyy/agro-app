@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
 import { uploadImprovedArticleDoc } from '../lib/supabase';
 import { uploadImage } from '../lib/upload';
+import QuillEditor from '../components/QuillEditor';
 import { emitNotificationsChanged } from '../lib/notifBus';
 import { UserContext } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -168,6 +169,15 @@ export default function Masters() {
     }
   };
 
+  const extractHeadingFromHtml = (html: string, fallback?: string): string => {
+    if (!html) return fallback || '';
+    const source = String(html);
+    const hMatch = source.match(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i);
+    const raw = hMatch ? hMatch[1] : source.replace(/<[^>]+>/g, ' ');
+    const text = raw.replace(/\s+/g, ' ').trim();
+    return text || (fallback || '');
+  };
+
   const resetArticleForm = () => {
     setEditingArticleId(null);
     setArticleHeadingEn('');
@@ -194,16 +204,26 @@ export default function Masters() {
   };
 
   const saveArticle = async () => {
-    if (!articleHeadingEn.trim()) {
-      Alert.alert('Error', 'Enter English heading');
+    const plainEn = (articleBodyEn || '').replace(/<[^>]+>/g, ' ').trim();
+    const plainTa = (articleBodyTa || '').replace(/<[^>]+>/g, ' ').trim();
+    if (!plainEn && !plainTa) {
+      Alert.alert('Error', 'Enter some article content');
       return;
     }
+
+    const headingAutoEn =
+      extractHeadingFromHtml(articleBodyEn, articleHeadingEn).trim() ||
+      'Untitled article';
+    const headingAutoTa =
+      extractHeadingFromHtml(articleBodyTa, articleHeadingTa).trim() ||
+      undefined;
+
     try {
       if (editingArticleId == null) {
         const id = await createImprovedArticle({
           categorySlug: improvedCategorySlug,
-          heading_en: articleHeadingEn.trim(),
-          heading_ta: articleHeadingTa.trim() || undefined,
+          heading_en: headingAutoEn,
+          heading_ta: headingAutoTa,
           body_en: articleBodyEn.trim() || undefined,
           body_ta: articleBodyTa.trim() || undefined,
         });
@@ -229,8 +249,8 @@ export default function Masters() {
         }
       } else {
         const ok = await updateImprovedArticle(editingArticleId, {
-          heading_en: articleHeadingEn.trim() || undefined,
-          heading_ta: articleHeadingTa.trim() || undefined,
+          heading_en: headingAutoEn,
+          heading_ta: headingAutoTa,
           body_en: articleBodyEn.trim() || undefined,
           body_ta: articleBodyTa.trim() || undefined,
         });
@@ -330,8 +350,13 @@ export default function Masters() {
           ) : (
             <>
               {/* Masters only in required order */}
-              {/* 1. Improved Technologies */}
-              <TouchableOpacity style={styles.masterBtn} onPress={() => { router.push('/improved-technologies/admin'); }}>
+              {/* 1. Improved Technologies - go to dedicated admin flow */}
+              <TouchableOpacity
+                style={styles.masterBtn}
+                onPress={() => {
+                  router.push('/improved-technologies/admin');
+                }}
+              >
                 <Ionicons name="book" size={18} color="#4caf50" />
                 <Text style={styles.masterBtnText}>Improved Technologies</Text>
               </TouchableOpacity>
@@ -921,81 +946,29 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
 
           {/* Article editor */}
           <View style={{ marginTop:20 }}>
-          <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>{editingArticleId ? 'Edit Article' : 'New Article'}</Text>
-          <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>Heading will be used as the article title. Below that you can type content like in a Word document (paragraphs, sub-headings, etc.).</Text>
+            <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>
+              {editingArticleId ? 'Edit Article' : 'New Article'}
+            </Text>
+            <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>
+              Use the rich text editor to add headings, sub-headings, lists and
+              images. The first heading will be used as the article title in
+              lists.
+            </Text>
 
-          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (EN)</Text>
-          <TextInput style={styles.input} value={articleHeadingEn} onChangeText={setArticleHeadingEn} placeholder="Heading in English" placeholderTextColor="#999" />
+            <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Content (EN)</Text>
+            <QuillEditor value={articleBodyEn} onChange={setArticleBodyEn} />
 
-          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Heading (TA)</Text>
-          <TextInput style={styles.input} value={articleHeadingTa} onChangeText={setArticleHeadingTa} placeholder="தலைப்பு (Tamil)" placeholderTextColor="#999" />
-
-          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Content (EN)</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 120, textAlignVertical:'top', textAlign:'justify' }]}
-              value={articleBodyEn}
-              onChangeText={setArticleBodyEn}
-              multiline
-              placeholder="Article body in English (use blank lines between paragraphs)"
-              placeholderTextColor="#999"
-            />
-
-          <Text style={{ marginTop:10, color:'#2d5016', fontWeight:'700' }}>Content (TA)</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 120, textAlignVertical:'top', textAlign:'justify' }]}
-              value={articleBodyTa}
-              onChangeText={setArticleBodyTa}
-              multiline
-              placeholder="உள்ளடக்கம் (Tamil)"
-              placeholderTextColor="#999"
-            />
+            <Text style={{ marginTop:16, color:'#2d5016', fontWeight:'700' }}>Content (TA)</Text>
+            <QuillEditor value={articleBodyTa} onChange={setArticleBodyTa} />
 
             <TouchableOpacity style={[styles.savePrimaryBtn, { marginTop: 14 }]} onPress={saveArticle}>
               <Ionicons name="save" size={18} color="#fff" />
-              <Text style={{ color:'#fff', fontWeight:'700' }}>{editingArticleId ? 'Update Article' : 'Save Article'}</Text>
+              <Text style={{ color:'#fff', fontWeight:'700' }}>
+                {editingArticleId ? 'Update Article' : 'Save Article'}
+              </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Images manager */}
-          <View style={{ marginTop:24 }}>
-            <Text style={{ color:'#2d5016', fontWeight:'700', fontSize:16 }}>Images</Text>
-            <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>Attach multiple images with captions.</Text>
-
-            <View style={{ marginTop:10 }}>
-              <Text style={{ color:'#2d5016', fontWeight:'700' }}>Caption (EN)</Text>
-              <TextInput style={styles.input} value={articleImgCaptionEn} onChangeText={setArticleImgCaptionEn} placeholder="Caption in English" placeholderTextColor="#999" />
-              <Text style={{ marginTop:8, color:'#2d5016', fontWeight:'700' }}>Caption (TA)</Text>
-              <TextInput style={styles.input} value={articleImgCaptionTa} onChangeText={setArticleImgCaptionTa} placeholder="விளக்கம் (Tamil)" placeholderTextColor="#999" />
-
-              <TouchableOpacity style={[styles.masterBtn, { marginTop:10, justifyContent:'center' }]} onPress={addArticleImage}>
-                <Ionicons name="image" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Add Image</Text>
-              </TouchableOpacity>
-            </View>
-
-            {Array.isArray(articleImages) && articleImages.length > 0 && (
-              <View style={{ marginTop:14 }}>
-                {articleImages.map((img:any) => (
-                  <View key={img.id} style={{ flexDirection:'row', alignItems:'center', marginBottom:10 }}>
-                    <Image source={{ uri: img.image_url || img.image }} style={{ width:64, height:64, borderRadius:8, marginRight:10 }} />
-                    <View style={{ flex:1 }}>
-                      {(img.caption_en || img.caption_ta) ? (
-                        <Text style={{ color:'#333', fontSize:13 }} numberOfLines={2}>
-                          {currentLanguage==='ta' && img.caption_ta ? img.caption_ta : img.caption_en}
-                        </Text>
-                      ) : (
-                        <Text style={{ color:'#999', fontSize:12 }}>No caption</Text>
-                      )}
-                    </View>
-                    <TouchableOpacity onPress={() => removeArticleImage(Number(img.id))} style={{ padding:6, backgroundColor:'#fdecea', borderRadius:8 }}>
-                      <Ionicons name="trash" size={18} color="#d32f2f" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
+          </ScrollView>
         <SafeAreaView edges={['bottom']} style={{ backgroundColor:'#fff' }} />
       </Modal>
 

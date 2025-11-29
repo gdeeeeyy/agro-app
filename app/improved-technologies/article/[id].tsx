@@ -1,74 +1,168 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
-import { getImprovedArticle } from '../../../lib/database';
 import { useLanguage } from '../../../context/LanguageContext';
+import { getImprovedArticle } from '../../../lib/database';
+import { WebView } from 'react-native-webview';
 
-export default function ImprovedArticleDetail() {
+interface ImprovedArticleFull {
+  id: number;
+  heading_en: string;
+  heading_ta?: string | null;
+  body_en?: string | null;
+  body_ta?: string | null;
+  images?: Array<{ id: number; image: string; caption_en?: string | null; caption_ta?: string | null }>;
+}
+
+export default function ImprovedTechnologiesArticle() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentLanguage } = useLanguage();
-  const [article, setArticle] = useState<any | null>(null);
+  const [article, setArticle] = useState<ImprovedArticleFull | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!id) return;
     (async () => {
-      if (!id) return;
+      setLoading(true);
       try {
-        const data = await getImprovedArticle(Number(id));
-        setArticle(data);
-      } catch {}
+        const full = await getImprovedArticle(Number(id));
+        if (full) setArticle(full as any);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [id]);
 
-  const heading = (a: any) => currentLanguage === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en;
-  const subheading = (a: any) => currentLanguage === 'ta' && a.subheading_ta ? a.subheading_ta : a.subheading_en;
-  const body = (a: any) => currentLanguage === 'ta' && a.body_ta ? a.body_ta : a.body_en;
-  const captionFor = (img: any) => currentLanguage === 'ta' && img.caption_ta ? img.caption_ta : img.caption_en;
+  const title = useMemo(() => {
+    if (!article) return '';
+    if (currentLanguage === 'ta' && article.heading_ta) return article.heading_ta;
+    return article.heading_en || '';
+  }, [article, currentLanguage]);
 
-  const paragraphs = (text?: string) => {
-    if (!text) return [];
-    return String(text).split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-  };
+  const htmlDocument = useMemo(() => {
+    if (!article) return '<p>No content.</p>';
+    const rawBody =
+      currentLanguage === 'ta' && article.body_ta
+        ? article.body_ta
+        : article.body_en || '';
+
+    // Normalise Quill HTML a bit to avoid large empty gaps
+    let bodyHtml = (rawBody || '')
+      // remove paragraphs that are only <br>
+      .replace(/<p>\s*(<br\s*\/?\s*>\s*)+<\/p>/gi, '')
+      // collapse multiple blank divs
+      .replace(/<div>\s*<br\s*\/?\s*>\s*<\/div>/gi, '')
+      // collapse repeated line breaks
+      .replace(/(<br\s*\/?\s*>\s*){3,}/gi, '<br />')
+      // trim whitespace around tags
+      .replace(/\s+<\//g, ' </')
+      .trim();
+
+    if (!bodyHtml) bodyHtml = '<p>No content yet.</p>';
+
+    const imagesHtml = Array.isArray(article.images) && article.images.length
+      ? `<div class="images">${article.images
+          .map((img) => {
+            const caption =
+              currentLanguage === 'ta' && img.caption_ta
+                ? img.caption_ta
+                : img.caption_en || '';
+            const escCaption = caption
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+            return `
+              <figure style="margin: 12px 0;">
+                <img src="${img.image}" style="max-width:100%;height:auto;border-radius:10px;" />
+                ${caption ? `<figcaption style="font-size:12px;color:#555;margin-top:4px;">${escCaption}</figcaption>` : ''}
+              </figure>
+            `;
+          })
+          .join('')}</div>`
+      : '';
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        padding: 12px 16px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-color: #ffffff;
+        color: #333333;
+      }
+      h1, h2, h3, h4 {
+        color: #2d5016;
+        margin-top: 14px;
+        margin-bottom: 6px;
+      }
+      p, li {
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      p {
+        margin: 6px 0;
+      }
+      ul, ol {
+        padding-left: 20px;
+        margin: 6px 0;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      .content {
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    ${imagesHtml}
+    <div class="content">
+      ${bodyHtml}
+    </div>
+  </body>
+</html>`;
+  }, [article, currentLanguage, title]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{article ? heading(article) : 'Improved Technologies'}</Text>
-        <View style={{ width: 24 }} />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={{ backgroundColor: '#4caf50' }}>
+        {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {title || 'Article'}
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {!article ? (
-          <Text style={{ color: '#666', marginTop: 16 }}>Loading...</Text>
-        ) : (
-          <>
-            <Text style={styles.heading}>{heading(article)}</Text>
-            {subheading(article) ? (
-              <Text style={styles.subheading}>{subheading(article)}</Text>
-            ) : null}
 
-            {paragraphs(body(article)).map((p, idx) => (
-              <Text key={idx} style={styles.paragraph}>{p}</Text>
-            ))}
-
-            {Array.isArray(article.images) && article.images.length > 0 && (
-              <View style={{ marginTop: 18 }}>
-                {article.images.map((img: any) => (
-                  <View key={img.id} style={{ marginBottom: 16 }}>
-                    <Image source={{ uri: img.image_url || img.image }} style={styles.image} />
-                    {captionFor(img) ? (
-                      <Text style={styles.caption}>{captionFor(img)}</Text>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#4caf50" />
+        </View>
+      ) : !article ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: '#666', textAlign: 'center' }}>Article not found.</Text>
+        </View>
+      ) : (
+        <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+          <WebView
+            originWhitelist={["*"]}
+            source={{ html: htmlDocument }}
+            style={{ flex: 1, backgroundColor: 'transparent' }}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -83,27 +177,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, marginLeft: 8 },
-  content: { padding: 16, paddingBottom: 24 },
-  heading: { fontSize: 22, fontWeight: '800', color: '#2d5016' },
-  subheading: { marginTop: 6, fontSize: 15, color: '#555' },
-  paragraph: {
-    marginTop: 10,
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-    textAlign: 'justify',
-  },
-  image: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
-    backgroundColor: '#ddd',
-  },
-  caption: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#555',
-    textAlign: 'justify',
-  },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
 });

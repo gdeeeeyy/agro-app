@@ -521,6 +521,41 @@ export async function listImprovedCategories() {
   } catch (err) { console.error('SQLite fetch error (categories):', err); return []; }
 }
 
+export async function createImprovedCategory(input: { name_en: string; name_ta?: string }) {
+  try {
+    const nameEn = String(input.name_en || '').trim();
+    const nameTa = input.name_ta ? String(input.name_ta).trim() : undefined;
+    if (!nameEn) return null;
+
+    if (API_URL) {
+      try {
+        const res = await api.post('/improved-categories', { name_en: nameEn, name_ta: nameTa });
+        return (res as any)?.id || null;
+      } catch (e) {
+        // fall back to local
+      }
+    }
+
+    // Local: generate a simple slug from the English name
+    let base = nameEn
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!base) base = 'category';
+
+    const r = await db.runAsync(
+      'INSERT INTO improved_categories (slug, name_en, name_ta) VALUES (?,?,?)',
+      base,
+      nameEn,
+      nameTa ?? null,
+    );
+    return r.lastInsertRowId;
+  } catch (err) {
+    console.error('SQLite insert error (category):', err);
+    return null;
+  }
+}
+
 export async function listImprovedArticles(categorySlug: string, language: 'en'|'ta' = 'en') {
   try {
     if (API_URL) {

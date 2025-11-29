@@ -15,6 +15,15 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const RAZORPAY_BASE_URL = process.env.RAZORPAY_BASE_URL || 'https://api.razorpay.com/v1';
 const RAZORPAY_CALLBACK_URL = process.env.RAZORPAY_CALLBACK_URL || null;
 
+// Textbelt SMS config for OTP sending (hosted or self-hosted)
+// Default URL/key use the public Textbelt demo (1 free SMS/day).
+// For higher volume, self-host Textbelt and set TEXTBELT_URL/TEXTBELT_KEY.
+const TEXTBELT_URL = process.env.TEXTBELT_URL || 'https://textbelt.com/text';
+const TEXTBELT_KEY = process.env.TEXTBELT_KEY || 'textbelt';
+
+const ADMIN_OTP_NUMBER = '1234567890';
+const OTP_WINDOW_MINUTES = 10;
+
 if (!DATABASE_URL) {
   console.error('DATABASE_URL not set');
   process.exit(1);
@@ -276,6 +285,16 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
+    // login OTP table (10-minute validity)
+    await pool.query(`CREATE TABLE IF NOT EXISTS login_otps (
+      id BIGSERIAL PRIMARY KEY,
+      number TEXT NOT NULL,
+      otp TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      expires_at TIMESTAMPTZ DEFAULT (now() + interval '10 minutes')
+    )`);
+    await pool.query("CREATE INDEX IF NOT EXISTS idx_login_otps_number ON login_otps(number)");
+
     // scan_plants table for mobile Scanner Plants
     await pool.query(`CREATE TABLE IF NOT EXISTS scan_plants (
       id BIGSERIAL PRIMARY KEY,
@@ -401,6 +420,104 @@ app.post('/auth/signin', async (req, res) => {
   const u = await one('SELECT id, number, full_name, is_admin, created_at FROM users WHERE number=$1 AND password=$2', [number, password]);
   if (!u) return res.status(401).json({ error: 'Invalid number or password' });
   res.json(u);
+});
+
+function randomOtpCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+// Request login OTP via SMS
+app.post('/auth/request-otp', async (req, res) => {
+  try {
+    const raw = (req.body && req.body.number) || '';
+    const number = String(raw).trim();
+    if (!number) return res.status(400).json({ error: 'number required' });
+
+    const code = randomOtpCode();
+    await pool.query(
+      'INSERT INTO login_otps (number, otp, created_at, expires_at) VALUES ($1,$2, now(), now() + interval \'10 minutes\')',
+      [number, code]
+    );
+
+    if (!TEXTBELT_URL || !TEXTBELT_KEY) {
+      console.warn('Textbelt not fully configured, cannot send SMS');
+      console.log('OTP for', number, '=>', code);
+      return res.status(500).json({ error: 'sms_not_configured' });
+    }
+
+    try {
+      const params = new URLSearchParams({
+        phone: number,
+        message: `Your Agriismart login OTP is ${code}`,
+        key: TEXTBELT_KEY,
+      });
+      const resp = await fetch(TEXTBELT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+      const json = await resp.json().catch(() => null);
+      if (!json || json.success !== true) {
+        console.error('Textbelt send OTP failed:', json || resp.statusText);
+        return res.status(500).json({ error: 'otp_send_failed' });
+      }
+    } catch (e) {
+      console.error('Textbelt send OTP failed:', e.message || e);
+      return res.status(500).json({ error: 'otp_send_failed' });
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('request-otp error:', e);
+    res.status(500).json({ error: 'otp_send_failed' });
+  }
+});
+
+// Verify login OTP and decide if user exists or must register
+app.post('/auth/verify-otp', async (req, res) => {
+  try {
+    const rawNumber = (req.body && req.body.number) || '';
+    const rawOtp = (req.body && req.body.otp) || '';
+    const number = String(rawNumber).trim();
+    const otp = String(rawOtp).trim();
+    if (!number || !otp) return res.status(400).json({ error: 'number and otp required' });
+
+    const row = await one(
+      'SELECT otp FROM login_otps WHERE number=$1 AND expires_at > now() ORDER BY created_at DESC LIMIT 1',
+      [number]
+    );
+    if (!row || row.otp !== otp) {
+      return res.status(400).json({ error: 'invalid_or_expired_otp' });
+    }
+
+    let user = await one(
+      'SELECT id, number, full_name, is_admin, created_at FROM users WHERE number=$1',
+      [number]
+    );
+
+    if (!user) {
+      // Allow auto-create for special admin number, otherwise require registration.
+      if (number === ADMIN_OTP_NUMBER) {
+        user = await one(
+          'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1,$2,$3,$4) RETURNING id, number, full_name, is_admin, created_at',
+          [number, '', null, 2]
+        );
+        return res.json({ user });
+      }
+      return res.json({ needsRegistration: true });
+    }
+
+    // Ensure admin role for special number
+    if (number === ADMIN_OTP_NUMBER && Number(user.is_admin ?? 0) !== 2) {
+      await pool.query('UPDATE users SET is_admin=2 WHERE id=$1', [user.id]);
+      user = await one('SELECT id, number, full_name, is_admin, created_at FROM users WHERE id=$1', [user.id]);
+    }
+
+    res.json({ user });
+  } catch (e) {
+    console.error('verify-otp error:', e);
+    res.status(500).json({ error: 'otp_verify_failed' });
+  }
 });
 
 // Create admin (server-side)
@@ -884,6 +1001,33 @@ app.delete('/scan-plants/:id', async (req, res) => {
 app.get('/improved-categories', async (req, res) => {
   const rows = await all('SELECT * FROM improved_categories ORDER BY id', []);
   res.json(rows);
+});
+
+app.post('/improved-categories', async (req, res) => {
+  try {
+    let { slug, name_en, name_ta } = req.body || {};
+    name_en = String(name_en || '').trim();
+    if (!name_en) return res.status(400).json({ error: 'name_en required' });
+
+    let base = String(slug || name_en)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!base) base = 'category';
+
+    const r = await one(
+      'INSERT INTO improved_categories (slug, name_en, name_ta) VALUES ($1,$2,$3) RETURNING id',
+      [base, name_en, name_ta ? String(name_ta).trim() : null]
+    );
+    res.json(r);
+  } catch (e) {
+    if (String(e.message || '').toLowerCase().includes('unique')) {
+      return res.status(400).json({ error: 'exists' });
+    }
+    console.error(e);
+    res.status(500).json({ error: 'failed' });
+  }
 });
 
 app.get('/improved-articles', async (req, res) => {

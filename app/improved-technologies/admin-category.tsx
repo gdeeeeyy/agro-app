@@ -38,7 +38,10 @@ export default function ImprovedTechnologiesAdminCategory() {
   }, [slug, currentLanguage]);
 
   const goToEditor = (articleId?: number) => {
-    router.push({ pathname: '/improved-technologies/admin-editor', params: { slug: String(slug), id: articleId != null ? String(articleId) : 'new' } });
+    router.push({
+      pathname: '/improved-technologies/admin-editor',
+      params: { slug: String(slug), id: articleId != null ? String(articleId) : 'new' },
+    });
   };
 
   const confirmDelete = (id: number) => {
@@ -87,7 +90,9 @@ export default function ImprovedTechnologiesAdminCategory() {
             const title = currentLanguage === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en;
             return (
               <View key={a.id} style={styles.articleCard}>
-                <Text style={{ flex: 1, color: '#2d5016', fontWeight: '700' }} numberOfLines={2}>{title}</Text>
+                <Text style={{ flex: 1, color: '#2d5016', fontWeight: '700' }} numberOfLines={2}>
+                  {title}
+                </Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity onPress={() => goToEditor(a.id)} style={styles.iconChip}>
                     <Ionicons name="create" size={18} color="#2d5016" />

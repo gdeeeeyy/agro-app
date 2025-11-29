@@ -1,67 +1,81 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
-import { listImprovedArticles, listImprovedCategories } from '../../lib/database';
 import { useLanguage } from '../../context/LanguageContext';
+import { listImprovedCategories, listImprovedArticles } from '../../lib/database';
 
 export default function ImprovedTechnologiesCategory() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { currentLanguage } = useLanguage();
+  const [categoryName, setCategoryName] = useState('');
   const [articles, setArticles] = useState<any[]>([]);
-  const [categoryName, setCategoryName] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!slug) return;
     (async () => {
+      setLoading(true);
       try {
         const cats = await listImprovedCategories();
-        const cat = (Array.isArray(cats) ? cats : []).find((c: any) => c.slug === slug);
-        if (cat) {
-          setCategoryName(currentLanguage === 'ta' && cat.name_ta ? cat.name_ta : cat.name_en);
+        const arr = Array.isArray(cats) ? cats : [];
+        const found = arr.find((c: any) => c.slug === slug);
+        if (found) {
+          let labelEn = found.name_en;
+          if (found.slug === 'agronomy') labelEn = 'Agronomy crops';
+          else if (found.slug === 'horticulture') labelEn = 'Horticulture crops';
+          else if (found.slug === 'animal') labelEn = 'Animal Husbandary';
+          else if (found.slug === 'post-harvest') labelEn = 'Post Harvest technologies';
+          setCategoryName(currentLanguage === 'ta' && found.name_ta ? found.name_ta : labelEn);
         }
-      } catch {}
+        const arts = await listImprovedArticles(String(slug), currentLanguage === 'ta' ? 'ta' : 'en');
+        setArticles(Array.isArray(arts) ? arts : []);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [slug, currentLanguage]);
-
-  useEffect(() => {
-    (async () => {
-      if (!slug) return;
-      try {
-        const rows = await listImprovedArticles(String(slug), currentLanguage === 'ta' ? 'ta' : 'en');
-        setArticles(Array.isArray(rows) ? rows : []);
-      } catch {}
-    })();
-  }, [slug, currentLanguage]);
-
-  const heading = (a: any) => currentLanguage === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en;
-  const subheading = (a: any) => currentLanguage === 'ta' && a.subheading_ta ? a.subheading_ta : a.subheading_en;
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{categoryName || 'Improved Technologies'}</Text>
-        <View style={{ width: 24 }} />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={{ backgroundColor: '#4caf50' }}>
+        {Platform.OS === 'android' ? <View style={{ height: 20, backgroundColor: '#4caf50' }} /> : null}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{categoryName || 'Improved Technologies'}</Text>
+          <View style={{ width: 24 }} />
+        </View>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {articles.length === 0 ? (
-          <Text style={{ color: '#666', marginTop: 12 }}>No articles yet.</Text>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#2d5016' }}>Articles</Text>
+        <Text style={{ marginTop: 4, color: '#666', fontSize: 13 }}>
+          Select an article to read full details.
+        </Text>
+
+        {loading ? (
+          <Text style={{ color: '#666', marginTop: 8 }}>Loading...</Text>
+        ) : articles.length === 0 ? (
+          <Text style={{ color: '#666', marginTop: 8 }}>No articles yet.</Text>
         ) : (
-          articles.map((a) => (
-            <TouchableOpacity
-              key={a.id}
-              style={styles.articleCard}
-              onPress={() => router.push({ pathname: '/improved-technologies/article/[id]', params: { id: String(a.id) } })}
-            >
-              <Text style={styles.articleHeading} numberOfLines={2}>{heading(a)}</Text>
-              {subheading(a) ? (
-                <Text style={styles.articleSubheading} numberOfLines={3}>{subheading(a)}</Text>
-              ) : null}
-            </TouchableOpacity>
-          ))
+          articles.map((a: any) => {
+            const title = currentLanguage === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en;
+            return (
+              <TouchableOpacity
+                key={a.id}
+                style={styles.articleCard}
+                onPress={() => router.push(`/improved-technologies/article/${a.id}`)}
+              >
+                <Text style={{ flex: 1, color: '#2d5016', fontWeight: '700' }} numberOfLines={2}>
+                  {title || 'Untitled article'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#4caf50" />
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -78,16 +92,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, marginLeft: 8 },
-  content: { padding: 16, paddingBottom: 24 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
   articleCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginBottom: 12,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  articleHeading: { fontSize: 18, fontWeight: '700', color: '#2d5016' },
-  articleSubheading: { marginTop: 4, fontSize: 14, color: '#555', textAlign: 'justify' },
 });
