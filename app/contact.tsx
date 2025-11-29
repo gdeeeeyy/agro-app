@@ -25,7 +25,7 @@ export default function Contact() {
         <Text style={{ color:'#2d5016', fontWeight:'700', fontSize: 16 }}>We’re here to help</Text>
         <TouchableOpacity style={styles.masterBtn} onPress={call}>
           <Ionicons name="call" size={18} color="#4caf50" />
-          <Text style={styles.masterBtnText}>Call</Text>
+          <Text style={styles.masterBtnText}>Contact us</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.masterBtn} onPress={wa}>
           <Ionicons name="logo-whatsapp" size={18} color="#4caf50" />

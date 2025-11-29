@@ -331,7 +331,7 @@ export default function Masters() {
             <>
               {/* Masters only in required order */}
               {/* 1. Improved Technologies */}
-              <TouchableOpacity style={styles.masterBtn} onPress={async () => { resetArticleForm(); setImprovedModalVisible(true); await loadImprovedCategoriesAndArticles(); }}>
+              <TouchableOpacity style={styles.masterBtn} onPress={() => { router.push('/improved-technologies/admin'); }}>
                 <Ionicons name="book" size={18} color="#4caf50" />
                 <Text style={styles.masterBtnText}>Improved Technologies</Text>
               </TouchableOpacity>
