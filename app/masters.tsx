@@ -293,7 +293,14 @@ export default function Masters() {
     try {
       const up = await uploadImage(r.assets[0].uri);
       const pos = (articleImages?.length || 0) + 1;
-      await addImprovedArticleImage(editingArticleId, up.url, up.publicId, articleImgCaptionEn.trim() || undefined, articleImgCaptionTa.trim() || undefined, pos);
+      await addImprovedArticleImage(
+        editingArticleId,
+        up.url,
+        up.publicId,
+        articleImgCaptionEn.trim() || undefined,
+        articleImgCaptionTa.trim() || undefined,
+        pos,
+      );
       const full = await getImprovedArticle(editingArticleId);
       if (full) setArticleImages(Array.isArray((full as any).images) ? (full as any).images : []);
       setArticleImgCaptionEn('');

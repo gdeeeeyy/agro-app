@@ -11,6 +11,7 @@ import {
   View,
   Image,
   Modal,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +33,7 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   const [number, setNumber] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [langVisible, setLangVisible] = useState(false);
@@ -75,7 +77,8 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
         return;
       }
 
-      setUser(user);
+      // Persist only when Remember me is enabled; otherwise keep for this session only.
+      await setUser(user, { persist: rememberMe });
       setLoading(false);
       router.replace('/(tabs)');
     } catch (e) {
@@ -155,6 +158,20 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
           secureTextEntry
           editable={!loading}
         />
+
+        {!isSignup && (
+          <View style={styles.rememberRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Switch
+                value={rememberMe}
+                onValueChange={setRememberMe}
+                thumbColor={rememberMe ? '#4caf50' : '#f4f3f4'}
+                trackColor={{ false: '#d0d0d0', true: '#c8e6c9' }}
+              />
+              <Text style={styles.rememberLabel}>Remember me on this device</Text>
+            </View>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -329,6 +346,18 @@ const styles = StyleSheet.create({
     color: '#000',
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  rememberRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  rememberLabel: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#555',
   },
   button: {
     width: '100%',

@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS products (
   unit TEXT,
   stock_available INTEGER DEFAULT 0,
   cost_per_unit DOUBLE PRECISION NOT NULL,
+  low_stock_threshold INTEGER DEFAULT 20,
+  low_stock_alert_time TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );

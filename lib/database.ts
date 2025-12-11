@@ -281,11 +281,19 @@ if (Platform.OS !== 'web') (async () => {
         await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} TEXT`);
       }
     };
+    const addProdIntCol = async (name: string, defaultVal: number) => {
+      if (!prodColNames.includes(name)) {
+        await db.runAsync(`ALTER TABLE products ADD COLUMN ${name} INTEGER DEFAULT ${defaultVal}`);
+      }
+    };
     await addProdTextCol('name_ta');
     await addProdTextCol('plant_used_ta');
     await addProdTextCol('details_ta');
     await addProdTextCol('unit');
     await addProdTextCol('seller_name');
+    // Low stock alert config (threshold + optional time-of-day string like '09:00')
+    await addProdIntCol('low_stock_threshold', 20);
+    await addProdTextCol('low_stock_alert_time');
 
     // orders migration (align with server: add logistics fields if missing)
     const orderCols = await db.getAllAsync("PRAGMA table_info(orders)");

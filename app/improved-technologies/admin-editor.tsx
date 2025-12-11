@@ -22,7 +22,7 @@ const extractHeadingFromHtml = (html: string, fallback?: string): string => {
 };
 
 export default function ImprovedTechnologiesAdminEditor() {
-  const { slug, id } = useLocalSearchParams<{ slug: string; id: string }>();
+  const { slug, id, title } = useLocalSearchParams<{ slug: string; id: string; title?: string }>();
   const isNew = !id || id === 'new';
 
   const [bodyEn, setBodyEn] = useState(INSTRUCTIONS_EN);
@@ -32,6 +32,19 @@ export default function ImprovedTechnologiesAdminEditor() {
   const [activeLang, setActiveLang] = useState<'en' | 'ta'>('en');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [loaded, setLoaded] = useState(isNew);
+
+  // When starting a brand new article from the category screen, seed the editor
+  // with the crop name as the top heading before the instructions.
+  useEffect(() => {
+    if (!isNew || !title) return;
+    const safeTitle = String(title);
+    const headingEn = `<h2>${safeTitle}</h2>` + INSTRUCTIONS_EN;
+    const headingTa = `<h2>${safeTitle}</h2>` + INSTRUCTIONS_TA;
+    setBodyEn(headingEn);
+    setBodyTa(headingTa);
+    setInitialBodyEn(headingEn);
+    setInitialBodyTa(headingTa);
+  }, [isNew, title]);
 
   useEffect(() => {
     if (isNew || !id) {

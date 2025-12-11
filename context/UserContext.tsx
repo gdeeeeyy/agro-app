@@ -11,9 +11,13 @@ interface User {
   created_at?: string;
 }
 
+interface SetUserOptions {
+  persist?: boolean; // default true
+}
+
 interface UserContextType {
   user: User | null;
-  setUser: (user: User | null) => void;
+  setUser: (user: User | null, options?: SetUserOptions) => void | Promise<void>;
   updateUserAddress: (address: string) => void;
   logout: () => Promise<void>;
 }
@@ -39,9 +43,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const setUser = async (u: User | null) => {
+  const setUser = async (u: User | null, options?: SetUserOptions) => {
+    const persist = options?.persist ?? true;
     setUserState(u);
     try {
+      if (!persist) {
+        // Session-only: keep in memory, clear any stored value.
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        return;
+      }
       if (u) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(u));
       else await AsyncStorage.removeItem(STORAGE_KEY);
     } catch {}
@@ -50,7 +60,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const updateUserAddress = (address: string) => {
     if (user) {
       const updated = { ...user, address } as User;
-      setUser(updated);
+      setUser(updated, { persist: true });
     }
   };
 

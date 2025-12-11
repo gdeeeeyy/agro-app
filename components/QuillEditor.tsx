@@ -40,6 +40,14 @@ export default function QuillEditor({ value, onChange, style }: Props) {
       .ql-editor {
         min-height: 100%;
       }
+      .ql-editor img {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        display: block;
+        margin: 8px 0;
+      }
     </style>
   </head>
   <body>

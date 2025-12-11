@@ -44,6 +44,8 @@ interface Product {
   cost_per_unit: number;
   avg_rating?: number;
   rating_count?: number;
+  low_stock_threshold?: number;
+  low_stock_alert_time?: string | null;
 }
 
 interface ProductForm {
@@ -59,6 +61,8 @@ interface ProductForm {
   pack_size?: string; // deprecated in favor of variants
   pack_unit?: string; // deprecated in favor of variants
   plant_used?: string; // required by server; default to name
+  low_stock_threshold: string;
+  low_stock_alert_time: string;
 }
 
 interface Keyword {
@@ -102,6 +106,8 @@ export default function AdminDashboard() {
     unit: '',
     pack_size: '',
     pack_unit: 'gms',
+    low_stock_threshold: '20',
+    low_stock_alert_time: '09:00',
   });
 
   // (moved isAdmin/isMaster/isVendor declarations up near UserContext)
@@ -187,13 +193,20 @@ export default function AdminDashboard() {
 
   const resetForm = () => {
     setFormData({
+      seller_name: '',
       name: '',
-      plant_used: '',
-      keywords: '',
+      name_ta: '',
       details: '',
+      details_ta: '',
       image: '',
       stock_available: '',
       cost_per_unit: '',
+      unit: '',
+      pack_size: '',
+      pack_unit: 'gms',
+      plant_used: '',
+      low_stock_threshold: '20',
+      low_stock_alert_time: '09:00',
     });
     setSelectedKeywords([]);
     setEditingProduct(null);
@@ -224,6 +237,8 @@ export default function AdminDashboard() {
       pack_size: '',
       pack_unit: 'gms',
       plant_used: (product as any).plant_used || product.name || '',
+      low_stock_threshold: String((product as any).low_stock_threshold ?? 20),
+      low_stock_alert_time: String((product as any).low_stock_alert_time || '09:00'),
     });
     // Parse existing keywords
     const existingKeywords = product.keywords.split(',').map(k => k.trim()).filter(k => k);
@@ -351,6 +366,8 @@ const pickImage = async () => {
       // Required by server schema (NOT NULL); will be corrected after variants are added
       stock_available: 0,
       cost_per_unit: 0,
+      low_stock_threshold: Number(formData.low_stock_threshold || '20') || 20,
+      low_stock_alert_time: formData.low_stock_alert_time?.trim() || '09:00',
       // Let backend auto-approve products created by master admin (is_admin=2)
       created_by: user?.id ?? undefined,
       creator_role: user?.is_admin ?? 0,
@@ -862,6 +879,38 @@ const pickImage = async () => {
               multiline
               numberOfLines={4}
             />
+
+            {/* Low stock alert config */}
+            <View style={{ marginTop: 8, marginBottom: 12 }}>
+              <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom: 4 }}>Low stock alert</Text>
+              <Text style={{ color:'#666', fontSize: 12, marginBottom: 6 }}>
+                You will receive a notification on your device when total stock reaches or falls below this quantity.
+              </Text>
+              <View style={{ flexDirection:'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color:'#555', marginBottom: 4 }}>Alert when stock ≤</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    value={formData.low_stock_threshold}
+                    onChangeText={(text) => setFormData({ ...formData, low_stock_threshold: text })}
+                    placeholder="20"
+                    placeholderTextColor="#999"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color:'#555', marginBottom: 4 }}>Preferred alert time (HH:MM)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.low_stock_alert_time}
+                    onChangeText={(text) => setFormData({ ...formData, low_stock_alert_time: text })}
+                    placeholder="09:00"
+                    placeholderTextColor="#999"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+            </View>
 
             {/* Variants (define all product units/pricing here) */}
             {!editingProduct ? (

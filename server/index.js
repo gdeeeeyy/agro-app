@@ -312,6 +312,9 @@ async function runMigrations() {
       updated_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(product_id, label)
     )`);
+    // Low stock alert columns (idempotent)
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 20");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alert_time TEXT");
     // Backfill columns for existing installations
     await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS label TEXT");
     await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS price DOUBLE PRECISION");
@@ -693,10 +696,12 @@ app.post('/products', async (req, res) => {
   const createdBy = p.created_by ? Number(p.created_by) : null;
   const creatorRole = p.creator_role != null ? Number(p.creator_role) : null; // 1=vendor,2=master
   const status = creatorRole === 2 ? 'approved' : 'pending';
+  const lowThreshold = p.low_stock_threshold != null ? Number(p.low_stock_threshold) : 20;
+  const alertTime = p.low_stock_alert_time ? String(p.low_stock_alert_time) : null;
   const r = await one(
-    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, seller_name, stock_available, cost_per_unit, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
-    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.seller_name ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), status, createdBy]
+    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, seller_name, stock_available, cost_per_unit, low_stock_threshold, low_stock_alert_time, status, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.seller_name ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), lowThreshold, alertTime, status, createdBy]
   );
   res.json(r);
 });
@@ -730,7 +735,7 @@ app.patch('/products/:id/review', async (req, res) => {
 });
 
 app.patch('/products/:id', async (req, res) => {
-  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','seller_name','stock_available','cost_per_unit'];
+  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','seller_name','stock_available','cost_per_unit','low_stock_threshold','low_stock_alert_time'];
   const set = []; const vals = []; let i = 1;
   for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
   if (!set.length) return res.json({ ok: true });
@@ -1520,8 +1525,35 @@ app.patch('/orders/:id', async (req, res) => {
       if (!flag || flag.stock_deducted !== true) {
         const items = await all('SELECT product_id, variant_id, quantity FROM order_items WHERE order_id=$1', [req.params.id]);
         for (const it of items) {
-          if (it.variant_id) await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
-          else await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
+          if (it.variant_id) {
+            await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
+          } else {
+            await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
+          }
+          // After each deduction, check low stock alert for the owning vendor/admin
+          try {
+            const prod = await one('SELECT stock_available, low_stock_threshold, low_stock_alert_time, created_by, name FROM products WHERE id=$1', [it.product_id]);
+            if (prod && prod.created_by) {
+              const threshold = prod.low_stock_threshold != null ? Number(prod.low_stock_threshold) : 20;
+              const currentStock = Number(prod.stock_available || 0);
+              if (Number.isFinite(currentStock) && currentStock <= threshold) {
+                const ownerId = Number(prod.created_by);
+                const title = `Low stock: ${prod.name || 'Product'}`;
+                const msg = `Stock for ${prod.name || 'this product'} is now ${currentStock} (alert at ${threshold}).`;
+                await pool.query('INSERT INTO notifications (title, message, user_id) VALUES ($1,$2,$3)', [title, msg, ownerId]);
+                // Push only to this owner's registered devices
+                try {
+                  const toks = await all('SELECT token FROM push_tokens WHERE user_id=$1', [ownerId]);
+                  if (toks.length) {
+                    const pushMsgs = toks.map(t => ({ to: t.token, sound: 'default', title, body: msg }));
+                    await fetch('https://exp.host/--/api/v2/push/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pushMsgs) }).catch(()=>{});
+                  }
+                } catch {}
+              }
+            }
+          } catch (le) {
+            console.warn('Low stock alert check failed:', le.message);
+          }
         }
         await pool.query('UPDATE orders SET stock_deducted=true WHERE id=$1', [req.params.id]);
       }
