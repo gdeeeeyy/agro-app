@@ -14,7 +14,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UserContext } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { signIn, signUp } from '../lib/auth';
@@ -94,13 +94,16 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        <Image 
-          source={require('../assets/images/icon.png')} 
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.content}>
+          <Image 
+            source={require('../assets/images/icon.png')} 
+            style={styles.appIcon} 
+            resizeMode="contain"
           style={styles.appIcon} 
           resizeMode="contain"
         />
@@ -244,24 +247,14 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
                 {currentLanguage === 'en' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => changeLang('ta')}
-                style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: currentLanguage === 'ta' ? '#4caf50' : '#eee', backgroundColor: currentLanguage === 'ta' ? '#f1f8f4' : '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-              >
-                <Text style={{ color: '#333', fontWeight: '600' }}>தமிழ்</Text>
-                {currentLanguage === 'ta' ? <Ionicons name="checkmark-circle" size={20} color="#4caf50" /> : null}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   content: {
     flex: 1,
