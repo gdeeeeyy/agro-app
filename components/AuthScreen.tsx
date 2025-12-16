@@ -99,9 +99,16 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Image source={require('../assets/images/icon.png')} style={styles.logo} />
-        <Text style={styles.title}>Agriismart</Text>
-        <Text style={styles.tagline}>Faith of the Farmers</Text>
+        <Image 
+          source={require('../assets/images/icon.png')} 
+          style={styles.appIcon} 
+          resizeMode="contain"
+        />
+        <Image 
+          source={require('../assets/images/typo-logo.jpeg')} 
+          style={styles.typoLogo} 
+          resizeMode="contain"
+        />
 
         {/* Mode switcher */}
         <View style={styles.modeSwitcher}>
@@ -254,7 +261,7 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ffffff',
   },
   content: {
     flex: 1,
@@ -262,25 +269,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  logo: {
+  appIcon: {
     width: 100,
     height: 100,
-    marginBottom: 20,
+    marginBottom: 10,
     borderRadius: 20,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  tagline: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#333',
-    marginBottom: 24,
-    textAlign: 'center',
+  typoLogo: {
+    width: '80%',
+    height: 80,
+    marginBottom: 30,
   },
   modeSwitcher: {
     flexDirection: 'row',
