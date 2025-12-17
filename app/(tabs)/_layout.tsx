@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React, { useContext } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -10,6 +12,7 @@ export default function TabLayout() {
   const isAdmin = user?.is_admin === 1;
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#4caf50' }} edges={['right', 'left', 'bottom']}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -19,14 +22,22 @@ export default function TabLayout() {
           backgroundColor: '#4caf50',
           borderTopWidth: 0,
           height: 60,
-          paddingBottom: 6,
+          paddingBottom: 8,
+          paddingTop: 8,
+          elevation: 0, // Remove shadow on Android
+          position: 'relative',
         },
+        tabBarHideOnKeyboard: true,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '700',
+          marginBottom: 4,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 4,
+          marginBottom: 4,
         },
       }}
-      sceneContainerStyle={{ backgroundColor: '#f5f5f5' }}
     >
       <Tabs.Screen
         name="index"
@@ -100,5 +111,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#4caf50',
+  },
+});
