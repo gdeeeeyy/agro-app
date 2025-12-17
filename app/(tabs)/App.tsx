@@ -224,7 +224,7 @@ mediaTypes: ['images'] as any,
               }
             }}>
               <Ionicons name="image" size={24} color="#fff" />
-              <Text style={styles.actionButtonText}>Add photo</Text>
+              <Text style={styles.actionButtonText}>Diagnose</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -252,17 +252,18 @@ mediaTypes: ['images'] as any,
         </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.analyzeButton, (!image || !plantName || loading) && styles.analyzeButtonDisabled]}
-          onPress={analyzeAndSave}
-          disabled={!image || !plantName || loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.analyzeButtonText}>{t('scanner.analyzeSave')}</Text>
-          )}
-        </TouchableOpacity>
+        {(!image || !plantName || loading) ? null : (
+          <TouchableOpacity
+            style={styles.analyzeButton}
+            onPress={analyzeAndSave}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.analyzeButtonText}>{t('scanner.analyzeSave')}</Text>
+            )}
+          </TouchableOpacity>
+        )}
 
         {result && !result.error && <PlantAnalysis data={result} />}
 

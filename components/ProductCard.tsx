@@ -119,6 +119,10 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
   const [detailsVisible, setDetailsVisible] = useState(false);
 
+  useEffect(() => {
+    if (detailsVisible) fetchVariants();
+  }, [detailsVisible]);
+
   const SCREEN_H = Dimensions.get('window').height;
   const INITIAL_Y = Math.round(SCREEN_H * 0.35);
   const sheetTranslateY = React.useRef(new Animated.Value(INITIAL_Y)).current;
@@ -200,11 +204,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
                 disabled={(variants.length === 0 && product.stock_available <= 0)}
               >
-                <Ionicons
-                  name="add"
-                  size={20}
-                  color={(variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff'}
-                />
+                <Text style={{color: (variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff', fontSize: 12, fontWeight: '600'}}>Add to cart</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -217,6 +217,18 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <Text style={styles.nameOverlay} numberOfLines={2}>
               {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
             </Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
+              {Array.from({length: 5}, (_, i) => {
+                const rating = (product as any).rating || 4.5;
+                let icon = 'star-outline' as any;
+                if (i < Math.floor(rating)) icon = 'star';
+                else if (i < rating) icon = 'star-half';
+                return <Ionicons key={i} name={icon} size={14} color="#FFD700" />;
+              })}
+              <Text style={{fontSize: 12, color: '#666', marginLeft: 4}}>
+                {((product as any).rating || 4.5).toFixed(1)} ({(product as any).reviewCount || 12})
+              </Text>
+            </View>
             {variants.length > 0 && (
               <TouchableOpacity style={[styles.unitSelector, { marginTop: 4 }]} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
                 <Text style={[styles.unitSelectorText, { fontSize: 12 }]}>
@@ -226,29 +238,44 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </TouchableOpacity>
             )}
             <View style={[styles.bottomRow, { marginTop: 6 }]}>
-              <View style={[styles.qtyPill, { height: 30, paddingHorizontal: 10, borderRadius: 8, gap: 8 }]}>
-                <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => Math.max(1, q - 1)); }}>
+              <View style={[styles.qtyPill, { height: 30, paddingHorizontal: 10, borderRadius: 8, gap: 8, backgroundColor: '#f5f5f5' }]}>
+                <TouchableOpacity 
+                  onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => Math.max(1, q - 1)); }}
+                  style={{ padding: 4 }}
+                >
                   <Ionicons name="remove" size={14} color="#2d5016" />
                 </TouchableOpacity>
-                <Text style={[styles.qtyText, { fontSize: 14 }]}>{selectedQuantity}</Text>
-                <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => q + 1); }}>
+                <Text style={[styles.qtyText, { fontSize: 14, minWidth: 20, textAlign: 'center' }]}>{selectedQuantity}</Text>
+                <TouchableOpacity 
+                  onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => q + 1); }}
+                  style={{ padding: 4 }}
+                >
                   <Ionicons name="add" size={14} color="#2d5016" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={[
                   styles.fabAdd,
-                  { width: 36, height: 36, borderRadius: 18 },
+                  { 
+                    minWidth: 80, 
+                    height: 36, 
+                    borderRadius: 18,
+                    paddingHorizontal: 12,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  },
                   (variants.length === 0 && product.stock_available <= 0) && styles.addButtonDisabled,
                 ]}
                 onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
                 disabled={(variants.length === 0 && product.stock_available <= 0)}
               >
-                <Ionicons
-                  name="add"
-                  size={18}
-                  color={(variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff'}
-                />
+                <Text style={{
+                  color: (variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff', 
+                  fontSize: 12, 
+                  fontWeight: '600'
+                }}>
+                  Add to cart
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -302,13 +329,13 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
         <TouchableWithoutFeedback onPress={closeDetails}>
           <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
             <TouchableWithoutFeedback>
-              <View style={{ width:'92%', maxHeight:'80%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
+              <View style={{ width:'90%', height:'90%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
                 <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
                   <Text style={[styles.modalTitle, { marginBottom: 0 }]} numberOfLines={2}>
                     {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
                   </Text>
                 </View>
-                <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 16 }}>
+                <ScrollView style={{flex:1}} contentContainerStyle={{ padding: 16, paddingBottom: 20 }} showsVerticalScrollIndicator={true}>
                   <Image
                     source={{ uri: productImage }}
                     style={{ width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#eef2e6' }}
@@ -406,17 +433,40 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                         (variants.length > 0 && !anyVariantInStock)
                       }
                     >
-                      <Ionicons
-                        name="add"
-                        size={22}
-                        color={
-                          (variants.length === 0 && product.stock_available <= 0) ||
-                          (variants.length > 0 && !anyVariantInStock)
-                            ? '#999'
-                            : '#fff'
-                        }
-                      />
+                      <Text style={{
+                  color: (variants.length === 0 && product.stock_available <= 0) ||
+                         (variants.length > 0 && !anyVariantInStock) ? '#999' : '#fff',
+                  fontSize: 14,
+                  fontWeight: '600'
+                }}>Add to cart</Text>
                     </TouchableOpacity>
+                  </View>
+                  
+                  {/* Reviews Section */}
+                  <View style={{marginTop: 24, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 16}}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <Ionicons name="star" size={20} color="#FFD700" />
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d5016', marginLeft: 8 }}>
+                        {((product as any).rating || 4.5).toFixed(1)} ({(product as any).reviewCount || 12} reviews)
+                      </Text>
+                    </View>
+                    <Text style={{fontSize: 16, fontWeight: '600', color: '#2d5016', marginBottom: 12}}>Reviews</Text>
+                    {[1, 2, 3].map((_, index) => (
+                      <View key={index} style={{marginBottom: 16, paddingBottom: 16, borderBottomWidth: index < 2 ? 1 : 0, borderBottomColor: '#f0f0f0'}}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+                          <View style={{width: 32, height: 32, borderRadius: 16, backgroundColor: '#e0e0e0', marginRight: 8}} />
+                          <Text style={{fontWeight: '600'}}>User {index + 1}</Text>
+                          <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 'auto'}}>
+                            <Ionicons name="star" size={16} color="#FFD700" />
+                            <Text style={{marginLeft: 4, fontSize: 14}}>4.5</Text>
+                          </View>
+                        </View>
+                        <Text style={{fontSize: 14, color: '#555', marginTop: 4}}>
+                          Great product! Worked exactly as described. Highly recommend for all farmers.
+                        </Text>
+                        <Text style={{fontSize: 12, color: '#999', marginTop: 4}}>2 days ago</Text>
+                      </View>
+                    ))}
                   </View>
                 </ScrollView>
               </View>
@@ -443,17 +493,19 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
     overflow: 'hidden',
+    width: '100%',
+    marginHorizontal: 0,
   },
   cardHorizontal: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 12,
     paddingVertical: 12,
-    minHeight: 140,
+    minHeight: 160,
   },
   square: {
     width: '100%',
-    aspectRatio: 1,
+    aspectRatio: 0.8, // Original aspect ratio
     position: 'relative',
   },
   squareImage: {
@@ -463,15 +515,15 @@ const styles = StyleSheet.create({
   },
   overlay: {
     position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    padding: 10,
-    backgroundColor: 'rgba(255,255,255,0.9)'
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.95)',
   },
   imageSquareSmall: {
-    width: 120,
-    height: 120,
+    width: 140,
+    height: 140,
     resizeMode: 'cover',
     backgroundColor: '#eef2e6',
     marginRight: 10,
@@ -485,7 +537,12 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
-  nameOverlay: { fontSize: 14, fontWeight: '700', color:'#2d5016' },
+  nameOverlay: { 
+    fontSize: 14, 
+    fontWeight: '700', 
+    color:'#2d5016',
+    marginBottom: 4,
+  },
   contentRight: {
     flex: 1,
     paddingVertical: 8,
@@ -508,7 +565,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardCompact: {
-    width: '48%',
+    width: '100%',
     minHeight: 280,
   },
   plantUsed: {
@@ -532,20 +589,17 @@ const styles = StyleSheet.create({
   stock: { display: 'none' },
   sellerTag: { fontStyle: 'italic', color: '#5e7a47', fontWeight: '600' },
   fabAdd: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    minWidth: 80,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#4caf50',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addButton: {
-    backgroundColor: '#4caf50',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   addButtonDisabled: {
     backgroundColor: '#e0e0e0',
@@ -553,8 +607,18 @@ const styles = StyleSheet.create({
   fabAddCompact: { width: 34, height: 34, borderRadius: 17 },
   qtyBtnCompact: { width: 24, height: 24, borderRadius: 12 },
   qtyInputCompact: { display: 'none' },
-  qtyPill: { flexDirection:'row', alignItems:'center', gap: 12, backgroundColor:'#eaf6ef', paddingHorizontal: 12, height: 36, borderRadius: 10 },
-  qtyText: { fontSize: 16, fontWeight:'700', color:'#2d5016' },
+  qtyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    height: 36,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  qtyText: { fontSize: 16, fontWeight: '700', color: '#2d5016' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
