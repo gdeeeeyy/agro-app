@@ -12,6 +12,8 @@ import {
   Image,
   Modal,
   Switch,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -72,17 +74,16 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
       const { user, error: authError } = result;
 
       if (authError || !user) {
-        setError(authError || (isSignup ? 'Failed to create account' : 'Failed to sign in'));
+        setError(authError || 'Authentication failed');
         setLoading(false);
         return;
       }
 
-      // Persist only when Remember me is enabled; otherwise keep for this session only.
       await setUser(user, { persist: rememberMe });
       setLoading(false);
       router.replace('/(tabs)');
-    } catch (e) {
-      setError(isSignup ? 'Failed to create account' : 'Failed to sign in');
+    } catch {
+      setError('Authentication failed');
       setLoading(false);
     }
   };
@@ -94,214 +95,177 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
-        <View style={styles.content}>
-          <Image 
-            source={require('../assets/images/icon.png')} 
-            style={styles.appIcon} 
-            resizeMode="contain"
-          />
-          <Image 
-            source={require('../assets/images/typo-logo.jpeg')} 
-            style={styles.typoLogo} 
-            resizeMode="contain"
-          />
+    <SafeAreaView style={styles.container}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoidingView}
+          >
+            <View style={styles.content}>
+              <Image
+                source={require('../assets/images/icon.png')}
+                style={styles.appIcon}
+                resizeMode="contain"
+              />
 
-          <View style={styles.modeSwitcher}>
-            <TouchableOpacity
-              style={[styles.modeButton, mode === 'login' && styles.modeButtonActive]}
-              onPress={() => switchMode('login')}
-              disabled={loading}
-            >
-              <Text style={[styles.modeButtonText, mode === 'login' && styles.modeButtonTextActive]}>
-                {t('auth.signin')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeButton, mode === 'signup' && styles.modeButtonActive]}
-              onPress={() => switchMode('signup')}
-              disabled={loading}
-            >
-              <Text style={[styles.modeButtonText, mode === 'signup' && styles.modeButtonTextActive]}>
-                {t('auth.signup')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <Image
+                source={require('../assets/images/typo-logo.jpeg')}
+                style={styles.typoLogo}
+                resizeMode="contain"
+              />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.modeSwitcher}>
+                <TouchableOpacity
+                  style={[styles.modeButton, mode === 'login' && styles.modeButtonActive]}
+                  onPress={() => switchMode('login')}
+                  disabled={loading}
+                >
+                  <Text style={[styles.modeButtonText, mode === 'login' && styles.modeButtonTextActive]}>
+                    {t('auth.signin')}
+                  </Text>
+                </TouchableOpacity>
 
-          {isSignup && (
-            <TextInput
-              style={styles.input}
-              placeholder={t('auth.fullname')}
-              placeholderTextColor="#999"
-              value={fullName}
-              onChangeText={setFullName}
-              editable={!loading}
-            />
-          )}
+                <TouchableOpacity
+                  style={[styles.modeButton, mode === 'signup' && styles.modeButtonActive]}
+                  onPress={() => switchMode('signup')}
+                  disabled={loading}
+                >
+                  <Text style={[styles.modeButtonText, mode === 'signup' && styles.modeButtonTextActive]}>
+                    {t('auth.signup')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder={t('auth.number')}
-            placeholderTextColor="#999"
-            value={number}
-            onChangeText={setNumber}
-            autoCapitalize="none"
-            keyboardType="number-pad"
-            editable={!loading}
-          />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <TextInput
-            style={styles.input}
-            placeholder={t('auth.password')}
-            placeholderTextColor="#999"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading}
-          />
-
-          {!isSignup && (
-            <View style={styles.rememberRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Switch
-                  value={rememberMe}
-                  onValueChange={setRememberMe}
-                  thumbColor={rememberMe ? '#4caf50' : '#f4f3f4'}
-                  trackColor={{ false: '#d0d0d0', true: '#c8e6c9' }}
+              {isSignup && (
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('auth.fullname')}
+                  placeholderTextColor="#999"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  editable={!loading}
                 />
-                <Text style={styles.rememberLabel}>Remember me on this device</Text>
-              </View>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {isSignup ? t('auth.signup') : t('auth.signin')}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => switchMode(isSignup ? 'login' : 'signup')}
-            disabled={loading}
-          >
-            <Text style={styles.link}>
-              {isSignup ? (
-                <>
-                  {t('auth.hasAccount')}{' '}
-                  <Text style={styles.linkBold}>{t('auth.signin')}</Text>
-                </>
-              ) : (
-                <>
-                  {t('auth.noAccount')}{' '}
-                  <Text style={styles.linkBold}>{t('auth.signup')}</Text>
-                </>
               )}
-            </Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 7 }]}>
-          <TouchableOpacity
-            onPress={() => setLangVisible(true)}
-            accessibilityLabel="Change Language"
-            style={styles.langButton}
-          >
-            <Ionicons name="globe-outline" size={18} color="#4caf50" />
-            <Text style={styles.langButtonText}>Language</Text>
-          </TouchableOpacity>
-        </View>
+              <TextInput
+                style={styles.input}
+                placeholder={t('auth.number')}
+                placeholderTextColor="#999"
+                value={number}
+                onChangeText={setNumber}
+                keyboardType="number-pad"
+                editable={!loading}
+              />
 
-        <Modal visible={langVisible} transparent animationType="fade" onRequestClose={() => setLangVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ width: '80%', backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden' }}>
-              <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#333' }}>{t('language.selectLanguageTitle')}</Text>
-                <TouchableOpacity onPress={() => setLangVisible(false)}>
-                  <Ionicons name="close" size={22} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <View style={{ padding: 10 }}>
-                <TouchableOpacity
-                  onPress={() => changeLang('en')}
-                  style={{ 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    borderWidth: 1, 
-                    borderColor: currentLanguage === 'en' ? '#4caf50' : '#eee', 
-                    backgroundColor: currentLanguage === 'en' ? '#f1f8f4' : '#fff', 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between', 
-                    marginBottom: 8 
-                  }}
-                >
-                  <Text style={{ color: '#333', fontWeight: '600' }}>English</Text>
-                  {currentLanguage === 'en' && <Ionicons name="checkmark-circle" size={20} color="#4caf50" />}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => changeLang('ta')}
-                  style={{ 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    borderWidth: 1, 
-                    borderColor: currentLanguage === 'ta' ? '#4caf50' : '#eee', 
-                    backgroundColor: currentLanguage === 'ta' ? '#f1f8f4' : '#fff', 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between' 
-                  }}
-                >
-                  <Text style={{ color: '#333', fontWeight: '600' }}>தமிழ்</Text>
-                  {currentLanguage === 'ta' && <Ionicons name="checkmark-circle" size={20} color="#4caf50" />}
-                </TouchableOpacity>
-              </View>
+              <TextInput
+                style={styles.input}
+                placeholder={t('auth.password')}
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+
+              {!isSignup && (
+                <View style={styles.rememberRow}>
+                  <Switch
+                    value={rememberMe}
+                    onValueChange={setRememberMe}
+                    thumbColor={rememberMe ? '#4caf50' : '#f4f3f4'}
+                    trackColor={{ false: '#d0d0d0', true: '#c8e6c9' }}
+                  />
+                  <Text style={styles.rememberLabel}>Remember me on this device</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? <ActivityIndicator color="#fff" /> : (
+                  <Text style={styles.buttonText}>
+                    {isSignup ? t('auth.signup') : t('auth.signin')}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => switchMode(isSignup ? 'login' : 'signup')}
+                disabled={loading}
+              >
+                <Text style={styles.link}>
+                  {isSignup ? t('auth.hasAccount') : t('auth.noAccount')}{' '}
+                  <Text style={styles.linkBold}>
+                    {isSignup ? t('auth.signin') : t('auth.signup')}
+                  </Text>
+                </Text>
+              </TouchableOpacity>
             </View>
+          </KeyboardAvoidingView>
+
+          {/* 🔒 FIXED LANGUAGE FOOTER */}
+          <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
+            <TouchableOpacity style={styles.langButton} onPress={() => setLangVisible(true)}>
+              <Ionicons name="globe-outline" size={18} color="#4caf50" />
+              <Text style={styles.langButtonText}>Language</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </KeyboardAvoidingView>
+        </View>
+      </TouchableWithoutFeedback>
+
+      {/* 🌍 LANGUAGE MODAL */}
+      <Modal visible={langVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('language.selectLanguageTitle')}</Text>
+              <TouchableOpacity onPress={() => setLangVisible(false)}>
+                <Ionicons name="close" size={22} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.langItem, currentLanguage === 'en' && styles.langItemActive]}
+              onPress={() => changeLang('en')}
+            >
+              <Text>English</Text>
+              {currentLanguage === 'en' && <Ionicons name="checkmark-circle" size={18} color="#4caf50" />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.langItem, currentLanguage === 'ta' && styles.langItemActive]}
+              onPress={() => changeLang('ta')}
+            >
+              <Text>தமிழ்</Text>
+              {currentLanguage === 'ta' && <Ionicons name="checkmark-circle" size={18} color="#4caf50" />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  keyboardAvoidingView: { flex: 1 },
+
   content: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 20,
+    paddingBottom: 120,
   },
-  appIcon: {
-    width: 100,
-    height: 100,
-    marginBottom: 10,
-    borderRadius: 20,
-  },
-  typoLogo: {
-    width: '80%',
-    height: 80,
-    marginBottom: 30,
-  },
+
+  appIcon: { width: 100, height: 100, marginBottom: 10, borderRadius: 20 },
+  typoLogo: { width: '80%', height: 80, marginBottom: 30 },
+
   modeSwitcher: {
     flexDirection: 'row',
     backgroundColor: '#e8f5e9',
@@ -309,28 +273,57 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 20,
   },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 50,
-    alignItems: 'center',
+
+  modeButton: { flex: 1, paddingVertical: 8, borderRadius: 50, alignItems: 'center' },
+  modeButtonActive: { backgroundColor: '#4caf50' },
+  modeButtonText: { fontWeight: '600', color: '#2d5016' },
+  modeButtonTextActive: { color: '#fff' },
+
+  input: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
   },
-  modeButtonActive: {
+
+  rememberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  rememberLabel: { marginLeft: 8 },
+
+  button: {
+    width: '100%',
     backgroundColor: '#4caf50',
-  },
-  modeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2d5016',
-  },
-  modeButtonTextActive: {
-    color: '#fff',
-  },
-  footer: {
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    marginBottom: 20,
   },
+  buttonDisabled: { backgroundColor: '#a5d6a7' },
+  buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+
+  link: { color: '#666' },
+  linkBold: { color: '#4caf50', fontWeight: '600' },
+
+  error: {
+    width: '100%',
+    backgroundColor: '#ffebee',
+    color: '#d32f2f',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+
   langButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,66 +335,38 @@ const styles = StyleSheet.create({
     borderColor: '#c8e6c9',
     backgroundColor: '#f1f8f4',
   },
-  langButtonText: {
-    color: '#2d5016',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  error: {
-    color: '#d32f2f',
-    backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-    width: '100%',
-    textAlign: 'center',
-  },
-  input: {
-    width: '100%',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    fontSize: 16,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  rememberRow: {
-    width: '100%',
-    flexDirection: 'row',
+  langButtonText: { fontWeight: '600', color: '#2d5016' },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  rememberLabel: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#555',
+  modalTitle: { fontWeight: '700' },
+
+  langItem: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  button: {
-    width: '100%',
-    backgroundColor: '#4caf50',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  buttonDisabled: {
-    backgroundColor: '#a5d6a7',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  link: {
-    fontSize: 15,
-    color: '#666',
-  },
-  linkBold: {
-    color: '#4caf50',
-    fontWeight: '600',
+  langItemActive: {
+    borderColor: '#4caf50',
+    backgroundColor: '#f1f8f4',
   },
 });

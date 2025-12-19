@@ -435,29 +435,6 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
 
               <Text style={[styles.orderSummary, { marginTop: 4 }]}>{t('payment.orderTotal')}: ₹{cartTotal.toFixed(2)}</Text>
 
-              <TouchableOpacity
-                style={[
-                  styles.paymentOption,
-                  selectedPayment === 'cod' && styles.paymentOptionSelected
-                ]}
-                onPress={() => handlePaymentSelect('cod')}
-              >
-                <View style={styles.paymentOptionContent}>
-                  <Ionicons 
-                    name="cash" 
-                    size={32} 
-                    color={selectedPayment === 'cod' ? '#4caf50' : '#666'} 
-                  />
-                  <View style={styles.paymentOptionText}>
-                    <Text style={styles.paymentOptionTitle}>{t('payment.cod')}</Text>
-                    <Text style={styles.paymentOptionSubtitle}>{t('payment.codDesc')}</Text>
-                  </View>
-                </View>
-                {selectedPayment === 'cod' && (
-                  <Ionicons name="checkmark-circle" size={24} color="#4caf50" />
-                )}
-              </TouchableOpacity>
-
               {/* Single online payment option via Razorpay */}
               <TouchableOpacity
                 style={[
