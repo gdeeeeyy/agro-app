@@ -1,3 +1,5 @@
+/* eslint-env node */
+
 // NOTE: On Render + Supabase free tiers, Postgres TLS often fails with
 // `self-signed certificate in certificate chain`. This override disables
 // strict certificate verification for this process so the API can connect.
@@ -7,6 +9,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const { Buffer } = require('buffer');
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -1349,11 +1352,12 @@ app.patch('/order-items/:id/rating', async (req, res) => {
     }
   }
   try {
-    await pool.query('UPDATE order_items SET rating=$1, review=$2 WHERE id=$3', [r, reviewText || null, req.params.id]);
+    // Explicitly cast id to bigint to match the database column type
+    await pool.query('UPDATE order_items SET rating=$1, review=$2 WHERE id=$3::bigint', [r, reviewText || null, req.params.id]);
     res.json({ ok: true });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'failed' });
+    console.error('Error updating rating:', e);
+    res.status(500).json({ error: 'failed', details: e.message });
   }
 });
 

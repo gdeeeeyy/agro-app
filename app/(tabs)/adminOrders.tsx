@@ -19,20 +19,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 interface Order {
-  id: number;
-  user_id: number;
-  full_name: string;
-  number: string;
-  total_amount: number;
-  payment_method: string;
-  payment_status?: string; // 'unpaid' | 'paid' | null
-  delivery_address?: string;
-  status: string;
-  status_note?: string;
-  delivery_date?: string;
-  created_at: string;
-  updated_at: string;
-}
+   id: number;
+   user_id: number;
+   full_name: string;
+   number: string;
+   total_amount: number;
+   payment_method: string;
+   payment_status?: string; // 'unpaid' | 'paid' | null
+   booking_address?: string;
+   delivery_address?: string;
+   status: string;
+   status_note?: string;
+   delivery_date?: string;
+   created_at: string;
+   updated_at: string;
+ }
 
 interface OrderItem {
   id: number;
@@ -231,6 +232,14 @@ export default function AdminOrders() {
             {new Date(item.created_at).toLocaleDateString('en-IN')}
           </Text>
         </View>
+        {item.booking_address && (
+          <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
+            <Ionicons name="business" size={18} color="#666" />
+            <Text style={styles.orderDetailText} numberOfLines={2}>
+              Booking: {item.booking_address}
+            </Text>
+          </View>
+        )}
         {item.delivery_address && (
           <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
             <Ionicons name="location" size={18} color="#666" />
@@ -337,6 +346,18 @@ export default function AdminOrders() {
                   <Text style={styles.orderInfoText}>
                     Payment: {formatPayment(selectedOrder.payment_method, (selectedOrder as any).payment_status)}
                   </Text>
+                  {selectedOrder.booking_address && (
+                    <View style={styles.addressInfo}>
+                      <Text style={styles.addressLabel}>Booking Address:</Text>
+                      <Text style={styles.addressText}>{selectedOrder.booking_address}</Text>
+                    </View>
+                  )}
+                  {selectedOrder.booking_address && (
+                    <View style={styles.addressInfo}>
+                      <Text style={styles.addressLabel}>Booking Address:</Text>
+                      <Text style={styles.addressText}>{selectedOrder.booking_address}</Text>
+                    </View>
+                  )}
                   {selectedOrder.delivery_address && (
                     <View style={styles.addressInfo}>
                       <Text style={styles.addressLabel}>Delivery Address:</Text>

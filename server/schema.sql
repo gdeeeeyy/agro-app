@@ -39,20 +39,21 @@ CREATE TABLE IF NOT EXISTS cart_items (
 );
 
 CREATE TABLE IF NOT EXISTS orders (
-  id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  total_amount DOUBLE PRECISION NOT NULL,
-  payment_method TEXT NOT NULL,
-  delivery_address TEXT,
-  status TEXT DEFAULT 'pending',
-  status_note TEXT,
-  delivery_date TEXT,
-  logistics_name TEXT,
-  tracking_number TEXT,
-  tracking_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+   id BIGSERIAL PRIMARY KEY,
+   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+   total_amount DOUBLE PRECISION NOT NULL,
+   payment_method TEXT NOT NULL,
+   booking_address TEXT,
+   delivery_address TEXT,
+   status TEXT DEFAULT 'pending',
+   status_note TEXT,
+   delivery_date TEXT,
+   logistics_name TEXT,
+   tracking_number TEXT,
+   tracking_url TEXT,
+   created_at TIMESTAMPTZ DEFAULT now(),
+   updated_at TIMESTAMPTZ DEFAULT now()
+ );
 
 CREATE TABLE IF NOT EXISTS order_items (
   id BIGSERIAL PRIMARY KEY,

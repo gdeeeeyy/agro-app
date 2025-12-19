@@ -42,7 +42,9 @@ export default function Cart() {
   const { cartItems, cartTotal, updateQuantity, removeItem, clearAll, refreshCart } = useCart();
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [currentAddressType, setCurrentAddressType] = useState<'booking' | 'delivery' | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<string>(''); // 'cod' or 'online'
+  const [bookingAddress, setBookingAddress] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [orderNote, setOrderNote] = useState<string>('');
 
@@ -155,7 +157,8 @@ export default function Cart() {
       Alert.alert(t('cart.empty'), t('cart.emptySubtext'));
       return;
     }
-    // Start with address collection for delivery
+    // Start with address collection for booking
+    setCurrentAddressType('booking');
     setAddressModalVisible(true);
   };
 
@@ -164,9 +167,16 @@ export default function Cart() {
   };
 
   const handleAddressConfirmed = (address: string) => {
-    setDeliveryAddress(address);
-    setAddressModalVisible(false);
-    setPaymentModalVisible(true);
+    if (currentAddressType === 'booking') {
+      setBookingAddress(address);
+      setCurrentAddressType('delivery');
+      // Modal stays open for delivery address
+    } else if (currentAddressType === 'delivery') {
+      setDeliveryAddress(address);
+      setAddressModalVisible(false);
+      setCurrentAddressType(null);
+      setPaymentModalVisible(true);
+    }
   };
 
   const handleConfirmOrder = async () => {
@@ -191,6 +201,7 @@ export default function Cart() {
         setLoading(true);
         const resp = await api.post('/payments/razorpay/link', {
           userId: user.id,
+          bookingAddress,
           deliveryAddress,
           note: orderNote.trim() || undefined,
         });
@@ -201,6 +212,8 @@ export default function Cart() {
         setPaymentModalVisible(false);
         setAddressModalVisible(false);
         setSelectedPayment('');
+        setBookingAddress('');
+        setDeliveryAddress('');
         setOrderNote('');
 
         // Open Razorpay payment page in browser right away
@@ -240,6 +253,7 @@ export default function Cart() {
       const orderId = await createOrder(
         user.id,
         selectedPayment,
+        bookingAddress,
         deliveryAddress,
         orderNote.trim() || undefined,
       );
@@ -391,14 +405,22 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
             </View>
 
             <ScrollView style={styles.modalContent}>
+              {bookingAddress && (
+                <View style={styles.addressSection}>
+                  <Text style={styles.addressLabel}>Booking Address</Text>
+                  <Text style={styles.addressText}>{bookingAddress}</Text>
+                </View>
+              )}
+
               {deliveryAddress && (
                 <View style={styles.addressSection}>
                   <Text style={styles.addressLabel}>{t('address.deliveryAddress')}</Text>
                   <Text style={styles.addressText}>{deliveryAddress}</Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.changeAddressButton}
                     onPress={() => {
                       setPaymentModalVisible(false);
+                      setCurrentAddressType('delivery');
                       setAddressModalVisible(true);
                     }}
                   >
@@ -408,22 +430,6 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
               )}
 
               <Text style={[styles.orderSummary, { marginTop: 4 }]}>{t('payment.orderTotal')}: ₹{cartTotal.toFixed(2)}</Text>
-              
-              {deliveryAddress && (
-                <View style={styles.addressSection}>
-                  <Text style={styles.addressLabel}>{t('address.deliveryAddress')}</Text>
-                  <Text style={styles.addressText}>{deliveryAddress}</Text>
-                  <TouchableOpacity 
-                    style={styles.changeAddressButton}
-                    onPress={() => {
-                      setPaymentModalVisible(false);
-                      setAddressModalVisible(true);
-                    }}
-                  >
-                    <Text style={styles.changeAddressText}>{t('address.changeAddress')}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
 
               <TouchableOpacity
                 style={[
@@ -516,8 +522,12 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
 
       <AddressModal
         visible={addressModalVisible}
-        onClose={() => setAddressModalVisible(false)}
+        onClose={() => {
+          setAddressModalVisible(false);
+          setCurrentAddressType(null);
+        }}
         onAddressConfirmed={handleAddressConfirmed}
+        title={currentAddressType === 'booking' ? "Booking Address" : "Delivery Address"}
       />
 
       {/* Creating payment loading overlay */}
@@ -946,5 +956,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  noteSection: {
+    marginTop: 16,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#f9f9f9',
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
 });

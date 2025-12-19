@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCart } from '../context/CartContext';
 import { useLanguage } from '../context/LanguageContext';
-import { getProductVariants } from '../lib/database';
+import { getProductReviews, getProductVariants } from '../lib/database';
 
 interface Product {
   id: number;
@@ -28,9 +28,21 @@ interface Product {
   plant_used: string;
   keywords: string;
   details: string;
+  name_ta?: string;
+  plant_used_ta?: string;
+  details_ta?: string;
   image?: string;
+  unit?: string;
   stock_available: number;
   cost_per_unit: number;
+  min_price?: number;
+  min_label?: string;
+  seller_name?: string;
+  created_by?: number;
+  creator_role?: number;
+  status?: 'pending' | 'approved' | 'rejected';
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ProductCardProps {
@@ -44,10 +56,33 @@ interface ProductCardProps {
 export default function ProductCard({ product, onPress, listOnlyDescription, compact = false, horizontal = false }: ProductCardProps) {
   const { addItem } = useCart();
   const { t, currentLanguage } = useLanguage();
+  
+  // Type for product variant
+  interface ProductVariant {
+    id: number;
+    label: string;
+    price: number;
+    stock_available: number;
+  }
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [variants, setVariants] = useState<any[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [selectedVariantId, setSelectedVariantId] = useState<number | undefined>(undefined);
   const [unitOpen, setUnitOpen] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'reviews'>('details');
+  
+  interface Review {
+    id: number;
+    rating: number;
+    review: string | null;
+    full_name: string | null;
+    created_at: string;
+  }
+  
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [averageRating, setAverageRating] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const placeholderImage = 'https://via.placeholder.com/800x600?text=Agri+Product';
   const productImage = product.image || placeholderImage;
 
@@ -60,16 +95,23 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
   const fetchVariants = async () => {
     try {
-      const vs = await getProductVariants(product.id) as any[];
-      setVariants(vs);
+      const vs = (await getProductVariants(product.id)) as ProductVariant[];
+      setVariants(vs || []);
       if (vs && vs.length) {
         // Keep current selection if still valid; otherwise select first
         const stillExists = vs.find(v => Number(v.id) === Number(selectedVariantId));
-        if (!stillExists) setSelectedVariantId(Number(vs[0].id));
+        if (!stillExists) {
+          setSelectedVariantId(Number(vs[0].id));
+        }
       } else {
         setSelectedVariantId(undefined);
       }
-    } catch {}
+    } catch (error) {
+      console.error('Error fetching variants:', error);
+      setVariants([]);
+      setSelectedVariantId(undefined);
+      throw error; // Re-throw to allow error handling in the calling function
+    }
   };
 
   useEffect(() => {
@@ -82,7 +124,9 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   }, [detailsVisible]);
 
   const selectedVariant = variants.find(v => Number(v.id) === Number(selectedVariantId));
-  const minVariant = variants.reduce((acc: any, v: any) => acc && acc.price <= v.price ? acc : v, variants[0]);
+  const minVariant = variants.length > 0 
+    ? variants.reduce((acc, v) => acc && acc.price <= v.price ? acc : v, variants[0])
+    : null;
   const selectedVariantStock = selectedVariant ? Number(selectedVariant.stock_available ?? 0) : 0;
   const anyVariantInStock = variants.some(v => Number(v.stock_available ?? 0) > 0);
   const serverMinPrice = (product as any).min_price != null ? Number((product as any).min_price) : undefined;
@@ -90,38 +134,141 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   const selParsed = parseVariantLabel(selectedVariant?.label);
   const minParsed = parseVariantLabel(minVariant?.label);
   const serverParsed = parseVariantLabel(serverMinLabel);
-  const displayPrice = selectedVariant ? Number(selectedVariant.price)
-    : (variants.length ? Number(minVariant?.price) : (serverMinPrice ?? Number(product.cost_per_unit)));
-  const displayLabel = selectedVariant ? (selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant?.label || ''))
-    : (variants.length ? (minParsed.quantity && minParsed.unit ? `${minParsed.quantity} ${minParsed.unit}` : (minVariant?.label || ''))
-       : (serverParsed.quantity && serverParsed.unit ? `${serverParsed.quantity} ${serverParsed.unit}` : (serverMinLabel || '')));
+  const displayPrice = selectedVariant 
+    ? Number(selectedVariant.price)
+    : (variants.length > 0 && minVariant 
+        ? Number(minVariant.price) 
+        : (serverMinPrice ?? Number(product.cost_per_unit)));
+          
+  const displayLabel = selectedVariant 
+    ? (selParsed.quantity && selParsed.unit 
+        ? `${selParsed.quantity} ${selParsed.unit}` 
+        : (selectedVariant?.label || ''))
+    : (variants.length > 0 && minVariant
+        ? (minParsed.quantity && minParsed.unit 
+            ? `${minParsed.quantity} ${minParsed.unit}` 
+            : (minVariant?.label || ''))
+        : (serverParsed.quantity && serverParsed.unit 
+            ? `${serverParsed.quantity} ${serverParsed.unit}` 
+            : (serverMinLabel || '')));
 
   const doAddToCart = async (qty: number, variantId?: number) => {
-    const success = await addItem(product.id, qty, variantId);
-    if (success) Alert.alert(t('common.success'), t('store.addedToCart'));
-    else Alert.alert(t('common.error'), t('store.addToCartError'));
+    try {
+      if (qty <= 0) {
+        Alert.alert(t('common.error'), t('cart.invalidQuantity'));
+        return false;
+      }
+      const success = await addItem(product.id, qty, variantId);
+      if (success) {
+        Alert.alert(t('common.success'), t('store.addedToCart'));
+        return true;
+      } else {
+        Alert.alert(t('common.error'), t('store.addToCartError'));
+        return false;
+      }
+    } catch (error) {
+      console.error('Error in doAddToCart:', error);
+      Alert.alert(t('common.error'), t('common.errorOccurred'));
+      return false;
+    }
   };
 
   const handleAddToCart = async () => {
-    if (variants.length > 0) {
-      if (!selectedVariantId) { setUnitOpen(true); return; }
-      const sv = variants.find(v => Number(v.id) === Number(selectedVariantId));
-      const vStock = Number(sv?.stock_available ?? 0);
-      if (vStock <= 0) { Alert.alert(t('store.outOfStock'), t('store.outOfStock')); return; }
-      if (selectedQuantity <= 0 || selectedQuantity > vStock) { Alert.alert(t('common.error'), t('cart.invalidQuantity')); return; }
-      await doAddToCart(selectedQuantity, Number(selectedVariantId));
-      return;
+    try {
+      setIsLoading(true);
+      if (variants.length > 0) {
+        if (!selectedVariantId) { setUnitOpen(true); return; }
+        const sv = variants.find(v => Number(v.id) === Number(selectedVariantId));
+        const vStock = Number(sv?.stock_available ?? 0);
+        if (vStock <= 0) { 
+          Alert.alert(t('store.outOfStock'), t('store.outOfStock')); 
+          return; 
+        }
+        if (selectedQuantity <= 0 || selectedQuantity > vStock) { 
+          Alert.alert(t('common.error'), t('cart.invalidQuantity')); 
+          return; 
+        }
+        await doAddToCart(selectedQuantity, Number(selectedVariantId));
+        return;
+      }
+      if (product.stock_available <= 0) { 
+        Alert.alert(t('store.outOfStock'), t('store.outOfStock')); 
+        return; 
+      }
+      if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) { 
+        Alert.alert(t('common.error'), t('cart.invalidQuantity')); 
+        return; 
+      }
+      await doAddToCart(selectedQuantity, undefined);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert(t('common.error'), t('common.errorOccurred'));
+    } finally {
+      setIsLoading(false);
     }
-    if (product.stock_available <= 0) { Alert.alert(t('store.outOfStock'), t('store.outOfStock')); return; }
-    if (selectedQuantity <= 0 || selectedQuantity > product.stock_available) { Alert.alert(t('common.error'), t('cart.invalidQuantity')); return; }
-    await doAddToCart(selectedQuantity, undefined);
   };
 
-  const [detailsVisible, setDetailsVisible] = useState(false);
-
-  useEffect(() => {
-    if (detailsVisible) fetchVariants();
-  }, [detailsVisible]);
+  const openDetails = async () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // Ensure we have variants loaded if needed
+      if (variants.length === 0) {
+        await fetchVariants();
+      }
+      
+      if (variants.length > 0 && !selectedVariantId && variants[0]) {
+        setSelectedVariantId(variants[0].id);
+      }
+      
+      setDetailsVisible(true);
+      
+      // Fetch reviews when opening the details
+      try {
+        setReviewsLoading(true);
+        const reviewsData = await getProductReviews(product.id);
+        const validReviews = Array.isArray(reviewsData) ? reviewsData : [];
+        setReviews(validReviews);
+        
+        // Calculate average rating
+        if (validReviews.length > 0) {
+          const totalRating = validReviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+          setAverageRating(Number((totalRating / validReviews.length).toFixed(1)));
+        } else {
+          setAverageRating(0);
+        }
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+        setReviews([]);
+        setAverageRating(0);
+      } finally {
+        setReviewsLoading(false);
+      }
+    } catch (error) {
+      console.error('Error opening product details:', error);
+      Alert.alert(t('common.error'), t('common.errorLoadingProduct'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const closeDetails = () => {
+    setDetailsVisible(false);
+    setActiveTab('details'); // Reset to details tab when closing
+  };
+  
+  // Handle press based on props
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      openDetails();
+    }
+  };
 
   const SCREEN_H = Dimensions.get('window').height;
   const INITIAL_Y = Math.round(SCREEN_H * 0.35);
@@ -132,13 +279,6 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
     currentOffsetRef.current = to;
     Animated.timing(sheetTranslateY, { toValue: to, duration: 180, useNativeDriver: true }).start();
   };
-
-  const openDetails = () => {
-    sheetTranslateY.setValue(INITIAL_Y);
-    currentOffsetRef.current = INITIAL_Y;
-    setDetailsVisible(true);
-  };
-  const closeDetails = () => setDetailsVisible(false);
 
   const panResponder = React.useRef(
     PanResponder.create({
@@ -164,17 +304,42 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
     })
   ).current;
 
-  const Unit = (product as any).unit || 'units';
-
   return (
-    <Pressable style={[styles.card, horizontal ? styles.cardHorizontal : null, compact && styles.cardCompact]} onPress={onPress || openDetails}>
+    <Pressable 
+      style={[
+        styles.card, 
+        horizontal ? styles.cardHorizontal : null, 
+        compact && styles.cardCompact
+      ]} 
+      onPress={handlePress}
+    >
       {horizontal ? (
         <>
-          <Image source={{ uri: productImage }} style={styles.imageSquareSmall} />
+          <Image 
+            source={{ uri: productImage }} 
+            style={styles.imageSquareSmall} 
+            resizeMode="cover"
+          />
           <View style={styles.contentRight}>
-            <Text style={[styles.name, styles.nameCompact]} numberOfLines={1}>
-              {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.name, styles.nameCompact]} numberOfLines={1}>
+                {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+              </Text>
+              {reviews.length > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  {Array.from({length: 5}, (_, i) => {
+                    const rating = averageRating;
+                    let icon = 'star-outline' as any;
+                    if (i < Math.floor(rating)) icon = 'star';
+                    else if (i < rating) icon = 'star-half';
+                    return <Ionicons key={i} name={icon} size={12} color="#FFD700" style={{ marginRight: 1 }} />;
+                  })}
+                  <Text style={{ fontSize: 10, color: '#666', marginLeft: 2 }}>
+                    {averageRating.toFixed(1)} ({reviews.length})
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             {variants.length > 0 && (
               <View style={styles.unitContainer}>
                 <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
@@ -212,29 +377,37 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
       ) : (
         // Square layout: image and all content within the same square height
         <View style={styles.square}>
-          <Image source={{ uri: productImage }} style={styles.squareImage} />
+          <Image 
+            source={{ uri: productImage }} 
+            style={styles.squareImage} 
+            resizeMode="cover"
+          />
           <View style={styles.overlay}>
-            <Text style={styles.nameOverlay} numberOfLines={2}>
-              {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
-            </Text>
-            <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
-              {Array.from({length: 5}, (_, i) => {
-                const rating = (product as any).rating || 4.5;
-                let icon = 'star-outline' as any;
-                if (i < Math.floor(rating)) icon = 'star';
-                else if (i < rating) icon = 'star-half';
-                return <Ionicons key={i} name={icon} size={14} color="#FFD700" />;
-              })}
-              <Text style={{fontSize: 12, color: '#666', marginLeft: 4}}>
-                {((product as any).rating || 4.5).toFixed(1)} ({(product as any).reviewCount || 12})
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nameOverlay} numberOfLines={2}>
+                {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
+              {reviews.length > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  {Array.from({length: 5}, (_, i) => {
+                    const rating = averageRating;
+                    let icon = 'star-outline' as any;
+                    if (i < Math.floor(rating)) icon = 'star';
+                    else if (i < rating) icon = 'star-half';
+                    return <Ionicons key={i} name={icon} size={12} color="#FFD700" style={{ marginRight: 1 }} />;
+                  })}
+                  <Text style={{ fontSize: 10, color: '#fff', marginLeft: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}>
+                    {averageRating.toFixed(1)}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             {variants.length > 0 && (
-              <TouchableOpacity style={[styles.unitSelector, { marginTop: 4 }]} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
-                <Text style={[styles.unitSelectorText, { fontSize: 12 }]}>
+              <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
+                <Text style={styles.unitSelectorText}>
                   {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
                 </Text>
-                <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#4caf50" />
+                <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
               </TouchableOpacity>
             )}
             <View style={[styles.bottomRow, { marginTop: 6 }]}>
@@ -282,11 +455,16 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
         </View>
       )}
 
-      <Modal visible={unitOpen} transparent animationType="fade" onRequestClose={()=> setUnitOpen(false)}>
+      <Modal 
+        visible={unitOpen} 
+        transparent 
+        animationType="fade" 
+        onRequestClose={() => setUnitOpen(false)}
+      >
         <TouchableWithoutFeedback onPress={() => setUnitOpen(false)}>
-          <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
+          <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
+              <View style={styles.modalContainer}>
                 <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
                   <Text style={{ fontWeight:'700', color:'#333' }}>Select unit</Text>
                 </View>
@@ -322,162 +500,152 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
       <Modal
         visible={detailsVisible}
-        animationType="fade"
+        animationType="slide"
         transparent
         onRequestClose={closeDetails}
       >
-        <TouchableWithoutFeedback onPress={closeDetails}>
-          <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
-            <TouchableWithoutFeedback>
-              <View style={{ width:'90%', height:'90%', backgroundColor:'#fff', borderRadius:16, overflow:'hidden' }}>
-                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
-                  <Text style={[styles.modalTitle, { marginBottom: 0 }]} numberOfLines={2}>
-                    {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={closeDetails}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <Text style={styles.modalTitle} numberOfLines={2}>
+                  {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+                </Text>
+                <TouchableOpacity onPress={closeDetails} style={{ paddingLeft: 12 }}>
+                  <Ionicons name="close" size={22} color="#333" />
+                </TouchableOpacity>
+              </View>
+              {reviews.length > 0 ? (
+                <View style={styles.ratingContainer}>
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const rating = averageRating;
+                    let icon = 'star-outline' as any;
+                    if (i < Math.floor(rating)) icon = 'star';
+                    else if (i < rating) icon = 'star-half';
+                    return <Ionicons key={i} name={icon} size={16} color="#FFD700" style={styles.starIcon} />;
+                  })}
+                  <Text style={styles.ratingText}>
+                    {averageRating.toFixed(1)} ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
                   </Text>
                 </View>
-                <ScrollView style={{flex:1}} contentContainerStyle={{ padding: 16, paddingBottom: 20 }} showsVerticalScrollIndicator={true}>
-                  <Image
-                    source={{ uri: productImage }}
-                    style={{ width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#eef2e6' }}
-                    resizeMode="cover"
-                  />
+              ) : null}
+            </View>
 
-                  {(product as any).seller_name ? (
-                    <Text style={[styles.sellerTag, { marginTop: 8 }]}>Seller: {(product as any).seller_name}</Text>
-                  ) : null}
+            <View style={styles.tabsContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'details' && styles.activeTab]}
+                onPress={() => setActiveTab('details')}
+              >
+                <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>Details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
+                onPress={() => setActiveTab('reviews')}
+              >
+                <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>Reviews ({reviews.length})</Text>
+              </TouchableOpacity>
+            </View>
 
-                  <Text style={{ fontSize: 14, color:'#333', marginTop: 12 }}>
-                    {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
-                  </Text>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
+              <View style={styles.contentContainer}>
+                {activeTab === 'details' ? (
+                  <>
+                    <Image source={{ uri: productImage }} style={styles.productImage} resizeMode="cover" />
 
-                  {variants.length > 0 && (
-                    <View style={{ marginTop: 12 }}>
-                      <TouchableOpacity style={styles.unitSelector} onPress={()=> setUnitOpen(v=>!v)}>
-                        <Text style={styles.unitSelectorText}>
-                          {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
-                        </Text>
-                        <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
-                      </TouchableOpacity>
-                      <Modal visible={unitOpen} transparent animationType="fade" onRequestClose={()=> setUnitOpen(false)}>
-                        <TouchableWithoutFeedback onPress={() => setUnitOpen(false)}>
-                          <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.3)', justifyContent:'center', alignItems:'center', padding:16 }}>
-                            <TouchableWithoutFeedback>
-                              <View style={{ width:'92%', maxHeight:'60%', backgroundColor:'#fff', borderRadius:12, overflow:'hidden' }}>
-                                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:12, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
-                                  <Text style={{ fontWeight:'700', color:'#333' }}>Select unit</Text>
-                                </View>
-                                <ScrollView>
-                                  {variants.map(v => {
-                                    const p = parseVariantLabel(v.label);
-                                    const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
-                                    const isSelected = Number(selectedVariantId) === Number(v.id);
-                                    return (
-                                      <TouchableOpacity
-                                        key={v.id}
-                                        style={styles.unitItem}
-                                        onPress={()=> { setSelectedVariantId(Number(v.id)); setUnitOpen(false); }}
-                                      >
-                                        <View style={{ flexDirection:'row', alignItems:'center' }}>
-                                          <Ionicons
-                                            name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                                            size={18}
-                                            color={isSelected ? '#4caf50' : '#999'}
-                                            style={{ marginRight: 8 }}
-                                          />
-                                          <Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
-                                        </View>
-                                      </TouchableOpacity>
-                                    );
-                                  })}
-                                </ScrollView>
+                    {(product as any).seller_name ? (
+                      <Text style={styles.sellerTag}>Seller: {(product as any).seller_name}</Text>
+                    ) : null}
+
+                    <Text style={styles.productDescription}>
+                      {(currentLanguage === 'ta' && (product as any).details_ta) ? (product as any).details_ta : product.details}
+                    </Text>
+
+                    {variants.length > 0 ? (
+                      <View style={{ marginTop: 12 }}>
+                        <Text style={{ fontWeight: '700', color: '#333', marginBottom: 8 }}>Available units</Text>
+                        {variants.map(v => {
+                          const p = parseVariantLabel(v.label);
+                          const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                          const isSelected = Number(selectedVariantId) === Number(v.id);
+                          const inStock = Number(v.stock_available ?? 0) > 0;
+                          return (
+                            <TouchableOpacity
+                              key={v.id}
+                              style={[styles.unitItem, !inStock && { opacity: 0.5 }]}
+                              onPress={() => setSelectedVariantId(Number(v.id))}
+                              disabled={!inStock}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons
+                                  name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                                  size={18}
+                                  color={isSelected ? '#4caf50' : '#999'}
+                                  style={{ marginRight: 8 }}
+                                />
+                                <Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
                               </View>
-                            </TouchableWithoutFeedback>
-                          </View>
-                        </TouchableWithoutFeedback>
-                      </Modal>
-                    </View>
-                  )}
-
-                  <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginTop: 16 }}>
-                    <View style={[styles.qtyPill, { paddingHorizontal: 16, height: 44, borderRadius: 12 }]}>
-                      <TouchableOpacity onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}>
-                        <Ionicons name="remove" size={18} color="#2d5016" />
-                      </TouchableOpacity>
-                      <Text style={[styles.qtyText, { fontSize: 18 }]}>{selectedQuantity}</Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (variants.length > 0) {
-                            // If using variants, cap by selected variant stock (if selected)
-                            if (selectedVariant) {
-                              setSelectedQuantity(q => Math.min(selectedVariantStock || 0, q + 1));
-                            } else {
-                              setSelectedQuantity(q => q + 1);
-                            }
-                          } else {
-                            setSelectedQuantity(q => Math.min(product.stock_available, q + 1));
-                          }
-                        }}
-                      >
-                        <Ionicons name="add" size={18} color="#2d5016" />
-                      </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity
-                      style={[
-                        styles.fabAdd,
-                        (variants.length === 0 && product.stock_available <= 0) && styles.addButtonDisabled,
-                        (variants.length > 0 && !anyVariantInStock) && styles.addButtonDisabled,
-                      ]}
-                      onPress={handleAddToCart}
-                      disabled={
-                        (variants.length === 0 && product.stock_available <= 0) ||
-                        (variants.length > 0 && !anyVariantInStock)
-                      }
-                    >
-                      <Text style={{
-                  color: (variants.length === 0 && product.stock_available <= 0) ||
-                         (variants.length > 0 && !anyVariantInStock) ? '#999' : '#fff',
-                  fontSize: 14,
-                  fontWeight: '600'
-                }}>Add to cart</Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {/* Reviews Section */}
-                  <View style={{marginTop: 24, borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 16}}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <Ionicons name="star" size={20} color="#FFD700" />
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d5016', marginLeft: 8 }}>
-                        {((product as any).rating || 4.5).toFixed(1)} ({(product as any).reviewCount || 12} reviews)
-                      </Text>
-                    </View>
-                    <Text style={{fontSize: 16, fontWeight: '600', color: '#2d5016', marginBottom: 12}}>Reviews</Text>
-                    {[1, 2, 3].map((_, index) => (
-                      <View key={index} style={{marginBottom: 16, paddingBottom: 16, borderBottomWidth: index < 2 ? 1 : 0, borderBottomColor: '#f0f0f0'}}>
-                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
-                          <View style={{width: 32, height: 32, borderRadius: 16, backgroundColor: '#e0e0e0', marginRight: 8}} />
-                          <Text style={{fontWeight: '600'}}>User {index + 1}</Text>
-                          <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 'auto'}}>
-                            <Ionicons name="star" size={16} color="#FFD700" />
-                            <Text style={{marginLeft: 4, fontSize: 14}}>4.5</Text>
-                          </View>
-                        </View>
-                        <Text style={{fontSize: 14, color: '#555', marginTop: 4}}>
-                          Great product! Worked exactly as described. Highly recommend for all farmers.
-                        </Text>
-                        <Text style={{fontSize: 12, color: '#999', marginTop: 4}}>2 days ago</Text>
+                              <Text style={{ color: inStock ? '#4caf50' : '#d32f2f', fontWeight: '600' }}>
+                                {inStock ? 'In stock' : 'Out'}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
-                    ))}
+                    ) : null}
+                  </>
+                ) : (
+                  <View style={styles.reviewsContainer}>
+                    {reviewsLoading ? (
+                      <View style={styles.loadingContainer}>
+                        <Text style={{ color: '#666' }}>Loading reviews…</Text>
+                      </View>
+                    ) : reviews.length > 0 ? (
+                      <View>
+                        {reviews.map((review: any) => {
+                          const name = String(review.full_name || review.number || 'Customer');
+                          const created = review.order_created_at || review.created_at;
+                          const rating = Number(review.rating || 0);
+                          return (
+                            <View key={String(review.id ?? `${name}-${created}`)} style={styles.reviewItem}>
+                              <View style={styles.reviewHeader}>
+                                <Text style={styles.reviewerName}>{name}</Text>
+                                {created ? (
+                                  <Text style={styles.reviewDate}>
+                                    {new Date(created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <View style={styles.ratingStars}>
+                                {Array.from({ length: 5 }, (_, i) => {
+                                  const icon = i < rating ? ('star' as any) : ('star-outline' as any);
+                                  return <Ionicons key={i} name={icon} size={14} color="#FFD700" style={{ marginRight: 1 }} />;
+                                })}
+                              </View>
+                              {review.review ? <Text style={styles.reviewText}>{String(review.review)}</Text> : null}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.noReviews}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={48} color="#e0e0e0" />
+                        <Text style={styles.noReviewsTitle}>No Reviews Yet</Text>
+                        <Text style={styles.noReviewsText}>Be the first to review this product</Text>
+                      </View>
+                    )}
                   </View>
-                </ScrollView>
+                )}
               </View>
-            </TouchableWithoutFeedback>
+            </ScrollView>
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
-
-
     </Pressable>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
@@ -503,23 +671,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     minHeight: 160,
   },
-  square: {
+  cardCompact: {
     width: '100%',
-    aspectRatio: 0.8, // Original aspect ratio
-    position: 'relative',
-  },
-  squareImage: {
-    ...StyleSheet.absoluteFillObject,
-    resizeMode: 'cover',
-    backgroundColor: '#eef2e6',
-  },
-  overlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    minHeight: 280,
   },
   imageSquareSmall: {
     width: 140,
@@ -529,30 +683,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderRadius: 14,
   },
-  imageCompact: {
-    height: undefined,
-    aspectRatio: 1,
-  },
-  content: {
-    padding: 12,
-    gap: 6,
-  },
-  nameOverlay: { 
-    fontSize: 14, 
-    fontWeight: '700', 
-    color:'#2d5016',
-    marginBottom: 4,
-  },
   contentRight: {
     flex: 1,
     paddingVertical: 8,
     paddingRight: 8,
-  },
-  contentCompact: {
-    padding: 12,
-    gap: 6,
-    flex: 1,
-    justifyContent: 'space-between',
   },
   name: {
     fontSize: 16,
@@ -564,30 +698,66 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 4,
   },
-  cardCompact: {
-    width: '100%',
-    minHeight: 280,
-  },
-  plantUsed: {
+  nameOverlay: {
     fontSize: 14,
-    color: '#4caf50',
-    fontWeight: '500',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#2d5016',
+    marginBottom: 4,
   },
-  details: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 16,
+  unitContainer: {
+    marginTop: 6,
   },
-  divider: { height: 0 },
-  topRow: {},
-  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  price: { fontSize: 16, fontWeight: '700', color: '#2d5016', marginBottom: 2 },
-  descLine: { fontSize: 12, color: '#4e7c35', fontWeight: '600', marginBottom: 2 },
-  priceCompact: { fontSize: 14 },
-  stock: { display: 'none' },
-  sellerTag: { fontStyle: 'italic', color: '#5e7a47', fontWeight: '600' },
+  unitSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    backgroundColor: '#f1f8f4',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minHeight: 32,
+  },
+  unitSelectorText: {
+    color: '#2d5016',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  unitItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f3f3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  unitItemText: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  qtyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    height: 36,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  qtyText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2d5016',
+  },
   fabAdd: {
     minWidth: 80,
     height: 36,
@@ -601,153 +771,187 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  fabAddCompact: { width: 34, height: 34, borderRadius: 17 },
   addButtonDisabled: {
     backgroundColor: '#e0e0e0',
   },
-  fabAddCompact: { width: 34, height: 34, borderRadius: 17 },
-  qtyBtnCompact: { width: 24, height: 24, borderRadius: 12 },
-  qtyInputCompact: { display: 'none' },
-  qtyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    height: 36,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+  // Square layout
+  square: {
+    width: '100%',
+    aspectRatio: 1,
+    position: 'relative',
   },
-  qtyText: { fontSize: 16, fontWeight: '700', color: '#2d5016' },
+  squareImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+    backgroundColor: '#eef2e6',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 12,
+    justifyContent: 'flex-end',
+  },
+  // Generic overlay used for both modals
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
+  },
+  // Unit picker modal container
+  modalContainer: {
+    width: '92%',
+    maxHeight: '70%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  // Details modal
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   modalContent: {
+    width: '92%',
+    height: '85%',
+    maxHeight: '85%',
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
+    overflow: 'hidden',
   },
-  fullModalContainer: { paddingBottom: 24 },
-  fullImageSquare: { width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: '#eef2e6' },
-  fullModalContent: { padding: 16 },
-  fullDetails: { fontSize: 14, color: '#333', lineHeight: 20 },
-  descScroll: { maxHeight: 240 },
-  descScrollContent: { paddingBottom: 8 },
-  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  backdrop: { ...StyleSheet.absoluteFillObject },
-  bottomSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '90%' },
-  sheetHandle: { width: 40, height: 4, backgroundColor: '#ccc', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#2d5016',
-    textAlign: 'center',
-    marginBottom: 8,
+    flex: 1,
   },
-  modalProductName: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 4,
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
-  modalStock: {
+  starIcon: {
+    marginRight: 2,
+  },
+  ratingText: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
+    marginLeft: 4,
   },
-  quantityContainer: {
+  tabsContainer: {
     flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  inlineQuantity: { display: 'none', flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 },
-  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  qtyInput: { width: 54, height: 34, borderWidth: 1, borderColor: '#bdbdbd', borderRadius: 6, textAlign: 'center', textAlignVertical: 'center', fontSize: 16, fontWeight: '700', color: '#111', backgroundColor: '#fff', ...Platform.select({ android: { height: 36, lineHeight: 22 } }) },
-  quantityButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  activeTab: {
+    borderBottomColor: '#4caf50',
   },
-  quantityInput: {
-    width: 80,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
-    marginHorizontal: 16,
-    backgroundColor: '#f9f9f9',
+  tabText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  unitContainer: { marginTop: 6 },
-  unitSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#c8e6c9', backgroundColor:'#f1f8f4', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, minHeight: 32 },
-  unitSelectorText: { color:'#2d5016', fontWeight:'700', fontSize: 13 },
-  unitDropdownScroll: { borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#fff', marginTop:6, maxHeight: 200 },
-  unitDropdownContent: { paddingVertical: 0 },
-  unitItem: { padding:10, borderBottomWidth:1, borderBottomColor:'#f3f3f3' },
-  unitItemText: { color:'#333' },
-  modalTotal: {
-    fontSize: 18,
-    fontWeight: '600',
+  activeTabText: {
     color: '#4caf50',
-    textAlign: 'center',
-    marginBottom: 24,
+    fontWeight: '600',
   },
-  modalButtons: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  contentContainer: {
+    padding: 16,
+  },
+  productImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: '#eef2e6',
+  },
+  sellerTag: {
+    fontStyle: 'italic',
+    color: '#5e7a47',
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  productDescription: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  reviewsContainer: {
+    flex: 1,
+    marginTop: 8,
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  reviewItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginRight: 8,
     alignItems: 'center',
+    marginBottom: 4,
   },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
+  reviewerName: {
     fontWeight: '600',
-  },
-  confirmButton: {
-    flex: 1,
-    backgroundColor: '#4caf50',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginLeft: 8,
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    color: '#333',
   },
-  addPrimaryButton: {
-    backgroundColor: '#4caf50',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 12,
-    minWidth: 140,
+  ratingStars: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 2,
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
+  },
+  reviewText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  noReviews: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
-  addPrimaryText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+  noReviewsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  noReviewsText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });

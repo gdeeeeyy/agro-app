@@ -828,7 +828,7 @@ const pickImage = async () => {
                   <ScrollView contentContainerStyle={{ paddingVertical:0 }}>
                     {keywords.length === 0 ? (
                       <View style={{ padding:12 }}>
-                        <Text style={{ color:'#666' }}>No keywords yet. Use "Manage Keywords" to add some.</Text>
+                        <Text style={{ color:'#666' }}>No keywords yet. Use Manage Keywords to add some.</Text>
                       </View>
                     ) : (
                       keywords.map(k => {

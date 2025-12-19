@@ -97,6 +97,7 @@ if (Platform.OS !== 'web') (async () => {
       user_id INTEGER NOT NULL,
       total_amount REAL NOT NULL,
       payment_method TEXT NOT NULL,
+      booking_address TEXT,
       delivery_address TEXT,
       status TEXT DEFAULT 'pending',
       status_note TEXT,
@@ -1071,10 +1072,10 @@ export async function getCartTotal(userId: number) {
 }
 
 // Order functions
-export async function createOrder(userId: number, paymentMethod: string, deliveryAddress?: string, note?: string) {
+export async function createOrder(userId: number, paymentMethod: string, bookingAddress?: string, deliveryAddress?: string, note?: string) {
   try {
     if (API_URL) {
-      const res = await api.post('/orders', { userId, paymentMethod, deliveryAddress: deliveryAddress || null, note: note || null });
+      const res = await api.post('/orders', { userId, paymentMethod, bookingAddress: bookingAddress || null, deliveryAddress: deliveryAddress || null, note: note || null });
       return (res as any).id;
     }
     // Get cart items
@@ -1088,8 +1089,8 @@ export async function createOrder(userId: number, paymentMethod: string, deliver
 
     // Create order
     const orderResult = await db.runAsync(
-      "INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note) VALUES (?, ?, ?, ?, ?, ?)",
-      userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null
+      "INSERT INTO orders (user_id, total_amount, payment_method, booking_address, delivery_address, status, status_note) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      userId, total, paymentMethod, bookingAddress || null, deliveryAddress || null, 'pending', note || null
     );
     // initial timeline status
     try { await db.runAsync("INSERT INTO order_status_history (order_id, status, note) VALUES (?, ?, ?)", orderResult.lastInsertRowId, 'confirmed', note || null); } catch {}

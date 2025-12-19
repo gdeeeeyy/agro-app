@@ -22,21 +22,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../../components/TopBar';
 
 interface Order {
-  id: number;
-  user_id: number;
-  total_amount: number;
-  payment_method: string;
-  payment_status?: string; // 'unpaid' | 'paid' | null
-  delivery_address?: string;
-  status: string;
-  status_note?: string;
-  delivery_date?: string;
-  logistics_name?: string;
-  tracking_number?: string;
-  tracking_url?: string;
-  created_at: string;
-  updated_at: string;
-}
+   id: number;
+   user_id: number;
+   total_amount: number;
+   payment_method: string;
+   payment_status?: string; // 'unpaid' | 'paid' | null
+   booking_address?: string;
+   delivery_address?: string;
+   status: string;
+   status_note?: string;
+   delivery_date?: string;
+   logistics_name?: string;
+   tracking_number?: string;
+   tracking_url?: string;
+   created_at: string;
+   updated_at: string;
+ }
 
 interface OrderItem {
   id: number;
@@ -60,7 +61,7 @@ export default function Orders() {
   const [statusHistory, setStatusHistory] = useState<Array<{ status: string; note?: string; created_at: string }>>([]);
   const [ratingDraft, setRatingDraft] = useState<Record<number, number>>({});
   const [reviewDraft, setReviewDraft] = useState<Record<number, string>>({});
-  const [showRatingEditor, setShowRatingEditor] = useState(false);
+  const [showRatingEditor, setShowRatingEditor] = useState<number | false>(false);
 
   const loadOrders = async () => {
     if (!user) return;
@@ -112,47 +113,45 @@ export default function Orders() {
   };
 
   const handleSubmitRatings = async () => {
-    if (!selectedOrder) return;
-    const items = orderItems;
-    const rateable = items.filter(it => {
-      const r = ratingDraft[it.id];
-      return typeof r === 'number' && r >= 1 && r <= 5;
-    });
-    if (!rateable.length) {
-      Alert.alert('No ratings', 'Please rate at least one product');
+    if (!selectedOrder || showRatingEditor === false) return;
+    const itemId = showRatingEditor;
+    const rating = ratingDraft[itemId];
+    
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+      Alert.alert('Invalid Rating', 'Please select a rating between 1 and 5 stars');
       return;
     }
+    
     try {
-      const results = await Promise.all(
-        rateable.map(async it => {
-          const rating = ratingDraft[it.id];
-          const review = reviewDraft[it.id];
-          return rateOrderItem(it.id, rating, review);
-        })
-      );
-      const anyFailed = results.some(ok => !ok);
-      if (anyFailed) {
-        Alert.alert('Partial error', 'Some ratings could not be saved. Please try again.');
-      } else {
-        Alert.alert('Thank you', 'Your ratings have been saved.');
-      }
-      // Reload order items to reflect latest ratings
-      try {
+      const review = reviewDraft[itemId] || '';
+      const success = await rateOrderItem(itemId, rating, review);
+      
+      if (success) {
+        Alert.alert('Thank You', 'Your rating has been saved.');
+        // Reload order items to reflect latest ratings
         const freshItems = await getOrderItems(selectedOrder.id) as OrderItem[];
         setOrderItems(freshItems);
-        const ratingMap: Record<number, number> = {};
-        const reviewMap: Record<number, string> = {};
-        for (const it of freshItems) {
-          const r = (it as any).rating;
-          const rv = (it as any).review;
-          if (r != null) ratingMap[it.id] = Number(r);
-          if (rv) reviewMap[it.id] = String(rv);
+        
+        // Update local state with fresh data
+        const ratingMap = { ...ratingDraft };
+        const reviewMap = { ...reviewDraft };
+        const updatedItem = freshItems.find(item => item.id === itemId);
+        
+        if (updatedItem) {
+          const r = (updatedItem as any).rating;
+          const rv = (updatedItem as any).review;
+          if (r != null) ratingMap[itemId] = Number(r);
+          if (rv) reviewMap[itemId] = String(rv);
+          
+          setRatingDraft(ratingMap);
+          setReviewDraft(reviewMap);
         }
-        setRatingDraft(ratingMap);
-        setReviewDraft(reviewMap);
-      } catch {}
+      } else {
+        Alert.alert('Error', 'Failed to save your rating. Please try again.');
+      }
     } catch (e) {
-      Alert.alert('Error', 'Failed to save ratings. Please try again.');
+      console.error('Error submitting rating:', e);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -258,6 +257,14 @@ export default function Orders() {
               {item.payment_method === 'cod' ? t('payment.cod') : item.payment_method.toUpperCase()}
             </Text>
           </View>
+        {item.booking_address && (
+          <View style={styles.orderDetailRow}>
+            <Ionicons name="business" size={20} color="#666" />
+            <Text style={styles.orderDetailText} numberOfLines={2}>
+              Booking: {item.booking_address}
+            </Text>
+          </View>
+        )}
         {item.delivery_address && (
           <View style={styles.orderDetailRow}>
             <Ionicons name="location" size={20} color="#666" />
@@ -375,6 +382,14 @@ export default function Orders() {
                       {selectedOrder.payment_method === 'cod' ? 'Cash on Delivery' : selectedOrder.payment_method.toUpperCase()}
                     </Text>
                   </View>
+                  {selectedOrder.booking_address && (
+                    <View style={styles.addressDetailSection}>
+                      <Text style={styles.detailLabel}>Booking Address:</Text>
+                      <Text style={styles.addressDetailText}>
+                        {selectedOrder.booking_address}
+                      </Text>
+                    </View>
+                  )}
                   {selectedOrder.delivery_address && (
                     <View style={styles.addressDetailSection}>
                       <Text style={styles.detailLabel}>Delivery Address:</Text>
@@ -418,7 +433,17 @@ export default function Orders() {
                         {selectedOrder && ['shipped','delivered','dispatched'].includes(selectedOrder.status.toLowerCase()) && (
                           <TouchableOpacity
                             style={styles.editReviewButton}
-                            onPress={() => setShowRatingEditor(true)}
+                            onPress={() => {
+                              setRatingDraft(prev => ({
+                                ...prev,
+                                [item.id]: (item as any).rating || 0
+                              }));
+                              setReviewDraft(prev => ({
+                                ...prev,
+                                [item.id]: (item as any).review || ''
+                              }));
+                              setShowRatingEditor(item.id);
+                            }}
                           >
                             <Text style={styles.editReviewText}>
                               {(item as any).rating != null ? 'Edit review' : 'Add review'}
@@ -431,68 +456,68 @@ export default function Orders() {
                   ))}
                 </View>
 
-                {selectedOrder && ['shipped','delivered','dispatched'].includes(selectedOrder.status.toLowerCase()) && (
+                {selectedOrder && ['shipped','delivered','dispatched'].includes(selectedOrder.status.toLowerCase()) && showRatingEditor && (
                   <View style={styles.detailSection}>
                     <View style={styles.ratingHeaderRow}>
-                      <Text style={styles.detailSectionTitle}>Rate your products</Text>
-                      {!showRatingEditor && (
+                      <Text style={styles.detailSectionTitle}>
+                        {orderItems.find(item => item.id === showRatingEditor)?.product_name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowRatingEditor(false)}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <View style={styles.ratingItem}>
+                      <View style={styles.starRow}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <TouchableOpacity
+                            key={star}
+                            onPress={() =>
+                              setRatingDraft((prev) => ({
+                                ...prev,
+                                [showRatingEditor]: star,
+                              }))
+                            }
+                          >
+                            <Ionicons
+                              name={(ratingDraft[showRatingEditor] || 0) >= star ? 'star' : 'star-outline'}
+                              size={28}
+                              color="#fbc02d"
+                              style={{ marginHorizontal: 4 }}
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={[styles.reviewInput, { minHeight: 100, textAlignVertical: 'top' }]}
+                        placeholder="Share your experience with this product (optional, up to 100 words)"
+                        placeholderTextColor="#999"
+                        multiline
+                        value={reviewDraft[showRatingEditor] || ''}
+                        onChangeText={(text) => handleChangeReview(showRatingEditor, text)}
+                      />
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
                         <TouchableOpacity
-                          style={styles.ratingToggleButton}
-                          onPress={() => setShowRatingEditor(true)}
+                          style={[styles.submitRatingsButton, { backgroundColor: '#f5f5f5' }]}
+                          onPress={() => setShowRatingEditor(false)}
                         >
-                          <Text style={styles.ratingToggleButtonText}>
-                            {Object.keys(ratingDraft || {}).length ? 'Edit ratings' : 'Add ratings'}
+                          <Text style={[styles.submitRatingsButtonText, { color: '#333' }]}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.submitRatingsButton, { flex: 1, marginLeft: 10 }]}
+                          onPress={() => {
+                            handleSubmitRatings();
+                            setShowRatingEditor(false);
+                          }}
+                        >
+                          <Text style={styles.submitRatingsButtonText}>
+                            {ratingDraft[showRatingEditor] ? 'Update Review' : 'Submit Review'}
                           </Text>
                         </TouchableOpacity>
-                      )}
+                      </View>
                     </View>
-
-                    {showRatingEditor && (
-                      <>
-                        {orderItems.map((item) => {
-                          const currentRating = ratingDraft[item.id] || 0;
-                          const currentReview = reviewDraft[item.id] || '';
-                          return (
-                            <View key={item.id} style={styles.ratingItem}>
-                              <Text style={styles.ratingItemName}>{item.product_name}</Text>
-                              <View style={styles.starRow}>
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <TouchableOpacity
-                                    key={star}
-                                    onPress={() =>
-                                      setRatingDraft((prev) => ({
-                                        ...prev,
-                                        [item.id]: star,
-                                      }))
-                                    }
-                                  >
-                                    <Ionicons
-                                      name={currentRating >= star ? 'star' : 'star-outline'}
-                                      size={20}
-                                      color="#fbc02d"
-                                    />
-                                  </TouchableOpacity>
-                                ))}
-                              </View>
-                              <TextInput
-                                style={styles.reviewInput}
-                                placeholder="Write a short review (optional, up to 100 words)"
-                                placeholderTextColor="#666"
-                                multiline
-                                value={currentReview}
-                                onChangeText={(text) => handleChangeReview(item.id, text)}
-                              />
-                            </View>
-                          );
-                        })}
-                        <TouchableOpacity
-                          style={styles.submitRatingsButton}
-                          onPress={handleSubmitRatings}
-                        >
-                          <Text style={styles.submitRatingsButtonText}>Submit Ratings</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
                   </View>
                 )}
 
