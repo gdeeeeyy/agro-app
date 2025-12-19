@@ -550,7 +550,11 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator
+            >
               <View style={styles.contentContainer}>
                 {activeTab === 'details' ? (
                   <>
@@ -641,6 +645,57 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 )}
               </View>
             </ScrollView>
+
+            {/* Sticky action bar */}
+            <View style={styles.actionBar}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionPrice} numberOfLines={1}>
+                  Rs. {Number(displayPrice).toFixed(0)}{displayLabel ? ` / ${displayLabel}` : ''}
+                </Text>
+              </View>
+
+              <View style={styles.actionQtyPill}>
+                <TouchableOpacity
+                  onPress={() => setSelectedQuantity(q => Math.max(1, q - 1))}
+                  style={{ padding: 6 }}
+                >
+                  <Ionicons name="remove" size={16} color="#2d5016" />
+                </TouchableOpacity>
+                <Text style={styles.actionQtyText}>{selectedQuantity}</Text>
+                <TouchableOpacity
+                  onPress={() => setSelectedQuantity(q => q + 1)}
+                  style={{ padding: 6 }}
+                >
+                  <Ionicons name="add" size={16} color="#2d5016" />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionAdd,
+                  ((variants.length > 0 && !anyVariantInStock) || (variants.length === 0 && product.stock_available <= 0)) && styles.addButtonDisabled,
+                ]}
+                onPress={handleAddToCart}
+                disabled={
+                  (variants.length > 0 && !anyVariantInStock) ||
+                  (variants.length === 0 && product.stock_available <= 0)
+                }
+              >
+                <Text
+                  style={{
+                    color:
+                      ((variants.length > 0 && !anyVariantInStock) ||
+                        (variants.length === 0 && product.stock_available <= 0))
+                        ? '#999'
+                        : '#fff',
+                    fontSize: 13,
+                    fontWeight: '700',
+                  }}
+                >
+                  Add to cart
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -815,20 +870,20 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '92%',
-    height: '85%',
-    maxHeight: '85%',
+    maxHeight: '70%',
     backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
+    flexShrink: 1,
   },
   modalHeader: {
-    padding: 16,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#2d5016',
     flex: 1,
   },
@@ -852,7 +907,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
@@ -870,10 +925,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 110, // room for the sticky action bar
   },
   contentContainer: {
     padding: 16,
@@ -883,6 +939,50 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
     backgroundColor: '#eef2e6',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  actionPrice: {
+    color: '#2d5016',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  actionQtyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    height: 36,
+  },
+  actionQtyText: {
+    minWidth: 22,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2d5016',
+  },
+  actionAdd: {
+    minWidth: 110,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4caf50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   sellerTag: {
     fontStyle: 'italic',
