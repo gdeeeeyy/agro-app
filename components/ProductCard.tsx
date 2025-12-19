@@ -91,7 +91,16 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
 
   // Card-level rating summary (shown outside the popup)
   const cardRatingCount = Number((product as any).rating_count || 0);
-  const cardAvgRating = Number((product as any).avg_rating || 0);
+  const cardAvgRatingRaw = Number((product as any).avg_rating || 0);
+  // Round to nearest 0.5 so star display doesn't overstate ratings (e.g., 4.2 shouldn't show a half-star)
+  const cardAvgRating = Math.round(cardAvgRatingRaw * 2) / 2;
+
+  const starIconForIndex = (index: number, rating: number) => {
+    const r = Math.round((Number.isFinite(rating) ? rating : 0) * 2) / 2;
+    if (r >= index + 1) return 'star' as const;
+    if (r >= index + 0.5) return 'star-half' as const;
+    return 'star-outline' as const;
+  };
 
   const parseVariantLabel = (label?: string): { quantity?: string; unit?: string } => {
     if (!label || typeof label !== 'string') return {};
@@ -334,15 +343,17 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </Text>
               {cardRatingCount > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const rating = cardAvgRating;
-                    let icon = 'star-outline' as any;
-                    if (i < Math.floor(rating)) icon = 'star';
-                    else if (i < rating) icon = 'star-half';
-                    return <Ionicons key={i} name={icon} size={12} color="#FFD700" style={{ marginRight: 1 }} />;
-                  })}
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Ionicons
+                      key={i}
+                      name={starIconForIndex(i, cardAvgRating) as any}
+                      size={12}
+                      color="#FFD700"
+                      style={{ marginRight: 1 }}
+                    />
+                  ))}
                   <Text style={{ fontSize: 10, color: '#666', marginLeft: 2 }}>
-                    {cardAvgRating.toFixed(1)} ({cardRatingCount})
+                    {cardAvgRatingRaw.toFixed(1)} ({cardRatingCount})
                   </Text>
                 </View>
               ) : null}
@@ -396,15 +407,17 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               </Text>
               {cardRatingCount > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const rating = cardAvgRating;
-                    let icon = 'star-outline' as any;
-                    if (i < Math.floor(rating)) icon = 'star';
-                    else if (i < rating) icon = 'star-half';
-                    return <Ionicons key={i} name={icon} size={12} color="#FFD700" style={{ marginRight: 1 }} />;
-                  })}
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Ionicons
+                      key={i}
+                      name={starIconForIndex(i, cardAvgRating) as any}
+                      size={12}
+                      color="#FFD700"
+                      style={{ marginRight: 1 }}
+                    />
+                  ))}
                   <Text style={{ fontSize: 10, color: '#fff', marginLeft: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}>
-                    {cardAvgRating.toFixed(1)}
+                    {cardAvgRatingRaw.toFixed(1)}
                   </Text>
                 </View>
               ) : null}

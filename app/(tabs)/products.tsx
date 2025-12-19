@@ -37,6 +37,9 @@ interface Product {
   image?: string;
   stock_available: number;
   cost_per_unit: number;
+  // rating summary (from API)
+  avg_rating?: number;
+  rating_count?: number;
 }
 
 export default function Products() {
