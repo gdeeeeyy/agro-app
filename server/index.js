@@ -56,9 +56,13 @@ async function runMigrations() {
       password TEXT NOT NULL,
       full_name TEXT,
       address TEXT,
+      booking_address TEXT,
+      delivery_address TEXT,
       is_admin INTEGER DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS booking_address TEXT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS delivery_address TEXT");
 
     await pool.query(`CREATE TABLE IF NOT EXISTS products (
       id BIGSERIAL PRIMARY KEY,
@@ -197,6 +201,7 @@ async function runMigrations() {
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       total_amount DOUBLE PRECISION NOT NULL,
       payment_method TEXT NOT NULL,
+      booking_address TEXT,
       delivery_address TEXT,
       status TEXT DEFAULT 'pending',
       status_note TEXT,
@@ -208,6 +213,8 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS booking_address TEXT");
+    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address TEXT");
     await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'");
 
     await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
@@ -411,19 +418,23 @@ app.post('/auth/signup', async (req, res) => {
   const { number, password, full_name } = req.body || {};
   try {
     const u = await one(
-      'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1, $2, $3, 0) RETURNING id, number, full_name, is_admin, created_at',
+      'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1, $2, $3, 0) RETURNING id, number, full_name, is_admin, created_at, booking_address, delivery_address',
       [number, password, full_name || null]
     );
     res.json(u);
   } catch (e) {
     if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'number already exists' });
-    console.error(e); res.status(500).json({ error: 'signup failed' });
+    console.error(e);
+    res.status(500).json({ error: 'signup failed' });
   }
 });
 
 app.post('/auth/signin', async (req, res) => {
   const { number, password } = req.body || {};
-  const u = await one('SELECT id, number, full_name, is_admin, created_at FROM users WHERE number=$1 AND password=$2', [number, password]);
+  const u = await one(
+    'SELECT id, number, full_name, is_admin, created_at, booking_address, delivery_address FROM users WHERE number=$1 AND password=$2',
+    [number, password]
+  );
   if (!u) return res.status(401).json({ error: 'Invalid number or password' });
   res.json(u);
 });
@@ -497,7 +508,7 @@ app.post('/auth/verify-otp', async (req, res) => {
     }
 
     let user = await one(
-      'SELECT id, number, full_name, is_admin, created_at FROM users WHERE number=$1',
+      'SELECT id, number, full_name, is_admin, created_at, booking_address, delivery_address FROM users WHERE number=$1',
       [number]
     );
 
@@ -516,7 +527,7 @@ app.post('/auth/verify-otp', async (req, res) => {
     // Ensure admin role for special number
     if (number === ADMIN_OTP_NUMBER && Number(user.is_admin ?? 0) !== 2) {
       await pool.query('UPDATE users SET is_admin=2 WHERE id=$1', [user.id]);
-      user = await one('SELECT id, number, full_name, is_admin, created_at FROM users WHERE id=$1', [user.id]);
+      user = await one('SELECT id, number, full_name, is_admin, created_at, booking_address, delivery_address FROM users WHERE id=$1', [user.id]);
     }
 
     res.json({ user });
@@ -544,9 +555,11 @@ app.post('/auth/create-admin', async (req, res) => {
 
 // Users (update basic details + role)
 app.patch('/users/:id', async (req, res) => {
-  const { address, full_name, number, is_admin } = req.body || {};
+  const { address, booking_address, delivery_address, full_name, number, is_admin } = req.body || {};
   const set = []; const vals=[]; let i=1;
   if (address !== undefined) { set.push(`address=$${i++}`); vals.push(address); }
+  if (booking_address !== undefined) { set.push(`booking_address=$${i++}`); vals.push(booking_address); }
+  if (delivery_address !== undefined) { set.push(`delivery_address=$${i++}`); vals.push(delivery_address); }
   if (full_name !== undefined) { set.push(`full_name=$${i++}`); vals.push(full_name); }
   if (number !== undefined) { set.push(`number=$${i++}`); vals.push(number); }
   // Role change with last-master guard
@@ -574,7 +587,10 @@ app.patch('/users/:id', async (req, res) => {
     }
     throw e;
   }
-  const u = await one('SELECT id, number, full_name, is_admin, created_at, address FROM users WHERE id=$1', [req.params.id]);
+  const u = await one(
+    'SELECT id, number, full_name, is_admin, created_at, address, booking_address, delivery_address FROM users WHERE id=$1',
+    [req.params.id]
+  );
   res.json(u);
 });
 
@@ -1170,7 +1186,7 @@ app.get('/cart/total', async (req, res) => {
 
 // Orders
 app.post('/orders', async (req, res) => {
-  const { userId, paymentMethod, deliveryAddress, note } = req.body || {};
+  const { userId, paymentMethod, bookingAddress, deliveryAddress, note } = req.body || {};
   const cartItems = await all(
     `SELECT ci.product_id, ci.variant_id, ci.quantity, p.name,
             COALESCE(v.price, p.cost_per_unit) as price,
@@ -1189,8 +1205,8 @@ app.post('/orders', async (req, res) => {
      WHERE ci.user_id = $1`, [userId]
   )).total || 0;
   const o = await one(
-    'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-    [userId, total, paymentMethod, deliveryAddress || null, 'pending', note || null, 'unpaid']
+    'INSERT INTO orders (user_id, total_amount, payment_method, booking_address, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+    [userId, total, paymentMethod, bookingAddress || null, deliveryAddress || null, 'pending', note || null, 'unpaid']
   );
   // Record initial timeline status as "pending" at order creation
   try {
@@ -1215,7 +1231,7 @@ app.post('/payments/razorpay/link', async (req, res) => {
     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
       return res.status(500).json({ error: 'razorpay_not_configured' });
     }
-    const { userId, deliveryAddress, note } = req.body || {};
+    const { userId, bookingAddress, deliveryAddress, note } = req.body || {};
     const uid = Number(userId);
     if (!uid) return res.status(400).json({ error: 'invalid_userId' });
 
@@ -1245,8 +1261,8 @@ app.post('/payments/razorpay/link', async (req, res) => {
 
     // Create a pending order locally with payment_method = 'razorpay'
     const order = await one(
-      'INSERT INTO orders (user_id, total_amount, payment_method, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-      [uid, totalAmount, 'razorpay', deliveryAddress || null, 'pending', note || null, 'unpaid']
+      'INSERT INTO orders (user_id, total_amount, payment_method, booking_address, delivery_address, status, status_note, payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      [uid, totalAmount, 'razorpay', bookingAddress || null, deliveryAddress || null, 'pending', note || null, 'unpaid']
     );
 
     // Record initial pending status in timeline for Razorpay orders as well

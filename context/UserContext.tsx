@@ -6,7 +6,10 @@ interface User {
   id: number;
   number: string;
   full_name?: string;
+  // legacy single address (kept for backward compatibility)
   address?: string;
+  booking_address?: string;
+  delivery_address?: string;
   is_admin?: number;
   created_at?: string;
 }

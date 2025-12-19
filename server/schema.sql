@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
   password TEXT NOT NULL,
   full_name TEXT,
   address TEXT,
+  booking_address TEXT,
+  delivery_address TEXT,
   is_admin INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );

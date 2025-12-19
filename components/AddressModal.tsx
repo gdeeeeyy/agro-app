@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
@@ -11,43 +11,62 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../context/UserContext';
-import { updateUserAddress } from '../lib/database';
 
 interface AddressModalProps {
   visible: boolean;
   onClose: () => void;
   onAddressConfirmed: (address: string) => void;
   title?: string;
+  addressType?: 'booking' | 'delivery';
 }
 
-export default function AddressModal({ 
-  visible, 
-  onClose, 
+export default function AddressModal({
+  visible,
+  onClose,
   onAddressConfirmed,
-  title = "Delivery Address" 
+  title = 'Delivery Address',
+  addressType = 'delivery',
 }: AddressModalProps) {
-  const { user, updateUserAddress: updateContextAddress } = useContext(UserContext);
-  const [address, setAddress] = useState(user?.address || '');
+  const { user, setUser } = useContext(UserContext);
+
+  const getInitial = () => {
+    const u: any = user;
+    if (addressType === 'booking') return String(u?.booking_address || u?.address || '');
+    return String(u?.delivery_address || u?.address || '');
+  };
+
+  const [address, setAddress] = useState(getInitial());
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setAddress(getInitial());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, addressType, user?.id]);
 
   const handleConfirm = async () => {
     if (!address.trim()) {
-      Alert.alert('Address Required', 'Please enter your delivery address');
+      Alert.alert('Address Required', `Please enter your ${addressType} address`);
       return;
     }
 
     setLoading(true);
     try {
-      // Update user address in database if user is logged in
+      // Persist into user record so next checkout can prefill
       if (user) {
-        const success = await updateUserAddress(user.id, address.trim());
-        if (success) {
-          updateContextAddress(address.trim());
+        const { updateUser } = await import('../lib/database');
+        const patch: any =
+          addressType === 'booking'
+            ? { booking_address: address.trim() }
+            : { delivery_address: address.trim() };
+        const ok = await updateUser(user.id, patch);
+        if (ok) {
+          await setUser({ ...(user as any), ...patch }, { persist: true });
         }
       }
-      
+
+      // Parent decides whether to close (needed for booking -> delivery flow)
       onAddressConfirmed(address.trim());
-      onClose();
     } catch (error) {
       console.error('Error updating address:', error);
       Alert.alert('Error', 'Failed to update address. Please try again.');
@@ -57,7 +76,7 @@ export default function AddressModal({
   };
 
   const handleClose = () => {
-    setAddress(user?.address || '');
+    setAddress(getInitial());
     onClose();
   };
 
@@ -78,13 +97,13 @@ export default function AddressModal({
             <View style={styles.infoSection}>
               <Ionicons name="location" size={24} color="#4caf50" />
               <Text style={styles.infoText}>
-                Please provide your complete delivery address for accurate delivery
+                Please provide your complete address for accurate order processing
               </Text>
             </View>
 
             <TextInput
               style={styles.addressInput}
-              placeholder="Enter your complete delivery address..."
+              placeholder="Enter your complete address..."
               placeholderTextColor="#999"
               value={address}
               onChangeText={setAddress}

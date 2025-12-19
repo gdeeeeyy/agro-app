@@ -352,12 +352,6 @@ export default function AdminOrders() {
                       <Text style={styles.addressText}>{selectedOrder.booking_address}</Text>
                     </View>
                   )}
-                  {selectedOrder.booking_address && (
-                    <View style={styles.addressInfo}>
-                      <Text style={styles.addressLabel}>Booking Address:</Text>
-                      <Text style={styles.addressText}>{selectedOrder.booking_address}</Text>
-                    </View>
-                  )}
                   {selectedOrder.delivery_address && (
                     <View style={styles.addressInfo}>
                       <Text style={styles.addressLabel}>Delivery Address:</Text>

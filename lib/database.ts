@@ -50,6 +50,8 @@ if (Platform.OS !== 'web') (async () => {
       password TEXT NOT NULL,
       full_name TEXT,
       address TEXT,
+      booking_address TEXT,
+      delivery_address TEXT,
       is_admin INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -296,6 +298,17 @@ if (Platform.OS !== 'web') (async () => {
     await addProdIntCol('low_stock_threshold', 20);
     await addProdTextCol('low_stock_alert_time');
 
+    // users migration (addresses)
+    const userCols = await db.getAllAsync("PRAGMA table_info(users)");
+    const userColNames = (userCols as any[]).map(c => c.name);
+    const addUserTextCol = async (name: string) => {
+      if (!userColNames.includes(name)) {
+        await db.runAsync(`ALTER TABLE users ADD COLUMN ${name} TEXT`);
+      }
+    };
+    await addUserTextCol('booking_address');
+    await addUserTextCol('delivery_address');
+
     // orders migration (align with server: add logistics fields if missing)
     const orderCols = await db.getAllAsync("PRAGMA table_info(orders)");
     const orderColNames = (orderCols as any[]).map(c => c.name);
@@ -304,6 +317,8 @@ if (Platform.OS !== 'web') (async () => {
         await db.runAsync(`ALTER TABLE orders ADD COLUMN ${name} TEXT`);
       }
     };
+    await addOrderTextCol('booking_address');
+    await addOrderTextCol('delivery_address');
     await addOrderTextCol('status_note'); // already exists in schema, but safe
     await addOrderTextCol('delivery_date'); // already exists in schema, but safe
     await addOrderTextCol('logistics_name');
@@ -1736,19 +1751,56 @@ export async function updateUserAddress(userId: number, address: string) {
   }
 }
 
-export async function updateUser(userId: number, fields: { full_name?: string; address?: string; number?: string; is_admin?: number }) {
+export async function updateUser(
+  userId: number,
+  fields: {
+    full_name?: string;
+    address?: string;
+    booking_address?: string;
+    delivery_address?: string;
+    number?: string;
+    is_admin?: number;
+  }
+) {
   try {
-    if (API_URL) { await api.patch(`/users/${userId}`, fields); return true; }
-    const sets: string[] = []; const vals: any[] = [];
-    if (fields.full_name !== undefined) { sets.push('full_name = ?'); vals.push(fields.full_name); }
-    if (fields.address !== undefined) { sets.push('address = ?'); vals.push(fields.address); }
-    if (fields.number !== undefined) { sets.push('number = ?'); vals.push(fields.number); }
-    if (fields.is_admin !== undefined) { sets.push('is_admin = ?'); vals.push(fields.is_admin); }
+    if (API_URL) {
+      await api.patch(`/users/${userId}`, fields);
+      return true;
+    }
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (fields.full_name !== undefined) {
+      sets.push('full_name = ?');
+      vals.push(fields.full_name);
+    }
+    if (fields.address !== undefined) {
+      sets.push('address = ?');
+      vals.push(fields.address);
+    }
+    if (fields.booking_address !== undefined) {
+      sets.push('booking_address = ?');
+      vals.push(fields.booking_address);
+    }
+    if (fields.delivery_address !== undefined) {
+      sets.push('delivery_address = ?');
+      vals.push(fields.delivery_address);
+    }
+    if (fields.number !== undefined) {
+      sets.push('number = ?');
+      vals.push(fields.number);
+    }
+    if (fields.is_admin !== undefined) {
+      sets.push('is_admin = ?');
+      vals.push(fields.is_admin);
+    }
     if (!sets.length) return true;
     vals.push(userId);
     await db.runAsync(`UPDATE users SET ${sets.join(', ')}, created_at=created_at WHERE id = ?`, ...vals);
     return true;
-  } catch (err) { console.error('SQLite update error:', err); return false; }
+  } catch (err) {
+    console.error('SQLite update error:', err);
+    return false;
+  }
 }
 
 export async function getUserById(userId: number) {
