@@ -624,11 +624,17 @@ app.delete('/users/:id', async (req, res) => {
 // Products
 app.get('/products', async (req, res) => {
   res.json(await all(`
-    SELECT p.*,
-           (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
-           (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
+    SELECT
+      p.*,
+      (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
+      (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label,
+      COALESCE(AVG(oi.rating)::numeric(3,2), 0) AS avg_rating,
+      COUNT(oi.rating) AS rating_count
     FROM products p
+    LEFT JOIN order_items oi
+      ON oi.product_id = p.id AND oi.rating IS NOT NULL
     WHERE p.status = 'approved'
+    GROUP BY p.id
     ORDER BY p.created_at DESC`));
 });
 
@@ -637,13 +643,19 @@ app.get('/products/search', async (req, res) => {
   const q = String(req.query.q || '').toLowerCase();
   const like = `%${q}%`;
   res.json(await all(
-    `SELECT p.*,
-            (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
-            (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
-     FROM products p WHERE 
-      p.status='approved' AND (
+    `SELECT
+        p.*,
+        (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
+        (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label,
+        COALESCE(AVG(oi.rating)::numeric(3,2), 0) AS avg_rating,
+        COUNT(oi.rating) AS rating_count
+     FROM products p
+     LEFT JOIN order_items oi
+       ON oi.product_id = p.id AND oi.rating IS NOT NULL
+     WHERE p.status='approved' AND (
       lower(p.name) LIKE $1 OR lower(p.plant_used) LIKE $1 OR lower(p.keywords) LIKE $1 OR lower(p.details) LIKE $1 OR
       lower(p.name_ta) LIKE $1 OR lower(p.plant_used_ta) LIKE $1 OR lower(p.details_ta) LIKE $1)
+     GROUP BY p.id
      ORDER BY p.created_at DESC`, [like]
   ));
 });
@@ -651,11 +663,17 @@ app.get('/products/search', async (req, res) => {
 app.get('/products/by-keyword', async (req, res) => {
   const like = `%${String(req.query.name || '').toLowerCase()}%`;
   res.json(await all(`
-    SELECT p.*,
-           (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
-           (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label
+    SELECT
+      p.*,
+      (SELECT MIN(price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
+      (SELECT label FROM product_variants v2 WHERE v2.product_id = p.id ORDER BY price ASC LIMIT 1) AS min_label,
+      COALESCE(AVG(oi.rating)::numeric(3,2), 0) AS avg_rating,
+      COUNT(oi.rating) AS rating_count
     FROM products p
+    LEFT JOIN order_items oi
+      ON oi.product_id = p.id AND oi.rating IS NOT NULL
     WHERE p.status='approved' AND lower(p.keywords) LIKE $1
+    GROUP BY p.id
     ORDER BY p.created_at DESC`, [like]));
 });
 

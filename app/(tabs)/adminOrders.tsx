@@ -14,9 +14,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
-import { getAllOrders, getOrderItems, updateOrderStatus, deleteOrder, listLogistics } from '../../lib/database';
+import { getAllOrders, getOrderById, getOrderItems, updateOrderStatus, deleteOrder, listLogistics } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 interface Order {
    id: number;
@@ -76,6 +76,17 @@ export default function AdminOrders() {
   const [logisticsList, setLogisticsList] = useState<Array<{ id: number; name: string; tracking_url?: string }>>([]);
   const [showLogisticsDropdown, setShowLogisticsDropdown] = useState(false);
 
+  const closeUpdateModal = () => {
+    // Ensure nested dropdown modals are closed first (Android back button)
+    setShowPreDropdown(false);
+    setShowPostDropdown(false);
+    setShowLogisticsDropdown(false);
+    setModalVisible(false);
+  };
+
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const showBackToProfile = from === 'profile';
+
   const isAdmin = (user?.is_admin || 0) >= 1;
 
   const loadOrders = async () => {
@@ -104,7 +115,16 @@ export default function AdminOrders() {
   const handleUpdateOrder = async (order: Order) => {
     const items = await getOrderItems(order.id) as OrderItem[];
     setOrderItems(items);
-    setSelectedOrder(order);
+
+    // Fetch full order row as a source of truth for booking/delivery address
+    // while preserving admin list-only fields (full_name, number)
+    let fullOrder: Order = order;
+    try {
+      const fresh = await getOrderById(order.id) as any;
+      if (fresh) fullOrder = { ...order, ...fresh };
+    } catch {}
+
+    setSelectedOrder(fullOrder);
     setNewStatus(order.status);
     setStatusNote(order.status_note || '');
     setDeliveryDate(order.delivery_date ? new Date(order.delivery_date) : null);
@@ -232,22 +252,18 @@ export default function AdminOrders() {
             {new Date(item.created_at).toLocaleDateString('en-IN')}
           </Text>
         </View>
-        {item.booking_address && (
-          <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
-            <Ionicons name="business" size={18} color="#666" />
-            <Text style={styles.orderDetailText} numberOfLines={2}>
-              Booking: {item.booking_address}
-            </Text>
-          </View>
-        )}
-        {item.delivery_address && (
-          <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
-            <Ionicons name="location" size={18} color="#666" />
-            <Text style={styles.orderDetailText} numberOfLines={3}>
-              {item.delivery_address}
-            </Text>
-          </View>
-        )}
+        <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
+          <Ionicons name="business" size={18} color="#666" />
+          <Text style={styles.orderDetailText} numberOfLines={2}>
+            Booking: {String((item as any).booking_address || (item as any).bookingAddress || 'Address not given')}
+          </Text>
+        </View>
+        <View style={[styles.orderDetailRow, { alignItems: 'flex-start' }]}>
+          <Ionicons name="location" size={18} color="#666" />
+          <Text style={styles.orderDetailText} numberOfLines={3}>
+            {String((item as any).delivery_address || (item as any).deliveryAddress || 'Address not given')}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.actionButtons}>
@@ -294,7 +310,15 @@ export default function AdminOrders() {
       <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
         <View style={{ position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Back" style={{ padding: 4 }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (showBackToProfile) router.push('/(tabs)/profile');
+              else if ((router as any).canGoBack?.()) router.back();
+              else router.push('/(tabs)/profile');
+            }}
+            accessibilityLabel="Back"
+            style={{ padding: 4 }}
+          >
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -321,17 +345,23 @@ export default function AdminOrders() {
         showsVerticalScrollIndicator={false}
       />
 
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+        <Modal
+          visible={modalVisible}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeUpdateModal}
+        >
         <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }} />
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Update Order Status</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Ionicons name="close" size={24} color="#333" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity onPress={closeUpdateModal} accessibilityLabel="Back" style={{ padding: 4 }}>
+                <Ionicons name="chevron-back" size={22} color="#333" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Update Order Status</Text>
+            </View>
+            <TouchableOpacity onPress={closeUpdateModal} accessibilityLabel="Close" style={{ padding: 4 }}>
+              <Ionicons name="close" size={22} color="#333" />
             </TouchableOpacity>
           </View>
 
@@ -346,18 +376,18 @@ export default function AdminOrders() {
                   <Text style={styles.orderInfoText}>
                     Payment: {formatPayment(selectedOrder.payment_method, (selectedOrder as any).payment_status)}
                   </Text>
-                  {selectedOrder.booking_address && (
-                    <View style={styles.addressInfo}>
-                      <Text style={styles.addressLabel}>Booking Address:</Text>
-                      <Text style={styles.addressText}>{selectedOrder.booking_address}</Text>
-                    </View>
-                  )}
-                  {selectedOrder.delivery_address && (
-                    <View style={styles.addressInfo}>
-                      <Text style={styles.addressLabel}>Delivery Address:</Text>
-                      <Text style={styles.addressText}>{selectedOrder.delivery_address}</Text>
-                    </View>
-                  )}
+                  <View style={styles.addressInfo}>
+                    <Text style={styles.addressLabel}>Booking Address:</Text>
+                    <Text style={styles.addressText}>
+                      {String((selectedOrder as any).booking_address || (selectedOrder as any).bookingAddress || 'Address not given')}
+                    </Text>
+                  </View>
+                  <View style={styles.addressInfo}>
+                    <Text style={styles.addressLabel}>Delivery Address:</Text>
+                    <Text style={styles.addressText}>
+                      {String((selectedOrder as any).delivery_address || (selectedOrder as any).deliveryAddress || 'Address not given')}
+                    </Text>
+                  </View>
                   {!!selectedOrder.status_note && selectedOrder.status_note.trim().length > 0 && (
                     <View style={[styles.addressInfo, { marginTop: 8 }] }>
                       <Text style={styles.addressLabel}>Customer Note:</Text>

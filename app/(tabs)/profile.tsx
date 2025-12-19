@@ -37,7 +37,7 @@ export default function Profile() {
               <Ionicons name="chevron-forward" size={18} color="#2d5016" />
             </TouchableOpacity>
             {(user?.is_admin ?? 0) === 2 && (
-              <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/adminOrders')}>
+              <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/adminOrders?from=profile')}>
                 <View style={styles.tileLeft}>
                   <Ionicons name="receipt" size={20} color="#4caf50" />
                   <Text style={styles.tileTitle}>{t('nav.manage')}</Text>

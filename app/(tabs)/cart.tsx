@@ -18,7 +18,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
 import { createOrder } from '../../lib/database';
 import { api } from '../../lib/api';
-import AddressModal from '../../components/AddressModal';
+import CheckoutAddressesModal from '../../components/CheckoutAddressesModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { Linking } from 'react-native';
@@ -42,7 +42,6 @@ export default function Cart() {
   const { cartItems, cartTotal, updateQuantity, removeItem, clearAll, refreshCart } = useCart();
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
-  const [currentAddressType, setCurrentAddressType] = useState<'booking' | 'delivery' | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<string>(''); // 'cod' or 'online'
   const [bookingAddress, setBookingAddress] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
@@ -157,8 +156,7 @@ export default function Cart() {
       Alert.alert(t('cart.empty'), t('cart.emptySubtext'));
       return;
     }
-    // Start with address collection for booking
-    setCurrentAddressType('booking');
+    // Collect both booking + delivery addresses (required) before payment selection
     setAddressModalVisible(true);
   };
 
@@ -166,17 +164,11 @@ export default function Cart() {
     setSelectedPayment(method);
   };
 
-  const handleAddressConfirmed = (address: string) => {
-    if (currentAddressType === 'booking') {
-      setBookingAddress(address);
-      setCurrentAddressType('delivery');
-      // Modal stays open for delivery address
-    } else if (currentAddressType === 'delivery') {
-      setDeliveryAddress(address);
-      setAddressModalVisible(false);
-      setCurrentAddressType(null);
-      setPaymentModalVisible(true);
-    }
+  const handleAddressesConfirmed = (booking: string, delivery: string) => {
+    setBookingAddress(booking);
+    setDeliveryAddress(delivery);
+    setAddressModalVisible(false);
+    setPaymentModalVisible(true);
   };
 
   const handleConfirmOrder = async () => {
@@ -186,15 +178,8 @@ export default function Cart() {
     }
 
     const ensureAddresses = () => {
-      if (!bookingAddress.trim()) {
+      if (!bookingAddress.trim() || !deliveryAddress.trim()) {
         setPaymentModalVisible(false);
-        setCurrentAddressType('booking');
-        setAddressModalVisible(true);
-        return false;
-      }
-      if (!deliveryAddress.trim()) {
-        setPaymentModalVisible(false);
-        setCurrentAddressType('delivery');
         setAddressModalVisible(true);
         return false;
       }
@@ -424,7 +409,6 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                     style={styles.changeAddressButton}
                     onPress={() => {
                       setPaymentModalVisible(false);
-                      setCurrentAddressType('booking');
                       setAddressModalVisible(true);
                     }}
                   >
@@ -441,7 +425,6 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                     style={styles.changeAddressButton}
                     onPress={() => {
                       setPaymentModalVisible(false);
-                      setCurrentAddressType('delivery');
                       setAddressModalVisible(true);
                     }}
                   >
@@ -541,15 +524,12 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
         </View>
       </Modal>
 
-      <AddressModal
+      <CheckoutAddressesModal
         visible={addressModalVisible}
-        onClose={() => {
-          setAddressModalVisible(false);
-          setCurrentAddressType(null);
-        }}
-        onAddressConfirmed={handleAddressConfirmed}
-        title={currentAddressType === 'booking' ? 'Booking Address' : 'Delivery Address'}
-        addressType={currentAddressType || 'delivery'}
+        bookingAddress={bookingAddress}
+        deliveryAddress={deliveryAddress}
+        onClose={() => setAddressModalVisible(false)}
+        onConfirm={handleAddressesConfirmed}
       />
 
       {/* Creating payment loading overlay */}

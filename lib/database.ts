@@ -1161,6 +1161,23 @@ export async function getUserOrders(userId: number) {
   }
 }
 
+export async function getOrderById(orderId: number) {
+  try {
+    if (API_URL) {
+      // Note: server route is singular: GET /order/:id
+      return await api.get(`/order/${orderId}`);
+    }
+    const rows = await db.getAllAsync(
+      `SELECT * FROM orders WHERE id = ?`,
+      orderId
+    );
+    return rows[0] || null;
+  } catch (err) {
+    console.error('SQLite fetch error:', err);
+    return null;
+  }
+}
+
 export async function getOrderItems(orderId: number) {
   try {
     if (API_URL) {

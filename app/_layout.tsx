@@ -10,15 +10,15 @@ export default function RootLayout() {
   React.useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       try {
-        // Only go back if there's history; otherwise do nothing (stay on current page)
-        // This keeps behavior "previous page only" across menus/screens.
+        // Only intercept the Android back button when we can actually navigate back.
+        // If we *can't* go back, return false so React Native can handle it (e.g. close modals / exit app).
         // @ts-ignore
         if ((router as any).canGoBack?.()) {
           router.back();
           return true;
         }
       } catch {}
-      return true;
+      return false;
     });
     return () => sub.remove();
   }, []);

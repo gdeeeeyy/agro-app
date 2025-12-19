@@ -3,16 +3,18 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getOrderItems, getOrderStatusHistory } from '../../lib/database';
+import { getOrderById, getOrderItems, getOrderStatusHistory } from '../../lib/database';
 
 export default function OrderDetailsPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const orderId = Number(id);
+  const [order, setOrder] = useState<any | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [history, setHistory] = useState<Array<{ status: string; note?: string; created_at: string }>>([]);
 
   useEffect(() => {
     (async () => {
+      try { const o = await getOrderById(orderId); setOrder(o || null); } catch {}
       try { const its = await getOrderItems(orderId) as any[]; setItems(its || []); } catch {}
       try { const hist = await getOrderStatusHistory(orderId) as any[]; setHistory(Array.isArray(hist)? hist : []); } catch {}
     })();
@@ -49,7 +51,21 @@ export default function OrderDetailsPage() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }}>
-        <Text style={styles.sectionTitle}>Order Items</Text>
+        <Text style={styles.sectionTitle}>Addresses</Text>
+        <View style={styles.addressCard}>
+          <Text style={styles.addressLabel}>Booking Address</Text>
+          <Text style={styles.addressText}>
+            {String(order?.booking_address || 'Address not given')}
+          </Text>
+        </View>
+        <View style={styles.addressCard}>
+          <Text style={styles.addressLabel}>Delivery Address</Text>
+          <Text style={styles.addressText}>
+            {String(order?.delivery_address || 'Address not given')}
+          </Text>
+        </View>
+
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Order Items</Text>
         {items.map(it => (
           <View key={it.id} style={styles.itemRow}>
             <Text style={{ color:'#2d5016', fontWeight:'700' }}>{it.product_name}</Text>
@@ -82,6 +98,9 @@ const styles = StyleSheet.create({
   header: { backgroundColor:'#4caf50', paddingHorizontal:12, paddingVertical:10, flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
   headerTitle: { color:'#fff', fontSize:18, fontWeight:'700' },
   sectionTitle: { color:'#2d5016', fontWeight:'800', fontSize:16, marginBottom:8 },
+  addressCard: { padding: 12, borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, backgroundColor: '#f9f9f9', marginBottom: 8 },
+  addressLabel: { fontSize: 12, fontWeight: '800', color: '#2d5016', marginBottom: 6 },
+  addressText: { fontSize: 13, color: '#333', lineHeight: 18 },
   itemRow: { padding:12, borderWidth:1, borderColor:'#e0e0e0', borderRadius:8, backgroundColor:'#f9f9f9', marginBottom:8, flexDirection:'row', justifyContent:'space-between' },
   timeline: { marginTop: 6, paddingLeft: 4 },
   timelineRow: { flexDirection:'row', alignItems:'flex-start', marginBottom:12 },

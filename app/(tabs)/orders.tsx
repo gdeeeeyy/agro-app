@@ -17,7 +17,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { getUserOrders, getOrderItems, getOrderStatusHistory, rateOrderItem } from '../../lib/database';
+import { getUserOrders, getOrderById, getOrderItems, getOrderStatusHistory, rateOrderItem } from '../../lib/database';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../../components/TopBar';
 
@@ -82,6 +82,15 @@ export default function Orders() {
   const handleViewDetails = async (order: Order) => {
     const items = await getOrderItems(order.id) as OrderItem[];
     setOrderItems(items);
+
+    // Fetch full order row as a source of truth for booking/delivery address
+    // (some list endpoints may omit these fields depending on backend/Supabase view)
+    let fullOrder: Order = order;
+    try {
+      const fresh = await getOrderById(order.id) as any;
+      if (fresh) fullOrder = { ...order, ...fresh };
+    } catch {}
+
     // Seed rating/review drafts from existing values
     const ratingMap: Record<number, number> = {};
     const reviewMap: Record<number, string> = {};
@@ -93,7 +102,7 @@ export default function Orders() {
     }
     setRatingDraft(ratingMap);
     setReviewDraft(reviewMap);
-    setSelectedOrder(order);
+    setSelectedOrder(fullOrder);
     setShowRatingEditor(false);
     try { const hist = await getOrderStatusHistory(order.id) as any[]; setStatusHistory(Array.isArray(hist)? hist : []); } catch { setStatusHistory([]); }
     setDetailsModalVisible(true);
@@ -257,22 +266,18 @@ export default function Orders() {
               {item.payment_method === 'cod' ? t('payment.cod') : item.payment_method.toUpperCase()}
             </Text>
           </View>
-        {item.booking_address && (
-          <View style={styles.orderDetailRow}>
-            <Ionicons name="business" size={20} color="#666" />
-            <Text style={styles.orderDetailText} numberOfLines={2}>
-              Booking: {item.booking_address}
-            </Text>
-          </View>
-        )}
-        {item.delivery_address && (
-          <View style={styles.orderDetailRow}>
-            <Ionicons name="location" size={20} color="#666" />
-            <Text style={styles.orderDetailText} numberOfLines={2}>
-              {item.delivery_address}
-            </Text>
-          </View>
-        )}
+        <View style={styles.orderDetailRow}>
+          <Ionicons name="business" size={20} color="#666" />
+          <Text style={styles.orderDetailText} numberOfLines={2}>
+            Booking: {String((item as any).booking_address || (item as any).bookingAddress || 'Address not given')}
+          </Text>
+        </View>
+        <View style={styles.orderDetailRow}>
+          <Ionicons name="location" size={20} color="#666" />
+          <Text style={styles.orderDetailText} numberOfLines={2}>
+            {String((item as any).delivery_address || (item as any).deliveryAddress || 'Address not given')}
+          </Text>
+        </View>
         {item.logistics_name && (
           <View style={styles.orderDetailRow}>
             <Ionicons name="cube" size={20} color="#666" />
@@ -382,22 +387,18 @@ export default function Orders() {
                       {selectedOrder.payment_method === 'cod' ? 'Cash on Delivery' : selectedOrder.payment_method.toUpperCase()}
                     </Text>
                   </View>
-                  {selectedOrder.booking_address && (
-                    <View style={styles.addressDetailSection}>
-                      <Text style={styles.detailLabel}>Booking Address:</Text>
-                      <Text style={styles.addressDetailText}>
-                        {selectedOrder.booking_address}
-                      </Text>
-                    </View>
-                  )}
-                  {selectedOrder.delivery_address && (
-                    <View style={styles.addressDetailSection}>
-                      <Text style={styles.detailLabel}>Delivery Address:</Text>
-                      <Text style={styles.addressDetailText}>
-                        {selectedOrder.delivery_address}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={styles.addressDetailSection}>
+                    <Text style={styles.detailLabel}>Booking Address:</Text>
+                    <Text style={styles.addressDetailText}>
+                      {String((selectedOrder as any).booking_address || (selectedOrder as any).bookingAddress || 'Address not given')}
+                    </Text>
+                  </View>
+                  <View style={styles.addressDetailSection}>
+                    <Text style={styles.detailLabel}>Delivery Address:</Text>
+                    <Text style={styles.addressDetailText}>
+                      {String((selectedOrder as any).delivery_address || (selectedOrder as any).deliveryAddress || 'Address not given')}
+                    </Text>
+                  </View>
                   {selectedOrder.status_note && (
                     <View style={styles.noteContainer}>
                       <Ionicons name="information-circle" size={20} color="#4caf50" />

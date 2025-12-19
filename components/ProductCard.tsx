@@ -43,6 +43,9 @@ interface Product {
   status?: 'pending' | 'approved' | 'rejected';
   created_at?: string;
   updated_at?: string;
+  // rating summary (populated by backend list endpoints)
+  avg_rating?: number;
+  rating_count?: number;
 }
 
 interface ProductCardProps {
@@ -85,6 +88,10 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
   const [isLoading, setIsLoading] = useState(false);
   const placeholderImage = 'https://via.placeholder.com/800x600?text=Agri+Product';
   const productImage = product.image || placeholderImage;
+
+  // Card-level rating summary (shown outside the popup)
+  const cardRatingCount = Number((product as any).rating_count || 0);
+  const cardAvgRating = Number((product as any).avg_rating || 0);
 
   const parseVariantLabel = (label?: string): { quantity?: string; unit?: string } => {
     if (!label || typeof label !== 'string') return {};
@@ -325,17 +332,17 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               <Text style={[styles.name, styles.nameCompact]} numberOfLines={1}>
                 {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
-              {reviews.length > 0 ? (
+              {cardRatingCount > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                  {Array.from({length: 5}, (_, i) => {
-                    const rating = averageRating;
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const rating = cardAvgRating;
                     let icon = 'star-outline' as any;
                     if (i < Math.floor(rating)) icon = 'star';
                     else if (i < rating) icon = 'star-half';
                     return <Ionicons key={i} name={icon} size={12} color="#FFD700" style={{ marginRight: 1 }} />;
                   })}
                   <Text style={{ fontSize: 10, color: '#666', marginLeft: 2 }}>
-                    {averageRating.toFixed(1)} ({reviews.length})
+                    {cardAvgRating.toFixed(1)} ({cardRatingCount})
                   </Text>
                 </View>
               ) : null}
@@ -387,17 +394,17 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               <Text style={styles.nameOverlay} numberOfLines={2}>
                 {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
-              {reviews.length > 0 ? (
+              {cardRatingCount > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                  {Array.from({length: 5}, (_, i) => {
-                    const rating = averageRating;
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const rating = cardAvgRating;
                     let icon = 'star-outline' as any;
                     if (i < Math.floor(rating)) icon = 'star';
                     else if (i < rating) icon = 'star-half';
                     return <Ionicons key={i} name={icon} size={12} color="#FFD700" style={{ marginRight: 1 }} />;
                   })}
                   <Text style={{ fontSize: 10, color: '#fff', marginLeft: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}>
-                    {averageRating.toFixed(1)}
+                    {cardAvgRating.toFixed(1)}
                   </Text>
                 </View>
               ) : null}
