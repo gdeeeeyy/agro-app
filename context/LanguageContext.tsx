@@ -43,6 +43,8 @@ const translations = {
     'nav.orders': 'Orders',
     'nav.admin': 'Admin',
     'nav.manage': 'Manage',
+    'nav.manageUsers': 'Manage Users',
+    'nav.manageUserOrders': 'Manage User Orders',
 'nav.profile': 'Profile',
 
     // Account/Profile
@@ -303,6 +305,8 @@ const translations = {
     'nav.orders': 'ஆர்டர்கள்',
     'nav.admin': 'நிர்வாகி',
     'nav.manage': 'நிர்வகி',
+    'nav.manageUsers': 'பயனர்களை நிர்வகி',
+    'nav.manageUserOrders': 'பயனர் ஆர்டர்களை நிர்வகி',
 'nav.profile': 'சுயவிவரம்',
 
     // Account/Profile

@@ -27,18 +27,25 @@ export async function uploadImprovedArticleDoc(
   const filePath = `improved-articles/${articleId}/${lang}.txt`;
 
   try {
-    const blob = new Blob([content], { type: 'text/plain; charset=utf-8' });
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, blob as any, {
-        contentType: 'text/plain; charset=utf-8',
-        upsert: true,
-      } as any);
+    // RN environments can be flaky with Blob/File; Uint8Array is the most portable.
+    const payload: any =
+      typeof TextEncoder !== 'undefined'
+        ? new TextEncoder().encode(content)
+        : new Blob([content], { type: 'text/plain; charset=utf-8' });
+
+    const { error } = await supabase.storage.from(bucket).upload(filePath, payload, {
+      contentType: 'text/plain; charset=utf-8',
+      upsert: true,
+    } as any);
 
     if (error) {
-      console.warn('Supabase uploadImprovedArticleDoc error:', (error as any).message || error);
+      console.warn(
+        'Supabase uploadImprovedArticleDoc error:',
+        (error as any).message || error,
+      );
       return null;
     }
+
     return filePath;
   } catch (e: any) {
     console.warn('Supabase uploadImprovedArticleDoc failed:', e?.message || e);

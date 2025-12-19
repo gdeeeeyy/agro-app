@@ -42,14 +42,6 @@ export default function ProfileDetails() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/profileEdit')}>
-        <View style={styles.tileLeft}>
-          <Ionicons name="create" size={20} color="#4caf50" />
-          <Text style={styles.tileTitle}>{t('account.profile')}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#2d5016" />
-      </TouchableOpacity>
-
       <View style={styles.languageCard}>
         <LanguageSelector />
       </View>

@@ -89,7 +89,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="adminOrders"
         options={{
-          title: t('nav.manage'),
+          title: t('nav.manageUserOrders'),
           href: null,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="clipboard" size={size + 6} color={color} />

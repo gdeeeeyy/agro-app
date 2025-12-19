@@ -40,7 +40,7 @@ export default function Profile() {
               <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/(tabs)/adminOrders?from=profile')}>
                 <View style={styles.tileLeft}>
                   <Ionicons name="receipt" size={20} color="#4caf50" />
-                  <Text style={styles.tileTitle}>{t('nav.manage')}</Text>
+                  <Text style={styles.tileTitle}>{t('nav.manageUserOrders')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#2d5016" />
               </TouchableOpacity>
@@ -66,7 +66,7 @@ export default function Profile() {
 
         <TouchableOpacity
           style={styles.tileRow}
-          onPress={() => Linking.openURL('mailto:kvktvmalai91@gmail.com')}
+          onPress={() => Linking.openURL('mailto:kvktvmalai91@gmail.com?subject=For%20Sale%20-%20Agriismart')}
         >
           <View style={styles.tileLeft}>
             <Ionicons name="mail" size={20} color="#4caf50" />

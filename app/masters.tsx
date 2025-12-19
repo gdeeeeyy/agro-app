@@ -371,7 +371,7 @@ export default function Masters() {
               {/* 2. User Manager */}
               <TouchableOpacity style={styles.masterBtn} onPress={async ()=> { router.push('/user-manager'); }}>
                 <Ionicons name="people" size={20} color="#4caf50" />
-                <Text style={styles.masterBtnText}>{t('nav.manage')}</Text>
+                <Text style={styles.masterBtnText}>{t('nav.manageUsers')}</Text>
               </TouchableOpacity>
 
               {/* 3. Manage Products */}

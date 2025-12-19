@@ -1,6 +1,8 @@
-import React, { useMemo, useRef } from 'react';
-import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, StyleSheet, ViewStyle, StyleProp, Alert, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImage } from '../lib/upload';
 
 interface Props {
   value: string;
@@ -10,6 +12,7 @@ interface Props {
 
 export default function QuillEditor({ value, onChange, style }: Props) {
   const webviewRef = useRef<WebView>(null);
+  const [uploading, setUploading] = useState(false);
 
   const html = useMemo(
     () => `<!DOCTYPE html>
@@ -68,10 +71,43 @@ export default function QuillEditor({ value, onChange, style }: Props) {
 
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
     <script>
+      const toolbarOptions = {
+        container: '#toolbar',
+        handlers: {
+          image: function () {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pick-image' }));
+            } catch (e) {}
+          }
+        }
+      };
+
       const editor = new Quill('#editor', {
         theme: 'snow',
-        modules: { toolbar: '#toolbar' }
+        modules: { toolbar: toolbarOptions }
       });
+
+      function insertImage(url) {
+        try {
+          const range = editor.getSelection(true);
+          const index = range ? range.index : editor.getLength();
+          editor.insertEmbed(index, 'image', url, 'user');
+          editor.setSelection(index + 1, 0);
+        } catch (e) {}
+      }
+
+      function onNativeMessage(event) {
+        try {
+          const data = typeof event.data === 'string' ? event.data : '';
+          const msg = JSON.parse(data);
+          if (msg && msg.type === 'insert-image' && msg.url) {
+            insertImage(String(msg.url));
+          }
+        } catch (e) {}
+      }
+
+      window.addEventListener('message', onNativeMessage);
+      document.addEventListener('message', onNativeMessage);
 
       const initialHtml = ${JSON.stringify(value || '')};
       if (initialHtml) {
@@ -90,6 +126,37 @@ export default function QuillEditor({ value, onChange, style }: Props) {
     [value]
   );
 
+  const handlePickAndUploadImage = async () => {
+    try {
+      setUploading(true);
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission required', 'Allow photo library access to add images.');
+        return;
+      }
+
+      const r = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+      });
+
+      if (r.canceled) return;
+      const uri = r.assets?.[0]?.uri;
+      if (!uri) return;
+
+      const up = await uploadImage(uri, { folder: 'agro-app/improved-articles' });
+
+      // Send URL into the editor to be inserted at the current cursor position.
+      webviewRef.current?.postMessage(
+        JSON.stringify({ type: 'insert-image', url: up.url }),
+      );
+    } catch (e: any) {
+      Alert.alert('Upload failed', String(e?.message || e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <View style={[styles.container, style]}>
       <WebView
@@ -101,6 +168,11 @@ export default function QuillEditor({ value, onChange, style }: Props) {
             const msg = JSON.parse(event.nativeEvent.data);
             if (msg.type === 'change') {
               onChange(msg.html || '');
+              return;
+            }
+            if (msg.type === 'pick-image') {
+              handlePickAndUploadImage();
+              return;
             }
           } catch {}
         }}
@@ -110,6 +182,12 @@ export default function QuillEditor({ value, onChange, style }: Props) {
         scrollEnabled
         style={{ backgroundColor: 'transparent' }}
       />
+
+      {uploading ? (
+        <View style={styles.uploadOverlay} pointerEvents="none">
+          <ActivityIndicator color="#4caf50" />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -122,5 +200,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#fff',
+  },
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
