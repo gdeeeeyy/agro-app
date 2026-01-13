@@ -35,7 +35,6 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   const [number, setNumber] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [langVisible, setLangVisible] = useState(false);
@@ -79,7 +78,8 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
         return;
       }
 
-      await setUser(user, { persist: rememberMe });
+      // Always persist login on this device so the user stays signed in.
+      await setUser(user, { persist: true });
       setLoading(false);
       router.replace('/(tabs)');
     } catch {
@@ -170,17 +170,6 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
                 editable={!loading}
               />
 
-              {!isSignup && (
-                <View style={styles.rememberRow}>
-                  <Switch
-                    value={rememberMe}
-                    onValueChange={setRememberMe}
-                    thumbColor={rememberMe ? '#4caf50' : '#f4f3f4'}
-                    trackColor={{ false: '#d0d0d0', true: '#c8e6c9' }}
-                  />
-                  <Text style={styles.rememberLabel}>Remember me on this device</Text>
-                </View>
-              )}
 
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}

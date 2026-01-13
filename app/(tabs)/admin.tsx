@@ -514,6 +514,7 @@ const pickImage = async () => {
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
+        <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>ID: {item.id}</Text>
         {isMaster && (() => {
           const avgRaw = (item as any).avg_rating;
           const countRaw = (item as any).rating_count;

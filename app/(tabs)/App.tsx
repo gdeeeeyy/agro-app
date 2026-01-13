@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
-import { savePlant, findProductsByKeywords, getRelatedProductsByName, getAllCrops } from "../../lib/database";
+import { savePlant, findProductsByKeywords, getRelatedProductsByName, listImprovedArticles } from "../../lib/database";
 import { analyzePlantImage } from "../../lib/gemini";
 import ProductCard from "../../components/ProductCard";
 import { useLanguage } from "../../context/LanguageContext";
@@ -194,11 +194,20 @@ mediaTypes: ['images'] as any,
   React.useEffect(() => {
     (async () => {
       try {
-        const rows = await getAllCrops() as any[];
-        setPickerCrops(rows);
-      } catch {}
+        const lang = currentLanguage === 'ta' ? 'ta' : 'en';
+        const agro = await listImprovedArticles('agronomy', lang) as any[];
+        const hort = await listImprovedArticles('horticulture', lang) as any[];
+        const all = [...(Array.isArray(agro) ? agro : []), ...(Array.isArray(hort) ? hort : [])];
+        const normalized = all.map((a: any) => ({
+          id: a.id,
+          name: lang === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en,
+        })).filter((a: any) => a.name);
+        setPickerCrops(normalized);
+      } catch {
+        setPickerCrops([]);
+      }
     })();
-  }, []);
+  }, [currentLanguage]);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
