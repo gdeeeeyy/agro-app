@@ -10,6 +10,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const { Buffer } = require('buffer');
+const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -26,6 +27,41 @@ const TEXTBELT_KEY = process.env.TEXTBELT_KEY || 'textbelt';
 
 const ADMIN_OTP_NUMBER = '1234567890';
 const OTP_WINDOW_MINUTES = 10;
+
+// JWT configuration - use environment variable or fallback to default (change in production!)
+const JWT_SECRET = process.env.JWT_SECRET || 'agriismart_jwt_secret_change_in_production';
+const JWT_EXPIRES_IN = '7d'; // Access token expires in 7 days
+const REFRESH_TOKEN_EXPIRES_IN = '30d'; // Refresh token expires in 30 days
+
+// Generate JWT tokens
+function generateTokens(user) {
+  const payload = {
+    id: user.id,
+    number: user.number,
+    is_admin: user.is_admin,
+  };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+  return { token, refreshToken };
+}
+
+// Middleware to verify JWT token
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
 
 if (!DATABASE_URL) {
   console.error('DATABASE_URL not set');
@@ -421,7 +457,8 @@ app.post('/auth/signup', async (req, res) => {
       'INSERT INTO users (number, password, full_name, is_admin) VALUES ($1, $2, $3, 0) RETURNING id, number, full_name, is_admin, created_at, booking_address, delivery_address',
       [number, password, full_name || null]
     );
-    res.json(u);
+    const tokens = generateTokens(u);
+    res.json({ user: u, ...tokens });
   } catch (e) {
     if (String(e.message).toLowerCase().includes('unique')) return res.status(400).json({ error: 'number already exists' });
     console.error(e);
@@ -436,7 +473,8 @@ app.post('/auth/signin', async (req, res) => {
     [number, password]
   );
   if (!u) return res.status(401).json({ error: 'Invalid number or password' });
-  res.json(u);
+  const tokens = generateTokens(u);
+  res.json({ user: u, ...tokens });
 });
 
 function randomOtpCode() {
@@ -534,6 +572,53 @@ app.post('/auth/verify-otp', async (req, res) => {
   } catch (e) {
     console.error('verify-otp error:', e);
     res.status(500).json({ error: 'otp_verify_failed' });
+  }
+});
+
+// Token refresh endpoint
+app.post('/auth/refresh', async (req, res) => {
+  const { refreshToken } = req.body || {};
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'Refresh token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    // Get fresh user data
+    const u = await one(
+      'SELECT id, number, full_name, is_admin, created_at, booking_address, delivery_address FROM users WHERE id=$1',
+      [decoded.id]
+    );
+    if (!u) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Generate new tokens
+    const tokens = generateTokens(u);
+    res.json({ ...tokens, user: u });
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired refresh token' });
+  }
+});
+
+// Get current user info (protected route)
+app.get('/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const u = await one(
+      'SELECT id, number, full_name, is_admin, created_at, booking_address, delivery_address FROM users WHERE id=$1',
+      [req.user.id]
+    );
+    if (!u) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(u);
+  } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(500).json({ error: 'Failed to get user info' });
   }
 });
 

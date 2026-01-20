@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import db from './database';
 import { api, API_URL } from './api';
+import { secureStorage } from './secureStorage';
 
 const ADMIN_OTP_NUMBER = '1234567890';
 
@@ -25,7 +26,14 @@ export async function signUp(number: string, password: string, fullName?: string
 
     if (API_URL) {
       const res = await api.post('/auth/signup', { number, password: hashedPassword, full_name: fullName || null });
-      return { user: res as User };
+      // Save tokens if provided
+      if (res.token) {
+        await secureStorage.saveToken(res.token);
+      }
+      if (res.refreshToken) {
+        await secureStorage.saveRefreshToken(res.refreshToken);
+      }
+      return { user: res.user || res };
     }
 
     const result = await db.runAsync(
@@ -54,7 +62,14 @@ export async function signIn(number: string, password: string): Promise<{ user?:
 
     if (API_URL) {
       const res = await api.post('/auth/signin', { number, password: hashedPassword });
-      return { user: res as User };
+      // Save tokens if provided
+      if (res.token) {
+        await secureStorage.saveToken(res.token);
+      }
+      if (res.refreshToken) {
+        await secureStorage.saveRefreshToken(res.refreshToken);
+      }
+      return { user: res.user || res };
     }
 
     const user = await db.getFirstAsync<User>(

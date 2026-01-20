@@ -46,7 +46,8 @@
           "cameraPermission": "தாவரங்களைப் புகைப்படம் எடுக்க கேமரா அனுமதி தேவை."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
