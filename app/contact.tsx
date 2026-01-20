@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 export default function Contact() {
   // Contact details (from provided reference)
   const EMAIL = 'kvktvmalai91@gmail.com';
-  const WEBSITE = 'https://kvk.Tiruvannamalai.com';
+  const WEBSITE = 'https://www.kvkthiruvannamalai.com';
 
   const PHONE_OFFICE = '04182-290551';
   const PHONE_MOBILE_1 = '+916384093303';
@@ -64,7 +64,7 @@ export default function Contact() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionRow} onPress={openWebsite}>
             <Ionicons name="globe" size={18} color="#4caf50" />
-            <Text style={styles.actionText}>kvk.Tiruvannamalai.com</Text>
+            <Text style={styles.actionText}>www.kvkthiruvannamalai.com</Text>
           </TouchableOpacity>
         </View>
 

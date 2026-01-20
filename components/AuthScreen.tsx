@@ -38,6 +38,7 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [langVisible, setLangVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { setUser } = useContext(UserContext);
   const { t, currentLanguage, setLanguage } = useLanguage();
@@ -160,15 +161,28 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
                 editable={!loading}
               />
 
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.password')}
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!loading}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder={t('auth.password')}
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={22}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              </View>
 
 
               <TouchableOpacity
@@ -275,6 +289,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+  },
+
+  passwordContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingRight: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 16,
+  },
+  eyeIcon: {
+    padding: 8,
   },
 
   rememberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

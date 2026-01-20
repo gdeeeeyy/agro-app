@@ -27,7 +27,9 @@ export default function ProfileDetails() {
           <Ionicons name="chevron-back" size={22} color="#2d5016" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <View style={{ width: 28 }} />
+        <TouchableOpacity onPress={() => router.push('/profileEdit')} accessibilityLabel="Edit Profile" style={{ padding: 6 }}>
+          <Ionicons name="create-outline" size={22} color="#2d5016" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
