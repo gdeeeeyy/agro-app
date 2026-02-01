@@ -160,35 +160,40 @@ mediaTypes: ['images'] as any,
       const augmentedName = plantNote ? `${plantName} (Note: ${plantNote})` : plantName;
       const geminiResponse = await analyzePlantImage(base64, augmentedName, currentLanguage);
 
+      // Immediately update result and stop loading so UI renders right away
       setResult(geminiResponse);
+      setLoading(false);
+      setImage(null);
+      setPlantName("");
+      setPlantNote("");
 
-      await savePlant(user.id, plantName, image, JSON.stringify(geminiResponse));
+      // Continue background tasks after UI has updated
+      savePlant(user.id, plantName, image, JSON.stringify(geminiResponse)).catch(err => 
+        console.error("Save plant error:", err)
+      );
 
       // Extract keywords from the analysis for better product matching
       const analysisKeywords = extractKeywordsFromAnalysis(geminiResponse, plantName);
-      const products = await findProductsByKeywords(analysisKeywords, 5);
+      findProductsByKeywords(analysisKeywords, 5).then(async (products) => {
+        // Also fetch related products based on the top matched product name
+        let related: any[] = [];
+        if (products.length > 0) {
+          const top = products[0] as any;
+          const topName = currentLanguage === 'ta' ? (top.name_ta || top.name) : top.name;
+          related = await getRelatedProductsByName(topName, products.map((p: any) => p.id), 3);
+        }
+        // Merge and dedupe by product id
+        const map: Record<string, any> = {};
+        [...products, ...related].forEach((p: any) => { map[p.id] = p; });
+        const combined = Object.values(map);
+        setRecommendedProducts(combined);
+      }).catch(err => console.error("Product fetch error:", err));
 
-      // Also fetch related products based on the top matched product name
-      let related: any[] = [];
-      if (products.length > 0) {
-        const top = products[0] as any;
-        const topName = currentLanguage === 'ta' ? (top.name_ta || top.name) : top.name;
-        related = await getRelatedProductsByName(topName, products.map((p: any) => p.id), 3);
-      }
-      // Merge and dedupe by product id
-      const map: Record<string, any> = {};
-      [...products, ...related].forEach((p: any) => { map[p.id] = p; });
-      const combined = Object.values(map);
-      setRecommendedProducts(combined);
-
-      Alert.alert(t('scanner.success'), t('scanner.successSaved'));
-      setImage(null);
-      setPlantName("");
     } catch (error) {
       console.error("Analysis error:", error);
       Alert.alert(t('scanner.error'), t('scanner.failed'));
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   React.useEffect(() => {

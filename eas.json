@@ -7,6 +7,15 @@
       },
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyAGzkF3Tj-V3LooUs4aYB-U3z6IxOjVOtU",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "agro-app",
+        "EXPO_PUBLIC_CLOUDINARY_PRESET": "unsigned_preset",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://rmmrxjkavdbpdciyrnmz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Au5eLJcglP4C9xHGWNWmiw_KlxnWuAU",
+        "EXPO_PUBLIC_SUPPORT_NUMBER": "1234567890",
+        "EXPO_PUBLIC_API_URL": "https://agro-app-6hlq.onrender.com"
       }
     },
     "production": {
@@ -16,6 +25,15 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyAGzkF3Tj-V3LooUs4aYB-U3z6IxOjVOtU",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "agro-app",
+        "EXPO_PUBLIC_CLOUDINARY_PRESET": "unsigned_preset",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://rmmrxjkavdbpdciyrnmz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Au5eLJcglP4C9xHGWNWmiw_KlxnWuAU",
+        "EXPO_PUBLIC_SUPPORT_NUMBER": "1234567890",
+        "EXPO_PUBLIC_API_URL": "https://agro-app-6hlq.onrender.com"
       }
     }
   }
