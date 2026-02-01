@@ -1,50 +1,200 @@
-# Welcome to your Expo app 👋
+# Agriismart
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A comprehensive agriculture mobile application built with React Native and Expo, designed to help farmers with plant disease detection, crop management, and agricultural product purchasing.
 
-## Get started
+## Features
 
-1. Install dependencies
+### 🌱 Plant Disease Scanner
+- AI-powered plant disease detection using Google Generative AI
+- Upload or capture images of plant leaves
+- Get instant diagnosis and treatment recommendations
+- Support for multiple crops (Tomato, Brinjal, etc.)
 
+### 🛒 Agricultural Products Store
+- Browse and purchase agricultural products
+- Product variants with different prices
+- Shopping cart functionality
+- Order tracking with status updates
+- Ratings and reviews for products
+
+### 📚 Crop Information
+- Detailed crop cultivation guides
+- Pest and disease management information
+- Bilingual support (English and Tamil)
+- Image galleries for pests and diseases
+
+### 🔬 Improved Technologies
+- Articles on modern farming techniques
+- Categorized by: Agronomy, Horticulture, Animal Husbandry, Post Harvest
+- Admin panel for content management
+
+### 👤 User Management
+- User registration and authentication
+- Role-based access (User, Vendor, Master Admin)
+- Profile management with addresses
+
+### 📦 Order Management
+- Place orders with COD or online payment (Razorpay)
+- Track order status (Pending → Confirmed → Processing → Dispatched)
+- Logistics tracking integration
+
+### 🔔 Notifications
+- In-app notifications
+- Push notifications support
+- Order status updates
+
+## Tech Stack
+
+### Mobile App
+- **Framework**: React Native with Expo SDK 54
+- **Navigation**: Expo Router
+- **State Management**: React Context
+- **Local Database**: expo-sqlite
+- **UI Components**: Custom components with Ionicons
+
+### Backend Server
+- **Runtime**: Node.js with Express
+- **Database**: PostgreSQL (Supabase/Neon compatible)
+- **Authentication**: JWT tokens
+- **Payments**: Razorpay integration
+- **SMS**: Textbelt for OTP
+
+### Cloud Services
+- **Image Storage**: Cloudinary
+- **Database Hosting**: Supabase/Neon
+- **Deployment**: Render (for API)
+
+## Project Structure
+
+```
+agro-app/
+├── app/                    # App screens (Expo Router)
+│   ├── (tabs)/            # Tab navigation screens
+│   ├── auth/              # Authentication screens
+│   ├── crop/              # Crop detail screens
+│   ├── improved-technologies/  # Technology articles
+│   └── order/             # Order detail screens
+├── components/            # Reusable UI components
+├── context/               # React Context providers
+├── lib/                   # Utilities and API functions
+├── server/                # Backend Express server
+├── assets/                # Images and static assets
+└── scripts/               # Utility scripts
+```
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli`)
+- Android Studio (for Android development)
+- Xcode (for iOS development, macOS only)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd agro-app
+   ```
+
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. Start the app
-
-   ```bash
-   npx expo start
+3. **Set up environment variables**
+   Create a `.env` file in the root directory:
+   ```env
+   EXPO_PUBLIC_API_URL=https://your-api-url.com
+   EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
+   EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your-preset
+   EXPO_PUBLIC_GEMINI_API_KEY=your-gemini-api-key
    ```
 
-In the output, you'll find options to open the app in a
+4. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+5. **Run on device/emulator**
+   - Press `a` for Android
+   - Press `i` for iOS
+   - Scan QR code with Expo Go app
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Backend Setup
 
-## Get a fresh project
+1. **Navigate to server directory**
+   ```bash
+   cd server
+   npm install
+   ```
 
-When you're ready, run:
+2. **Set up environment variables**
+   ```env
+   DATABASE_URL=postgresql://user:password@host:port/database
+   JWT_SECRET=your-jwt-secret
+   RAZORPAY_KEY_ID=your-razorpay-key
+   RAZORPAY_KEY_SECRET=your-razorpay-secret
+   TEXTBELT_URL=https://textbelt.com/text
+   TEXTBELT_KEY=textbelt
+   ```
 
+3. **Start the server**
+   ```bash
+   npm start
+   ```
+
+## Running Tests
+
+### Server Tests
 ```bash
-npm run reset-project
+cd server
+npm test
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Building for Production
 
-## Learn more
+### Android APK
+```bash
+eas build -p android --profile preview
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+### Android App Bundle (for Play Store)
+```bash
+eas build -p android --profile production
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### iOS
+```bash
+eas build -p ios --profile production
+```
 
-## Join the community
+For detailed Play Store publishing instructions, see [PLAYSTORE_GUIDE.md](./PLAYSTORE_GUIDE.md).
 
-Join our community of developers creating universal apps.
+## Language Support
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The app supports:
+- **English** (en)
+- **Tamil** (ta)
+
+Users can switch languages from the profile settings.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is private and proprietary.
+
+## Contact
+
+- **Email**: kvktvmalai91@gmail.com
+- **Website**: http://www.kvkthiruvannamalai.com
+- **Phone**: 04182-290551

@@ -81,7 +81,7 @@ export default function CropDataPage() {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView />
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#4caf50' }} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -373,6 +373,7 @@ export default function CropDataPage() {
           <SafeAreaView edges={['bottom']} style={{ backgroundColor:'#fff' }} />
         </Modal>
       </ScrollView>
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#fff' }} />
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
@@ -15,13 +16,13 @@ export default function LanguageScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <Text style={styles.heading}>{t('language.selectLanguage')}</Text>
       <LanguageSelector />
       <TouchableOpacity style={styles.cta} onPress={onContinue}>
         <Text style={styles.ctaText}>{t('common.next')}</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
