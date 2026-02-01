@@ -541,7 +541,7 @@ export async function listImprovedCategories() {
     if (API_URL) {
       try { return await api.get('/improved-categories'); } catch (e) { /* fall back */ }
     }
-    return await db.getAllAsync('SELECT * FROM improved_categories ORDER BY id');
+    return await db.getAllAsync('SELECT * FROM improved_categories ORDER BY name_en ASC');
   } catch (err) { console.error('SQLite fetch error (categories):', err); return []; }
 }
 

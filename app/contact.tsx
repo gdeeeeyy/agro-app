@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 export default function Contact() {
   // Contact details (from provided reference)
   const EMAIL = 'kvktvmalai91@gmail.com';
-  const WEBSITE = 'https://www.kvkthiruvannamalai.com';
+  const WEBSITE = 'http://www.kvkthiruvannamalai.com';
 
   const PHONE_OFFICE = '04182-290551';
   const PHONE_MOBILE_1 = '+916384093303';

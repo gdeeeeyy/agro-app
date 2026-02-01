@@ -289,6 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    color: '#333',
   },
 
   passwordContainer: {
@@ -304,6 +305,7 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     padding: 16,
+    color: '#333',
   },
   eyeIcon: {
     padding: 8,

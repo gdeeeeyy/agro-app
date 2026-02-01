@@ -109,7 +109,7 @@ export default function AdminOrders() {
     if (!num) return tpl;
     if (tpl.includes('{tracking}')) return tpl.replace('{tracking}', num);
     if (tpl.includes('%s')) return tpl.replace('%s', num);
-    return tpl.endsWith('/') ? tpl + num : `${tpl}${tpl.includes('?') ? '' : '/'}${num}`;
+    return tpl;
   };
 
   const handleUpdateOrder = async (order: Order) => {

@@ -1126,7 +1126,7 @@ app.delete('/scan-plants/:id', async (req, res) => {
 
 // Improved Technologies: public API
 app.get('/improved-categories', async (req, res) => {
-  const rows = await all('SELECT * FROM improved_categories ORDER BY id', []);
+  const rows = await all('SELECT * FROM improved_categories ORDER BY name_en ASC', []);
   res.json(rows);
 });
 
