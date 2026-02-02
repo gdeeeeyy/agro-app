@@ -105,13 +105,13 @@ agro-app/
    ```
 
 3. **Set up environment variables**
-   Create a `.env` file in the root directory:
+   Create a `.env` file in the root directory (Expo public vars only):
    ```env
    EXPO_PUBLIC_API_URL=https://your-api-url.com
    EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
-   EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your-preset
-   EXPO_PUBLIC_GEMINI_API_KEY=your-gemini-api-key
+   EXPO_PUBLIC_CLOUDINARY_PRESET=your-preset
    ```
+   Note: AI keys must NOT be exposed in the client app bundle.
 
 4. **Start the development server**
    ```bash
@@ -132,6 +132,7 @@ agro-app/
    ```
 
 2. **Set up environment variables**
+   Configure these on Render (or in `server/.env` for local dev):
    ```env
    DATABASE_URL=postgresql://user:password@host:port/database
    JWT_SECRET=your-jwt-secret
@@ -139,6 +140,9 @@ agro-app/
    RAZORPAY_KEY_SECRET=your-razorpay-secret
    TEXTBELT_URL=https://textbelt.com/text
    TEXTBELT_KEY=textbelt
+   GROQ_API_KEY=your-groq-api-key
+   # Optional
+   GROQ_VISION_MODEL=llama-3.2-11b-vision-preview
    ```
 
 3. **Start the server**

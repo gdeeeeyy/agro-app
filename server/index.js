@@ -25,8 +25,11 @@ const RAZORPAY_CALLBACK_URL = process.env.RAZORPAY_CALLBACK_URL || null;
 const TEXTBELT_URL = process.env.TEXTBELT_URL || 'https://textbelt.com/text';
 const TEXTBELT_KEY = process.env.TEXTBELT_KEY || 'textbelt';
 
-// Gemini API key (server-side only - never expose to client)
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Groq API (server-side only - never expose to client)
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_BASE_URL = process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1';
+// Vision-capable model name. You can override this on Render.
+const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
 
 const ADMIN_OTP_NUMBER = '1234567890';
 const OTP_WINDOW_MINUTES = 10;
@@ -1773,22 +1776,22 @@ app.post('/conversations/:id/messages', async (req, res) => {
   res.json({ id: m.id, created_at: m.created_at });
 });
 
-// ============ Plant Disease Analysis (Gemini AI) ============
+// ============ Plant Disease Analysis (Groq Vision) ============
 app.post('/analyze-plant', async (req, res) => {
   try {
     const { base64Image, plantName, language } = req.body || {};
-    
+
     if (!base64Image || !plantName) {
       return res.status(400).json({ error: 'base64Image and plantName required' });
     }
-    
-    if (!GEMINI_API_KEY) {
-      console.error('GEMINI_API_KEY not configured');
-      return res.status(500).json({ 
-        plant: plantName, 
-        disease_or_pest: 'Service unavailable', 
-        description: 'AI service not configured on server', 
-        keywords: [] 
+
+    if (!GROQ_API_KEY) {
+      console.error('GROQ_API_KEY not configured');
+      return res.status(500).json({
+        plant: plantName,
+        disease_or_pest: 'Service unavailable',
+        description: 'AI service not configured on server',
+        keywords: [],
       });
     }
 
@@ -1796,40 +1799,49 @@ app.post('/analyze-plant', async (req, res) => {
     const lang = language === 'ta' ? 'ta' : 'en';
 
     const prompts = {
-      en: `
-You are a plant disease and pest identification assistant.
+      en: `You are a plant disease and pest identification assistant.
 The plant is: ${plantName}.
 Analyze the image and return:
-1. Disease or pest
-2. Short description
-3. 3–5 keywords
+1) Disease or pest
+2) Short description
+3) 3–5 keywords
 Respond strictly in JSON:
-{ "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
-`,
-      ta: `
-நீங்கள் ஒரு தாவர நோய் மற்றும் பூச்சி அடையாள உதவியாளர்.
+{ "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }`,
+      ta: `நீங்கள் ஒரு தாவர நோய் மற்றும் பூச்சி அடையாள உதவியாளர்.
 தாவரம்: ${plantName}.
 படத்தை ஆய்வு செய்து பின்வருவனவற்றை வழங்கவும்:
-1. நோய் அல்லது பூச்சி
-2. சுருக்கமான விளக்கம்
-3. 3-5 முக்கிய வார்த்தைகள்
+1) நோய் அல்லது பூச்சி
+2) சுருக்கமான விளக்கம்
+3) 3-5 முக்கிய வார்த்தைகள்
 கண்டிப்பாக JSON வடிவத்தில் பதிலளிக்கவும் (தமிழில்):
 { "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
-அனைத்து மதிப்புகளும் தமிழில் இருக்க வேண்டும்.
-`
+அனைத்து மதிப்புகளும் தமிழில் இருக்க வேண்டும்.`,
     };
 
+    // Groq uses an OpenAI-compatible Chat Completions API.
+    // For vision models, send a text+image message.
     const payload = {
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: prompts[lang] },
-          { inlineData: { mimeType: 'image/jpeg', data: base64Raw } }
-        ]
-      }]
+      model: GROQ_VISION_MODEL,
+      temperature: 0.2,
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompts[lang] },
+            {
+              type: 'image_url',
+              image_url: {
+                // base64 JPEG data URL
+                url: `data:image/jpeg;base64,${base64Raw}`,
+              },
+            },
+          ],
+        },
+      ],
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `${GROQ_BASE_URL}/chat/completions`;
 
     // Retry logic
     const maxRetries = 3;
@@ -1840,57 +1852,62 @@ Respond strictly in JSON:
       try {
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP ${response.status}`);
+          const msg = errData?.error?.message || errData?.message || response.statusText;
+          throw new Error(`${response.status} ${msg}`);
         }
 
         const data = await response.json();
-        const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        
+        const textOutput = data?.choices?.[0]?.message?.content;
+
         if (!textOutput) {
-          throw new Error('No response from Gemini API');
+          throw new Error('No response from Groq API');
         }
 
-        const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
+        const jsonMatch = String(textOutput).match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-          console.warn('No JSON found in Gemini response:', textOutput);
-          return res.json({ plant: plantName, disease_or_pest: 'Unknown', description: textOutput, keywords: [] });
+          console.warn('No JSON found in Groq response:', textOutput);
+          return res.json({ plant: plantName, disease_or_pest: 'Unknown', description: String(textOutput), keywords: [] });
         }
 
         try {
           return res.json(JSON.parse(jsonMatch[0]));
-        } catch (parseErr) {
+        } catch {
           console.warn('Failed to parse extracted JSON:', jsonMatch[0]);
-          return res.json({ plant: plantName, disease_or_pest: 'Unknown', description: textOutput, keywords: [] });
+          return res.json({ plant: plantName, disease_or_pest: 'Unknown', description: String(textOutput), keywords: [] });
         }
       } catch (err) {
         lastErr = err;
-        const retriable = err.message?.includes('429') || err.message?.includes('503') || err.message?.includes('Network');
+        const msg = String(err?.message || err);
+        const retriable = msg.includes('429') || msg.includes('503') || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('network');
         if (!retriable || attempt === maxRetries - 1) {
-          console.error('Gemini API error:', err.message);
-          return res.json({ 
-            plant: plantName, 
-            disease_or_pest: 'Service unavailable', 
-            description: 'AI service temporarily unavailable (try again later)', 
-            keywords: [] 
+          console.error('Groq API error:', msg);
+          return res.json({
+            plant: plantName,
+            disease_or_pest: 'Service unavailable',
+            description: 'AI service temporarily unavailable (try again later)',
+            keywords: [],
           });
         }
         const backoff = 1000 * Math.pow(2, attempt);
-        await new Promise(r => setTimeout(r, backoff));
+        await new Promise((r) => setTimeout(r, backoff));
         attempt++;
       }
     }
 
-    return res.json({ 
-      plant: plantName, 
-      disease_or_pest: 'Service unavailable', 
-      description: String(lastErr?.message || 'Unknown error'), 
-      keywords: [] 
+    return res.json({
+      plant: plantName,
+      disease_or_pest: 'Service unavailable',
+      description: String(lastErr?.message || 'Unknown error'),
+      keywords: [],
     });
   } catch (e) {
     console.error('analyze-plant error:', e);
