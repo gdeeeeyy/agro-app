@@ -437,7 +437,11 @@ runMigrations();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+
+// Plant analysis uploads base64 images which can be several MB.
+// Increase body limits to avoid 413 Payload Too Large.
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 app.get('/health', async (req, res) => {
   try { await pool.query('select 1'); res.json({ ok: true }); } catch (e) { res.status(500).json({ ok: false }); }

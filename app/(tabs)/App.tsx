@@ -102,7 +102,8 @@ const takePhoto = async () => {
 
     const result = await ImagePicker.launchCameraAsync({
 mediaTypes: ['images'] as any,
-      quality: 1,
+      // Reduce size so base64 upload doesn't exceed server limits.
+      quality: 0.7,
       allowsEditing: true,
       aspect: [4, 3],
     });
@@ -116,7 +117,8 @@ mediaTypes: ['images'] as any,
 const pickImageFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
 mediaTypes: ['images'] as any,
-      quality: 1,
+      // Reduce size so base64 upload doesn't exceed server limits.
+      quality: 0.7,
       allowsEditing: true,
       aspect: [4, 3],
     });
@@ -219,6 +221,21 @@ mediaTypes: ['images'] as any,
       <View style={styles.wrapper}>
         <AppHeader />
 
+        {/* Loading overlay for Diagnose */}
+        <Modal
+          visible={loading}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {}}
+        >
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color="#4caf50" />
+              <Text style={styles.loadingText}>{t('scanner.analyzing') || 'Analyzing...'}</Text>
+            </View>
+          </View>
+        </Modal>
+
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {/* 1. First ask user to take / pick a photo */}
         <View style={styles.imagePickerSection}>
@@ -266,10 +283,11 @@ mediaTypes: ['images'] as any,
         </View>
         )}
 
-        {(!image || !plantName || loading) ? null : (
+        {(!image || !plantName) ? null : (
           <TouchableOpacity
-            style={styles.analyzeButton}
+            style={[styles.analyzeButton, loading ? styles.analyzeButtonDisabled : null]}
             onPress={analyzeAndSave}
+            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -525,6 +543,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 16,
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 18,
+    elevation: 4,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '700',
   },
   disclaimerOverlay: {
     flex: 1,
