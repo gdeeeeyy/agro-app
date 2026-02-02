@@ -58,6 +58,7 @@ A comprehensive agriculture mobile application built with React Native and Expo,
 - **Authentication**: JWT tokens
 - **Payments**: Razorpay integration
 - **SMS**: Textbelt for OTP
+- **AI (plant diagnosis)**: GroqCloud (vision model) called server-side via `/analyze-plant`
 
 ### Cloud Services
 - **Image Storage**: Cloudinary
@@ -124,15 +125,13 @@ agro-app/
    - Scan QR code with Expo Go app
 
 ### Backend Setup
-
 1. **Navigate to server directory**
    ```bash
    cd server
    npm install
    ```
-
 2. **Set up environment variables**
-   Configure these on Render (or in `server/.env` for local dev):
+   Configure these on Render (recommended) or in `server/.env` for local dev.
    ```env
    DATABASE_URL=postgresql://user:password@host:port/database
    JWT_SECRET=your-jwt-secret
@@ -140,11 +139,15 @@ agro-app/
    RAZORPAY_KEY_SECRET=your-razorpay-secret
    TEXTBELT_URL=https://textbelt.com/text
    TEXTBELT_KEY=textbelt
+   # AI (server-side only)
    GROQ_API_KEY=your-groq-api-key
-   # Optional
-   GROQ_VISION_MODEL=llama-3.2-11b-vision-preview
+   # Optional overrides
+   GROQ_BASE_URL=https://api.groq.com/openai/v1
+   GROQ_VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
    ```
-
+   Notes:
+   - Do NOT put `GROQ_API_KEY` (or any AI key) in Expo `EXPO_PUBLIC_*` variables.
+   - Groq occasionally deprecates model IDs; if you see a 400 "decommissioned" error, update `GROQ_VISION_MODEL` using Groq's deprecations page.
 3. **Start the server**
    ```bash
    npm start
