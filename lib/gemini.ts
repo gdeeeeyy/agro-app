@@ -1,94 +1,40 @@
 import axios from "axios";
+import Constants from 'expo-constants';
 
-const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+// Get backend API URL from config
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'https://agro-app-6hlq.onrender.com';
 
 export async function analyzePlantImage(base64Image: string, plantName: string, language: 'en' | 'ta' = 'en') {
-  if (!apiKey) throw new Error("Missing Gemini API key");
-
-  const base64Raw = base64Image.split(",")[1] ?? base64Image;
-
-  const prompts = {
-    en: `
-You are a plant disease and pest identification assistant.
-The plant is: ${plantName}.
-Analyze the image and return:
-1. Disease or pest
-2. Short description
-3. 3–5 keywords
-Respond strictly in JSON:
-{ "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
-`,
-    ta: `
-நீங்கள் ஒரு தாவர நோய் மற்றும் பூச்சி அடையாள உதவியாளர்.
-தாவரம்: ${plantName}.
-படத்தை ஆய்வு செய்து பின்வருவனவற்றை வழங்கவும்:
-1. நோய் அல்லது பூச்சி
-2. சுருக்கமான விளக்கம்
-3. 3-5 முக்கிய வார்த்தைகள்
-கண்டிப்பாக JSON வடிவத்தில் பதிலளிக்கவும் (தமிழில்):
-{ "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
-அனைத்து மதிப்புகளும் தமிழில் இருக்க வேண்டும்.
-`
-  };
-
-  const prompt = prompts[language];
-
-  const payload = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: "image/jpeg", data: base64Raw } },
-        ],
-      },
-    ],
-  };
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-  // Simple retry with exponential backoff for 429/503/network errors
+  // Call backend API instead of Gemini directly (API key stays server-side)
   const maxRetries = 3;
   let attempt = 0;
   let lastErr: any = null;
 
   while (attempt < maxRetries) {
     try {
-      const res = await axios.post(url, payload, {
+      const res = await axios.post(`${API_URL}/analyze-plant`, {
+        base64Image,
+        plantName,
+        language
+      }, {
         headers: { "Content-Type": "application/json" },
-        timeout: 15000,
+        timeout: 30000, // 30s timeout for AI analysis
       });
 
-      const textOutput = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!textOutput) throw new Error("No response from Gemini API");
-
-      const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.warn("No JSON found in Gemini response:", textOutput);
-        return { plant: plantName, disease_or_pest: "Unknown", description: textOutput, keywords: [] };
-      }
-
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch (parseErr) {
-        console.warn("Failed to parse extracted JSON:", jsonMatch[0]);
-        return { plant: plantName, disease_or_pest: "Unknown", description: textOutput, keywords: [] };
-      }
+      return res.data;
     } catch (err: any) {
       lastErr = err;
       const status = err?.response?.status;
       const retriable = status === 429 || status === 503 || err?.code === 'ECONNABORTED' || err?.message?.includes('Network request failed');
       if (!retriable || attempt === maxRetries - 1) {
-        console.error("Gemini API error:", err.response?.data || err.message);
-        // graceful fallback so the app keeps working
+        console.error("Plant analysis API error:", err.response?.data || err.message);
         return { plant: plantName, disease_or_pest: "Service unavailable", description: "AI service temporarily unavailable (try again later)", keywords: [] };
       }
-      const backoff = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+      const backoff = 1000 * Math.pow(2, attempt);
       await new Promise(r => setTimeout(r, backoff));
       attempt++;
     }
   }
 
-  // Should not reach here, but return a safe fallback
   return { plant: plantName, disease_or_pest: "Service unavailable", description: String(lastErr?.message || 'Unknown error'), keywords: [] };
 }

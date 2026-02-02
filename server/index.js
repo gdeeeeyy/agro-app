@@ -25,6 +25,9 @@ const RAZORPAY_CALLBACK_URL = process.env.RAZORPAY_CALLBACK_URL || null;
 const TEXTBELT_URL = process.env.TEXTBELT_URL || 'https://textbelt.com/text';
 const TEXTBELT_KEY = process.env.TEXTBELT_KEY || 'textbelt';
 
+// Gemini API key (server-side only - never expose to client)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
 const ADMIN_OTP_NUMBER = '1234567890';
 const OTP_WINDOW_MINUTES = 10;
 
@@ -1768,6 +1771,131 @@ app.post('/conversations/:id/messages', async (req, res) => {
     }
   } catch {}
   res.json({ id: m.id, created_at: m.created_at });
+});
+
+// ============ Plant Disease Analysis (Gemini AI) ============
+app.post('/analyze-plant', async (req, res) => {
+  try {
+    const { base64Image, plantName, language } = req.body || {};
+    
+    if (!base64Image || !plantName) {
+      return res.status(400).json({ error: 'base64Image and plantName required' });
+    }
+    
+    if (!GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY not configured');
+      return res.status(500).json({ 
+        plant: plantName, 
+        disease_or_pest: 'Service unavailable', 
+        description: 'AI service not configured on server', 
+        keywords: [] 
+      });
+    }
+
+    const base64Raw = base64Image.split(',')[1] || base64Image;
+    const lang = language === 'ta' ? 'ta' : 'en';
+
+    const prompts = {
+      en: `
+You are a plant disease and pest identification assistant.
+The plant is: ${plantName}.
+Analyze the image and return:
+1. Disease or pest
+2. Short description
+3. 3–5 keywords
+Respond strictly in JSON:
+{ "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
+`,
+      ta: `
+நீங்கள் ஒரு தாவர நோய் மற்றும் பூச்சி அடையாள உதவியாளர்.
+தாவரம்: ${plantName}.
+படத்தை ஆய்வு செய்து பின்வருவனவற்றை வழங்கவும்:
+1. நோய் அல்லது பூச்சி
+2. சுருக்கமான விளக்கம்
+3. 3-5 முக்கிய வார்த்தைகள்
+கண்டிப்பாக JSON வடிவத்தில் பதிலளிக்கவும் (தமிழில்):
+{ "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
+அனைத்து மதிப்புகளும் தமிழில் இருக்க வேண்டும்.
+`
+    };
+
+    const payload = {
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompts[lang] },
+          { inlineData: { mimeType: 'image/jpeg', data: base64Raw } }
+        ]
+      }]
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    // Retry logic
+    const maxRetries = 3;
+    let attempt = 0;
+    let lastErr = null;
+
+    while (attempt < maxRetries) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!textOutput) {
+          throw new Error('No response from Gemini API');
+        }
+
+        const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          console.warn('No JSON found in Gemini response:', textOutput);
+          return res.json({ plant: plantName, disease_or_pest: 'Unknown', description: textOutput, keywords: [] });
+        }
+
+        try {
+          return res.json(JSON.parse(jsonMatch[0]));
+        } catch (parseErr) {
+          console.warn('Failed to parse extracted JSON:', jsonMatch[0]);
+          return res.json({ plant: plantName, disease_or_pest: 'Unknown', description: textOutput, keywords: [] });
+        }
+      } catch (err) {
+        lastErr = err;
+        const retriable = err.message?.includes('429') || err.message?.includes('503') || err.message?.includes('Network');
+        if (!retriable || attempt === maxRetries - 1) {
+          console.error('Gemini API error:', err.message);
+          return res.json({ 
+            plant: plantName, 
+            disease_or_pest: 'Service unavailable', 
+            description: 'AI service temporarily unavailable (try again later)', 
+            keywords: [] 
+          });
+        }
+        const backoff = 1000 * Math.pow(2, attempt);
+        await new Promise(r => setTimeout(r, backoff));
+        attempt++;
+      }
+    }
+
+    return res.json({ 
+      plant: plantName, 
+      disease_or_pest: 'Service unavailable', 
+      description: String(lastErr?.message || 'Unknown error'), 
+      keywords: [] 
+    });
+  } catch (e) {
+    console.error('analyze-plant error:', e);
+    res.status(500).json({ error: 'Analysis failed' });
+  }
 });
 
 // Register push token

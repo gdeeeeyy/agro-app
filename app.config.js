@@ -1,0 +1,72 @@
+import 'dotenv/config';
+
+export default {
+  expo: {
+    name: "Agriismart",
+    slug: "agriismart",
+    version: "1.1.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    scheme: "agriismart",
+    userInterfaceStyle: "automatic",
+    newArchEnabled: true,
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.agriismart.app"
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/icon.png",
+        backgroundColor: "#4caf50"
+      },
+      edgeToEdgeEnabled: true,
+      predictiveBackGestureEnabled: false,
+      package: "com.agriismart.app"
+    },
+    web: {
+      output: "static",
+      favicon: "./assets/images/icon.png"
+    },
+    plugins: [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/images/icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#ffffff",
+          dark: {
+            backgroundColor: "#000000"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          photosPermission: "பயிர் படங்களை ஆய்வு செய்ய உங்கள் புகைப்படங்களுக்கு அணுகல் தேவை.",
+          cameraPermission: "தாவரங்களைப் புகைப்படம் எடுக்க கேமரா அனுமதி தேவை."
+        }
+      ],
+      "expo-sqlite",
+      "expo-secure-store"
+    ],
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true
+    },
+    extra: {
+      router: {},
+      eas: {
+        projectId: "6f402230-bb39-4c78-945c-6617065f9bb3"
+      },
+      // Client-side config (no secrets here - API key is server-side only)
+      cloudinaryCloudName: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
+      cloudinaryPreset: process.env.EXPO_PUBLIC_CLOUDINARY_PRESET,
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      supportNumber: process.env.EXPO_PUBLIC_SUPPORT_NUMBER,
+      apiUrl: process.env.EXPO_PUBLIC_API_URL
+    }
+  }
+};
