@@ -29,7 +29,8 @@ const TEXTBELT_KEY = process.env.TEXTBELT_KEY || 'textbelt';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_BASE_URL = process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1';
 // Vision-capable model name. You can override this on Render.
-const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
+// Note: Groq deprecates preview model IDs; check their deprecations page if you see 400 "decommissioned" errors.
+const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
 
 const ADMIN_OTP_NUMBER = '1234567890';
 const OTP_WINDOW_MINUTES = 10;
