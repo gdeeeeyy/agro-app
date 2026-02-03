@@ -146,6 +146,7 @@ const translations = {
     'address.title': 'Delivery Address',
     'address.required': 'Address Required',
     'address.enterAddress': 'Please enter your delivery address',
+    'address.bookingAddress': 'Booking Address',
     'address.placeholder': 'Enter your complete delivery address...',
     'address.helper': 'Include house number, street name, area, landmark, city, and PIN code',
     'address.info': 'Please provide your complete delivery address for accurate delivery',
@@ -215,7 +216,19 @@ const translations = {
     'admin.createAdmin': 'Create Admin',
     'admin.noKeywords': 'No keywords available. Use "Manage Keywords" to add some.',
     
-// Profile
+    // Contact Us
+    'contact.title': 'Contact Us',
+    'contact.heading': "We're here to help",
+    'contact.emailUs': 'Email Us',
+    'contact.callUs': 'Call Us',
+    'contact.website': 'www.kvkthiruvannamalai.com',
+    'contact.whatsapp': 'WhatsApp',
+    'contact.errorCall': 'Unable to open phone dialer.',
+    'contact.errorWhatsApp': 'Unable to open WhatsApp.',
+    'contact.errorEmail': 'Unable to open email app.',
+    'contact.errorWebsite': 'Unable to open website.',
+
+    // Profile
     'profile.memberSince': 'Member Since',
 
     // Language Settings
@@ -409,9 +422,10 @@ const translations = {
     'address.title': 'டெலிவரி முகவரி',
     'address.required': 'முகவரி தேவை',
     'address.enterAddress': 'உங்கள் டெலிவரி முகவரியை உள்ளிடவும்',
+    'address.bookingAddress': 'பதிப்பு முகவரி',
     'address.placeholder': 'உங்கள் முழு டெலிவரி முகவரியை உள்ளிடவும்...',
-    'address.helper': 'வீட்டு எண், தெரு பெயர், பகுதி, அடையாளம், நகரம் மற்றும் பின் குறியீட்டை உள்ளடக்கவும்',
-    'address.info': 'துல்லியமான டெலிவரிக்காக உங்கள் முழு டெலிவரி முகவரியை வழங்கவும்',
+    'address.helper': 'வீட்டு எண், தெரு பெயர், பகுதி, அடல்ந்கம், நகரம், மற்றும் பின் குடக்காரம் அடகி',
+    'address.info': 'துல்லியான டெலிவரிக்காக உங்கள் முழு டெலிவரி முகவரியை வழங்கங்காரம்',
     'address.confirmAddress': 'முகவரியை உறுதிப்படுத்தவும்',
     'address.changeAddress': 'முகவரியை மாற்றவும்',
     'address.saving': 'சேமிக்கிறது...',
@@ -478,7 +492,19 @@ const translations = {
     'admin.createAdmin': 'நிர்வாகியை உருவாக்கவும்',
     'admin.noKeywords': 'முக்கிய வார்த்தைகள் கிடைக்கவில்லை. சிலவற்றைச் சேர்க்க "முக்கிய வார்த்தைகளை நிர்வகிக்கவும்" பயன்படுத்தவும்.',
     
-// Profile
+// Contact Us
+    'contact.title': 'தொடர்பு கொள்க',
+    'contact.heading': 'நாங்கள் உங்கள் உதவிக்கு இருக்கிறோம்',
+    'contact.emailUs': 'மின்னஞ்சல் அனுப்பவும்',
+    'contact.callUs': 'அழைக்கவும்',
+    'contact.website': 'www.kvkthiruvannamalai.com',
+    'contact.whatsapp': 'WhatsApp',
+    'contact.errorCall': 'தொலைபேசி டையலைக்கர் திறக்க இயலவில்லை.',
+    'contact.errorWhatsApp': 'WhatsApp திறக்க இயலவில்லை.',
+    'contact.errorEmail': 'மின்னஞ்சல் பயன்பாட்டு திறக்க இயலவில்லை.',
+    'contact.errorWebsite': 'இணையதளம் திறக்க இயலவில்லை.',
+
+    // Profile
     'profile.memberSince': 'உறுப்பினராக இருந்து',
 
     // Language Settings

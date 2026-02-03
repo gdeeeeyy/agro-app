@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
 import { savePlant, findProductsByKeywords, getRelatedProductsByName, listImprovedArticles } from "../../lib/database";
@@ -42,6 +43,44 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [disclaimerVisible, setDisclaimerVisible] = useState(true);
   const { user } = useContext(UserContext);
+
+  const isFirstFocus = useRef(true);
+
+  const clearResults = useCallback(() => {
+    setResult(null);
+    setImage(null);
+    setPlantName('');
+    setPlantNote('');
+    setRecommendedProducts([]);
+  }, []);
+
+  const handleClearResults = useCallback(() => {
+    Alert.alert(
+      currentLanguage === 'ta' ? 'முடிவுகளை அழி' : 'Clear Results',
+      currentLanguage === 'ta' ? 'முடிவுகளை அழித்து மீண்டும் பரிசோதனையை தொடங்க வேண்டுமா?' : 'Do you want to clear results and restart the diagnosis?',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: currentLanguage === 'ta' ? 'ஆம்' : 'Yes',
+          style: 'destructive',
+          onPress: clearResults,
+        },
+      ]
+    );
+  }, [currentLanguage, t, clearResults]);
+
+  // Show confirm dialog when page regains focus with existing results
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      if (result !== null) {
+        handleClearResults();
+      }
+    }, [result, handleClearResults])
+  );
 
   // Function to extract relevant keywords from analysis
   const extractKeywordsFromAnalysis = (analysis: any, plantName: string): string[] => {
@@ -237,7 +276,8 @@ mediaTypes: ['images'] as any,
         </Modal>
 
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        {/* 1. First ask user to take / pick a photo */}
+        {/* 1. First ask user to take / pick a photo - only show if no results */}
+        {!result && (
         <View style={styles.imagePickerSection}>
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.actionButton} onPress={async () => {
@@ -255,10 +295,11 @@ mediaTypes: ['images'] as any,
               }
             }}>
               <Ionicons name="image" size={24} color="#fff" />
-              <Text style={styles.actionButtonText}>Diagnose</Text>
+              <Text style={styles.actionButtonText}>{currentLanguage === 'ta' ? 'பரிசோதி' : 'Diagnose'}</Text>
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
         {image && <Image source={{ uri: image }} style={styles.image} />}
 
@@ -292,7 +333,7 @@ mediaTypes: ['images'] as any,
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.analyzeButtonText}>{t('scanner.analyzeSave')}</Text>
+              <Text style={styles.analyzeButtonText}>{currentLanguage === 'ta' ? 'ஆய்வு செய்க' : t('scanner.analyzeSave')}</Text>
             )}
           </TouchableOpacity>
         )}

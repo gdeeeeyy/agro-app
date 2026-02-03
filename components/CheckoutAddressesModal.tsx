@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../context/UserContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface CheckoutAddressesModalProps {
   visible: boolean;
@@ -28,6 +29,7 @@ export default function CheckoutAddressesModal({
   deliveryAddress,
 }: CheckoutAddressesModalProps) {
   const { user, setUser } = useContext(UserContext);
+  const { t, currentLanguage } = useLanguage();
 
   const getInitialBooking = () => {
     const u: any = user;
@@ -52,11 +54,11 @@ export default function CheckoutAddressesModal({
 
   const handleConfirm = async () => {
     if (!booking.trim()) {
-      Alert.alert('Address Required', 'Please enter your booking address');
+      Alert.alert(t('address.required'), currentLanguage === 'ta' ? 'உங்கள் பதிப்பு முகவரியை உள்ளிடவும்' : 'Please enter your booking address');
       return;
     }
     if (!delivery.trim()) {
-      Alert.alert('Address Required', 'Please enter your delivery address');
+      Alert.alert(t('address.required'), t('address.enterAddress'));
       return;
     }
 
@@ -77,7 +79,7 @@ export default function CheckoutAddressesModal({
       onConfirm(b, d);
     } catch (error) {
       console.error('Error updating addresses:', error);
-      Alert.alert('Error', 'Failed to update address. Please try again.');
+      Alert.alert(t('common.error'), currentLanguage === 'ta' ? 'முகவரி நொகடவக்க அயந்து. அங்கள் அக்க் இகவை தொஎதுகவும்.' : 'Failed to update address. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -93,7 +95,7 @@ export default function CheckoutAddressesModal({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Enter Addresses</Text>
+            <Text style={styles.modalTitle}>{currentLanguage === 'ta' ? 'முகவரிகள் உள்ளிடவும்' : 'Enter Addresses'}</Text>
             <TouchableOpacity onPress={onClose} accessibilityLabel="Close" style={{ padding: 4 }}>
               <Ionicons name="close" size={22} color="#333" />
             </TouchableOpacity>
@@ -103,14 +105,14 @@ export default function CheckoutAddressesModal({
             <View style={styles.infoSection}>
               <Ionicons name="location" size={22} color="#4caf50" />
               <Text style={styles.infoText}>
-                Both booking and delivery addresses are required to place the order.
+                {currentLanguage === 'ta' ? 'அருவு பதிப்பு முகவரிகளும் பதொருகளுயும் ஆர்ட்டங்கிப்பிலப் தேவைக்கங்கள்.' : 'Both booking and delivery addresses are required to place the order.'}
               </Text>
             </View>
 
-            <Text style={styles.fieldLabel}>Booking Address</Text>
+            <Text style={styles.fieldLabel}>{t('address.bookingAddress')}</Text>
             <TextInput
               style={styles.addressInput}
-              placeholder="Enter booking address..."
+              placeholder={currentLanguage === 'ta' ? 'பதிப்பு முகவரி உள்ளிடவும்...' : 'Enter booking address...'}
               placeholderTextColor="#999"
               value={booking}
               onChangeText={setBooking}
@@ -120,10 +122,10 @@ export default function CheckoutAddressesModal({
               autoCapitalize="words"
             />
 
-            <Text style={styles.fieldLabel}>Delivery Address</Text>
+            <Text style={styles.fieldLabel}>{t('address.deliveryAddress')}</Text>
             <TextInput
               style={styles.addressInput}
-              placeholder="Enter delivery address..."
+              placeholder={currentLanguage === 'ta' ? 'பதொரு முகவரி உள்ளிடவும்...' : 'Enter delivery address...'}
               placeholderTextColor="#999"
               value={delivery}
               onChangeText={setDelivery}
@@ -134,20 +136,20 @@ export default function CheckoutAddressesModal({
             />
 
             <Text style={styles.helperText}>
-              Include house number, street name, area, landmark, city, and PIN code
+              {currentLanguage === 'ta' ? 'வீட்டு எண், தெரு பெயர், பகுதி, அடல்ந்கம், நகரம், மற்றும் பின் குடக்கங்காரம் அடகி' : 'Include house number, street name, area, landmark, city, and PIN code'}
             </Text>
           </ScrollView>
 
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.confirmButton, loading && styles.confirmButtonDisabled]}
               onPress={handleConfirm}
               disabled={loading}
             >
-              <Text style={styles.confirmButtonText}>{loading ? 'Saving...' : 'Continue'}</Text>
+              <Text style={styles.confirmButtonText}>{loading ? (currentLanguage === 'ta' ? 'சேமிக்கிறது...' : 'Saving...') : (currentLanguage === 'ta' ? 'தடக்கார' : 'Continue')}</Text>
             </TouchableOpacity>
           </View>
         </View>

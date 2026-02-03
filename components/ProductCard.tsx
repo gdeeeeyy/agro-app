@@ -387,7 +387,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 onPress={(e:any)=> { e?.stopPropagation?.(); handleAddToCart(); }}
                 disabled={(variants.length === 0 && product.stock_available <= 0)}
               >
-                <Text style={{color: (variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff', fontSize: 12, fontWeight: '600'}}>Add to cart</Text>
+                <Text style={{color: (variants.length === 0 && product.stock_available <= 0) ? '#999' : '#fff', fontSize: 12, fontWeight: '600'}}>{currentLanguage === 'ta' ? 'கார்டில் சேர்' : 'Add to cart'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -467,7 +467,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                   fontSize: 12, 
                   fontWeight: '600'
                 }}>
-                  Add to cart
+                  {currentLanguage === 'ta' ? 'கார்டில் சேர்' : 'Add to cart'}
                 </Text>
               </TouchableOpacity>
             </View>

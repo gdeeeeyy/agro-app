@@ -4,8 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import TopBar from '../components/TopBar';
 import { router } from 'expo-router';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Contact() {
+  const { currentLanguage, t } = useLanguage();
+  
   // Contact details (from provided reference)
   const EMAIL = 'kvktvmalai91@gmail.com';
   const WEBSITE = 'http://www.kvkthiruvannamalai.com';
@@ -19,7 +22,7 @@ export default function Contact() {
     try {
       await Linking.openURL(`tel:${tel}`);
     } catch {
-      Alert.alert('Contact us', 'Unable to open phone dialer.');
+      Alert.alert(t('contact.title'), t('contact.errorCall'));
     }
   };
 
@@ -28,7 +31,7 @@ export default function Contact() {
     try {
       await Linking.openURL(`https://wa.me/${n}`);
     } catch {
-      Alert.alert('Contact us', 'Unable to open WhatsApp.');
+      Alert.alert(t('contact.title'), t('contact.errorWhatsApp'));
     }
   };
 
@@ -37,7 +40,7 @@ export default function Contact() {
       const s = subject ? `?subject=${encodeURIComponent(subject)}` : '';
       await Linking.openURL(`mailto:${EMAIL}${s}`);
     } catch {
-      Alert.alert('Contact us', 'Unable to open email app.');
+      Alert.alert(t('contact.title'), t('contact.errorEmail'));
     }
   };
 
@@ -45,31 +48,31 @@ export default function Contact() {
     try {
       await Linking.openURL(WEBSITE);
     } catch {
-      Alert.alert('Contact us', 'Unable to open website.');
+      Alert.alert(t('contact.title'), t('contact.errorWebsite'));
     }
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <TopBar title="Contact Us" showBack onBack={() => router.back()} />
+      <TopBar title={t('contact.title')} showBack onBack={() => router.back()} />
 
       <View style={styles.content}>
-        <Text style={styles.heading}>We’re here to help</Text>
+        <Text style={styles.heading}>{t('contact.heading')}</Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Email Us</Text>
+          <Text style={styles.cardTitle}>{t('contact.emailUs')}</Text>
           <TouchableOpacity style={styles.actionRow} onPress={() => email()}>
             <Ionicons name="mail" size={18} color="#4caf50" />
             <Text style={styles.actionText}>{EMAIL}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionRow} onPress={openWebsite}>
             <Ionicons name="globe" size={18} color="#4caf50" />
-            <Text style={styles.actionText}>www.kvkthiruvannamalai.com</Text>
+            <Text style={styles.actionText}>{t('contact.website')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Call Us</Text>
+          <Text style={styles.cardTitle}>{t('contact.callUs')}</Text>
           <TouchableOpacity style={styles.actionRow} onPress={() => call(PHONE_OFFICE)}>
             <Ionicons name="call" size={18} color="#4caf50" />
             <Text style={styles.actionText}>{PHONE_OFFICE}</Text>
@@ -85,7 +88,7 @@ export default function Contact() {
 
           <TouchableOpacity style={[styles.actionRow, { marginTop: 6 }]} onPress={() => wa(PHONE_MOBILE_1)}>
             <Ionicons name="logo-whatsapp" size={18} color="#4caf50" />
-            <Text style={styles.actionText}>WhatsApp: {PHONE_MOBILE_1}</Text>
+            <Text style={styles.actionText}>{t('contact.whatsapp')}: {PHONE_MOBILE_1}</Text>
           </TouchableOpacity>
         </View>
       </View>

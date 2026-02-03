@@ -6,11 +6,13 @@ import { router } from 'expo-router';
 import CartIcon from './CartIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserContext } from '../context/UserContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getNotifications } from '../lib/database';
 import { onNotificationsChanged } from '../lib/notifBus';
 
 export default function AppHeader() {
   const { user } = React.useContext(UserContext);
+  const { currentLanguage } = useLanguage();
   const [unread, setUnread] = React.useState(0);
 
   const keyFor = (uid?: number|null) => `@agro_last_notif_time_${uid?String(uid):'all'}`;
@@ -49,7 +51,7 @@ export default function AppHeader() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <Image source={require('../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.title} numberOfLines={1}>Agriismart</Text>
+          <Text style={styles.title} numberOfLines={1}>{currentLanguage === 'ta' ? 'அக்ரிஸ்மார்ட்' : 'Agriismart'}</Text>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={openNotifications} accessibilityLabel="Notifications" style={[styles.actionBtn, { position:'relative' }]}>

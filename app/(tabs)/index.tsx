@@ -331,18 +331,18 @@ export default function Home() {
       {/* Highlights */}
       <View style={{ backgroundColor:'#fff', padding:16, borderBottomWidth:1, borderBottomColor:'#e0e0e0' }}>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-          <Text style={{ fontSize:20, fontWeight:'700', color:'#2d5016' }}>Highlights</Text>
+          <Text style={{ fontSize:20, fontWeight:'700', color:'#2d5016' }}>{currentLanguage === 'ta' ? 'முக்கிய அம்சங்கள்' : 'Highlights'}</Text>
           <TouchableOpacity onPress={fetchNews} style={{ paddingHorizontal:8, paddingVertical:6, borderRadius:8 }}>
             <Ionicons name="refresh" size={18} color="#2d5016" />
           </TouchableOpacity>
         </View>
         <Text style={{ color:'#666', fontSize:12, marginTop:4 }}>
-          Covering agricultural farming, animal rearing, and agricultural value added products.
+          {currentLanguage === 'ta' ? 'விவசாய பயிர்வளர்ப்பு, விலங்கு வளர்ப்பு மற்றும் விவசாய மதிப்பு சேர்க்கப்பட்ட பொருட்கள்.' : 'Covering agricultural farming, animal rearing, and agricultural value added products.'}
         </Text>
         {newsLoading ? (
-          <Text style={{ color:'#666', marginTop:8 }}>Loading...</Text>
+          <Text style={{ color:'#666', marginTop:8 }}>{currentLanguage === 'ta' ? 'ஏற்றுதல் நடந்துகொண்டிருக்கிறது...' : 'Loading...'}</Text>
         ) : news.length === 0 ? (
-          <Text style={{ color:'#666', marginTop:8 }}>No highlights available</Text>
+          <Text style={{ color:'#666', marginTop:8 }}>{currentLanguage === 'ta' ? 'எந்த முக்கிய அம்சங்களும் கிடைக்கவில்லை' : 'No highlights available'}</Text>
         ) : (
           <View style={{ marginTop: 12 }}>
             {news.slice(0,10).map((n, idx) => (

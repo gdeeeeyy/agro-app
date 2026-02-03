@@ -38,7 +38,7 @@ interface CartItem {
 
 export default function Cart() {
   const { user } = useContext(UserContext);
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const { cartItems, cartTotal, updateQuantity, removeItem, clearAll, refreshCart } = useCart();
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -227,7 +227,7 @@ export default function Cart() {
       } catch (error) {
         console.error('Razorpay link error:', error);
         setLoading(false);
-        Alert.alert(t('common.error'), 'Unable to start Razorpay payment. Please try again.');
+        Alert.alert(t('common.error'), currentLanguage === 'ta' ? 'Razorpay செலுத்தலை தொடங்க இயலவில்லை. தயவு செய்து மீண்டும் முயற்சி செய்யவும்.' : 'Unable to start Razorpay payment. Please try again.');
         return;
       }
     }
@@ -290,10 +290,10 @@ export default function Cart() {
           </Text>
         ) : null}
         <Text style={styles.itemPrice}>
-          ₹{item.cost_per_unit} each
+          ₹{item.cost_per_unit} {currentLanguage === 'ta' ? 'ஒவ்வொரு' : 'each'}
         </Text>
         <Text style={styles.itemTotal}>
-          Total: ₹{(item.quantity * item.cost_per_unit).toFixed(2)}
+          {currentLanguage === 'ta' ? 'மொத்தம்' : 'Total'}: ₹{(item.quantity * item.cost_per_unit).toFixed(2)}
         </Text>
       </View>
 
@@ -403,7 +403,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
             <ScrollView style={styles.modalContent}>
               {bookingAddress && (
                 <View style={styles.addressSection}>
-                  <Text style={styles.addressLabel}>Booking Address</Text>
+                  <Text style={styles.addressLabel}>{currentLanguage === 'ta' ? 'பதிப்பு முகவரி' : 'Booking Address'}</Text>
                   <Text style={styles.addressText}>{bookingAddress}</Text>
                   <TouchableOpacity
                     style={styles.changeAddressButton}
@@ -450,8 +450,8 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                     color={selectedPayment === 'online' ? '#4caf50' : '#666'} 
                   />
                   <View style={styles.paymentOptionText}>
-                    <Text style={styles.paymentOptionTitle}>UPI / Card Payment</Text>
-                    <Text style={styles.paymentOptionSubtitle}>Pay securely via Razorpay (UPI or cards)</Text>
+                    <Text style={styles.paymentOptionTitle}>{currentLanguage === 'ta' ? 'UPI / கார்டு செலுத்தல்' : 'UPI / Card Payment'}</Text>
+                    <Text style={styles.paymentOptionSubtitle}>{currentLanguage === 'ta' ? 'Razorpay வழியாக பாதுகாப்பாக செலுத்தவும்' : 'Pay securely via Razorpay (UPI or cards)'}</Text>
                   </View>
                 </View>
                 {selectedPayment === 'online' && (
@@ -460,11 +460,11 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
               </TouchableOpacity>
 
               <View style={styles.noteSection}>
-                <Text style={styles.addressLabel}>Suggestion/Note (optional)</Text>
-                <Text style={styles.helperText}>You can add a note for the admin regarding this order</Text>
+                <Text style={styles.addressLabel}>{currentLanguage === 'ta' ? 'பரிந்துரை/குறிப்பு (விருப்பமான)' : 'Suggestion/Note (optional)'}</Text>
+                <Text style={styles.helperText}>{currentLanguage === 'ta' ? 'இந்த வரிசையைப் பற்றி நிர்வாகிக்கு குறிப்பு சேர்க்கலாம்' : 'You can add a note for the admin regarding this order'}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Add your suggestion or note..."
+                  placeholder={currentLanguage === 'ta' ? 'உங்கள் பரிந்துரை அல்லது குறிப்பு சேர்க்கவும்...' : 'Add your suggestion or note...'}
                   placeholderTextColor="#999"
                   value={orderNote}
                   onChangeText={setOrderNote}
@@ -476,10 +476,10 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
 
             <View style={styles.modalFooter}>
               <View style={styles.payUsingRow}>
-                <Text style={styles.payUsingLabel}>PAY USING</Text>
+                <Text style={styles.payUsingLabel}>{currentLanguage === 'ta' ? 'இதைப் பயன்படுத்தி செலுத்துவது' : 'PAY USING'}</Text>
                 <Text style={styles.payUsingMethod}>
                   {selectedPayment === 'online'
-                    ? 'Razorpay UPI / Card'
+                    ? (currentLanguage === 'ta' ? 'Razorpay UPI / கார்டு' : 'Razorpay UPI / Card')
                     : selectedPayment === 'cod'
                     ? t('payment.cod')
                     : t('payment.required')}
@@ -494,7 +494,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 disabled={!selectedPayment}
               >
                 <Text style={styles.confirmButtonAmount}>₹{cartTotal.toFixed(2)}</Text>
-                <Text style={styles.confirmButtonText}>Place Order</Text>
+                <Text style={styles.confirmButtonText}>{currentLanguage === 'ta' ? 'ஆர்டர் செய்யவும்' : 'Place Order'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -513,9 +513,9 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
       <Modal visible={loading} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center', minWidth: 220 }}>
-            <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 }}>Preparing payment…</Text>
+            <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 }}>{currentLanguage === 'ta' ? 'செலுத்தலைத் தயாரித்துக் கொண்டிருக்கிறது...' : 'Preparing payment…'}</Text>
             <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
-              Please wait while we create a secure Razorpay link.
+              {currentLanguage === 'ta' ? 'நாங்கள் ஒரு பாதுகாப்பான Razorpay இணைப்பைத் தயாரிக்கும்போது, தயவு செய்து காத்திருக்கவும்.' : 'Please wait while we create a secure Razorpay link.'}
             </Text>
           </View>
         </View>
@@ -529,10 +529,10 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
               <>
                 <Ionicons name="time-outline" size={64} color="#ff9800" />
                 <Text style={{ fontSize: 20, fontWeight: '700', color: '#333', marginTop: 16, textAlign: 'center' }}>
-                  Waiting for payment…
+                  {currentLanguage === 'ta' ? 'செலுத்தலுக்காக காத்திருக்கிறது...' : 'Waiting for payment…'}
                 </Text>
                 <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
-                  Complete the payment in your browser, then return here.
+                  {currentLanguage === 'ta' ? 'உங்கள் உலாவியில் செலுத்தலை முடிந்தபின், இங்கே திரும்பவும்.' : 'Complete the payment in your browser, then return here.'}
                 </Text>
               </>
             )}
@@ -542,16 +542,16 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                   <Ionicons name="checkmark" size={48} color="#fff" />
                 </View>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: '#4caf50', marginTop: 16, textAlign: 'center' }}>
-                  Payment Successful!
+                  {currentLanguage === 'ta' ? 'செலுத்தல் வெற்றிகரமாக முடிந்தது!' : 'Payment Successful!'}
                 </Text>
                 <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
-                  Your order is confirmed and your cart has been cleared.
+                  {currentLanguage === 'ta' ? 'உங்கள் ஆர்டர் உறுதி செய்யப்பட்டுள்ளது மற்றும் உங்கள் கார்டு சரிசெய்யப்பட்டுள்ளது.' : 'Your order is confirmed and your cart has been cleared.'}
                 </Text>
                 <TouchableOpacity
                   style={{ marginTop: 20, backgroundColor: '#4caf50', paddingHorizontal: 28, paddingVertical: 10, borderRadius: 8 }}
                   onPress={handlePaymentStatusClose}
                 >
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Go to Orders</Text>
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{currentLanguage === 'ta' ? 'ஆர்டர்களுக்குச் செல்லவும்' : 'Go to Orders'}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -561,18 +561,18 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                   <Ionicons name="close" size={48} color="#fff" />
                 </View>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: '#f44336', marginTop: 16, textAlign: 'center' }}>
-                  {paymentStatus === 'cancelled' ? 'Payment Cancelled' : 'Payment Failed'}
+                  {paymentStatus === 'cancelled' ? (currentLanguage === 'ta' ? 'செலுத்தல் ரத்து செய்யப்பட்டது' : 'Payment Cancelled') : (currentLanguage === 'ta' ? 'செலுத்தல் தோல்வியடைந்தது' : 'Payment Failed')}
                 </Text>
                 <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
                   {paymentStatus === 'cancelled'
-                    ? 'Payment was not completed.'
-                    : 'Something went wrong. Please try again.'}
+                    ? (currentLanguage === 'ta' ? 'செலுத்தல் முடிந்துவிடவில்லை.' : 'Payment was not completed.')
+                    : (currentLanguage === 'ta' ? 'ஏதேனும் பிழை ஏற்பட்டுள்ளது. தயவு செய்து மீண்டும் முயற்சி செய்யவும்.' : 'Something went wrong. Please try again.')}
                 </Text>
                 <TouchableOpacity
                   style={{ marginTop: 20, backgroundColor: '#f44336', paddingHorizontal: 28, paddingVertical: 10, borderRadius: 8 }}
                   onPress={handlePaymentStatusClose}
                 >
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Back to Cart</Text>
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{currentLanguage === 'ta' ? 'கார்டுக்குத் திரும்பவும்' : 'Back to Cart'}</Text>
                 </TouchableOpacity>
               </>
             )}

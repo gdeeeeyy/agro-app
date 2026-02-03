@@ -12,6 +12,7 @@ import {
   Linking,
   Alert,
   TextInput,
+  Clipboard,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -192,15 +193,13 @@ export default function Orders() {
   };
 
   const copyTracking = async (text: string) => {
-    let copied = false;
     try {
-      if ((navigator as any)?.clipboard?.writeText) {
-        await (navigator as any).clipboard.writeText(text);
-        copied = true;
-      }
-    } catch {}
-    if (copied) Alert.alert('Copied', 'Tracking number copied to clipboard');
-    else Alert.alert('Tracking number', String(text));
+      await Clipboard.setString(String(text));
+      Alert.alert('Copied', 'Tracking number copied to clipboard');
+    } catch (error) {
+      console.error('Copy failed:', error);
+      Alert.alert('Error', 'Failed to copy tracking number');
+    }
   };
 
   const getStatusIcon = (status: string) => {

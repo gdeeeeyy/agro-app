@@ -16,7 +16,13 @@ export default function ImprovedTechnologiesHome() {
       setLoading(true);
       const cats = await listImprovedCategories();
       const arr = Array.isArray(cats) ? cats : [];
-      setCategories(arr);
+      // Sort categories alphabetically by display name
+      const sorted = arr.sort((a, b) => {
+        const labelA = labelForCategory(a).toLowerCase();
+        const labelB = labelForCategory(b).toLowerCase();
+        return labelA.localeCompare(labelB);
+      });
+      setCategories(sorted);
     } catch {
       setCategories([]);
     } finally {
@@ -46,15 +52,17 @@ export default function ImprovedTechnologiesHome() {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Improved Technologies</Text>
+          <Text style={styles.headerTitle}>{currentLanguage === 'ta' ? 'மேம்படுத்திய தொழில்நுட்பங்கள்' : 'Improved Technologies'}</Text>
           <View style={{ width: 24 }} />
         </View>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#2d5016' }}>Categories</Text>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#2d5016' }}>
+          {currentLanguage === 'ta' ? 'வகைகள்' : 'Categories'}
+        </Text>
         <Text style={{ marginTop: 4, color: '#666', fontSize: 13 }}>
-          Choose a category to explore improved practices.
+          {currentLanguage === 'ta' ? 'மேம்படுத்திய முறைகளை அறிய ஒரு வகையைத் தேர்ந்தெடுக்கவும்.' : 'Choose a category to explore improved practices.'}
         </Text>
 
         {loading ? (
@@ -62,7 +70,7 @@ export default function ImprovedTechnologiesHome() {
             <ActivityIndicator color="#4caf50" />
           </View>
         ) : categories.length === 0 ? (
-          <Text style={{ marginTop: 16, color: '#666' }}>No categories available.</Text>
+          <Text style={{ marginTop: 16, color: '#666' }}>{currentLanguage === 'ta' ? 'எந்த வகைகளும் கிடைக்கவில்லை.' : 'No categories available.'}</Text>
         ) : (
           <View style={{ marginTop: 12 }}>
             {categories.map((c: any) => {
