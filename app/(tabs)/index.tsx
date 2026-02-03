@@ -323,7 +323,7 @@ export default function Home() {
           style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
           onPress={() => router.push('/improved-technologies')}
         >
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>Improved Technologies</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#2d5016' }}>{currentLanguage === 'ta' ? 'மேம்படுத்திய தொழில்நுட்பங்கள்' : 'Improved Technologies'}</Text>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
       </View>
