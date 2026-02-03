@@ -15,6 +15,7 @@ interface CartItem {
   product_id: number;
   quantity: number;
   name: string;
+  name_ta?: string;
   image: string;
   cost_per_unit: number;
   variant_id?: number | null;

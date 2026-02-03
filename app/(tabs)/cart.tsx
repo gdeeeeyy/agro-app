@@ -29,6 +29,7 @@ interface CartItem {
   product_id: number;
   quantity: number;
   name: string;
+  name_ta?: string;
   image: string;
   cost_per_unit: number;
   variant_id?: number | null;
@@ -281,8 +282,8 @@ export default function Cart() {
       )}
       
       <View style={styles.itemDetails}>
-<Text style={styles.itemName} numberOfLines={2}>
-          {item.name}
+        <Text style={styles.itemName} numberOfLines={2}>
+          {currentLanguage === 'ta' && item.name_ta ? item.name_ta : item.name}
         </Text>
         {item.variant_label ? (
           <Text style={{ color:'#4e7c35', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
