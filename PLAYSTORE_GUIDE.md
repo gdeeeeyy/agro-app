@@ -185,7 +185,7 @@ You'll need to prepare:
 Navigate to **"Policy" > "App content"** and complete:
 
 1. **Privacy policy**: Add a URL to your privacy policy
-   - Host it on your website or use a service like [Termly](https://termly.io)
+   - Host it on your website or as a static endpoint on your Render server
    
 2. **Ads**: Declare if your app contains ads (No for Agriismart)
 
