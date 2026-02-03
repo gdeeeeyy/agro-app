@@ -949,7 +949,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   scrollContent: {
-    paddingBottom: 110, // room for the sticky action bar
+    paddingBottom: 130, // room for the sticky action bar and bottom nav
   },
   contentContainer: {
     padding: 16,
@@ -966,6 +966,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    paddingBottom: 20,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     backgroundColor: '#fff',

@@ -233,6 +233,7 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     padding: 16,
+    paddingBottom: 32,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     gap: 12,
