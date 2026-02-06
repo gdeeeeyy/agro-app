@@ -23,11 +23,21 @@ export default function ImprovedTechnologiesCategory() {
         const found = arr.find((c: any) => c.slug === slug);
         if (found) {
           let labelEn = found.name_en;
-          if (found.slug === 'agronomy') labelEn = 'Agronomy crops';
-          else if (found.slug === 'horticulture') labelEn = 'Horticulture crops';
-          else if (found.slug === 'animal') labelEn = 'Animal Husbandary';
-          else if (found.slug === 'post-harvest') labelEn = 'Post Harvest technologies';
-          setCategoryName(currentLanguage === 'ta' && found.name_ta ? found.name_ta : labelEn);
+          let labelTa = found.name_ta;
+          if (found.slug === 'agronomy') {
+            labelEn = 'Agronomy crops';
+            if (!labelTa) labelTa = 'வேளாண்மை பயிர்கள்';
+          } else if (found.slug === 'horticulture') {
+            labelEn = 'Horticulture crops';
+            if (!labelTa) labelTa = 'தோட்டக்கலை பயிர்கள்';
+          } else if (found.slug === 'animal') {
+            labelEn = 'Animal Husbandary';
+            if (!labelTa) labelTa = 'கால்நடை வளர்ப்பு';
+          } else if (found.slug === 'post-harvest') {
+            labelEn = 'Post Harvest technologies';
+            if (!labelTa) labelTa = 'அறுவடைக்கு பின் தொழில்நுட்பங்கள்';
+          }
+          setCategoryName(currentLanguage === 'ta' && labelTa ? labelTa : labelEn);
         }
         const arts = await listImprovedArticles(String(slug), currentLanguage === 'ta' ? 'ta' : 'en');
         // Sort articles alphabetically by heading

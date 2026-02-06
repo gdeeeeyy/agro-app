@@ -36,11 +36,20 @@ export default function ImprovedTechnologiesHome() {
 
   const labelForCategory = (c: any) => {
     let labelEn = c.name_en;
-    const labelTa = c.name_ta;
-    if (c.slug === 'agronomy') labelEn = 'Agronomy crops';
-    else if (c.slug === 'horticulture') labelEn = 'Horticulture crops';
-    else if (c.slug === 'animal') labelEn = 'Animal Husbandary';
-    else if (c.slug === 'post-harvest') labelEn = 'Post Harvest technologies';
+    let labelTa = c.name_ta;
+    if (c.slug === 'agronomy') {
+      labelEn = 'Agronomy crops';
+      if (!labelTa) labelTa = 'வேளாண்மை பயிர்கள்';
+    } else if (c.slug === 'horticulture') {
+      labelEn = 'Horticulture crops';
+      if (!labelTa) labelTa = 'தோட்டக்கலை பயிர்கள்';
+    } else if (c.slug === 'animal') {
+      labelEn = 'Animal Husbandary';
+      if (!labelTa) labelTa = 'கால்நடை வளர்ப்பு';
+    } else if (c.slug === 'post-harvest') {
+      labelEn = 'Post Harvest technologies';
+      if (!labelTa) labelTa = 'அறுவடைக்கு பின் தொழில்நுட்பங்கள்';
+    }
     return currentLanguage === 'ta' && labelTa ? labelTa : labelEn;
   };
 

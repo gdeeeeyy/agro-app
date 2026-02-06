@@ -20,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { UserContext } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { signIn, signUp } from '../lib/auth';
+import { deleteUser, listUsersBasic } from '../lib/database';
 
 type AuthMode = 'login' | 'signup';
 
@@ -39,6 +40,8 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   const [error, setError] = useState('');
   const [langVisible, setLangVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const { setUser } = useContext(UserContext);
   const { t, currentLanguage, setLanguage } = useLanguage();
@@ -93,6 +96,44 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
     if (next === mode) return;
     setMode(next);
     setError('');
+  };
+
+  const handleForgotPassword = async () => {
+    if (!number) {
+      setError(t('auth.fillFields'));
+      setForgotPasswordVisible(false);
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      // Find user by phone number
+      const users = await listUsersBasic() as any[];
+      const user = users.find((u: any) => String(u.number) === number);
+      
+      if (user) {
+        // Delete the user account
+        const deleted = await deleteUser(user.id);
+        if (!deleted) {
+          setError(t('auth.deleteError'));
+          setForgotPasswordVisible(false);
+          setDeletingAccount(false);
+          return;
+        }
+      }
+      
+      // Switch to signup mode
+      setForgotPasswordVisible(false);
+      setMode('signup');
+      setPassword('');
+      setError(t('auth.accountDeleted'));
+    } catch (err) {
+      console.error('Delete account error:', err);
+      setError(t('auth.deleteError'));
+    } finally {
+      setDeletingAccount(false);
+      setForgotPasswordVisible(false);
+    }
   };
 
   return (
@@ -184,6 +225,15 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
                 </TouchableOpacity>
               </View>
 
+              {!isSignup && (
+                <TouchableOpacity
+                  style={styles.forgotPasswordLink}
+                  onPress={() => setForgotPasswordVisible(true)}
+                  disabled={loading}
+                >
+                  <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -220,6 +270,56 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
           </View>
         </View>
       </TouchableWithoutFeedback>
+
+      {/* 🔐 FORGOT PASSWORD MODAL */}
+      <Modal visible={forgotPasswordVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.forgotPasswordCard}>
+            <TouchableOpacity 
+              style={styles.forgotPasswordClose} 
+              onPress={() => setForgotPasswordVisible(false)} 
+              disabled={deletingAccount}
+            >
+              <Ionicons name="close" size={22} color="#666" />
+            </TouchableOpacity>
+
+            <View style={styles.forgotPasswordIconContainer}>
+              <Ionicons name="key-outline" size={32} color="#4caf50" />
+            </View>
+
+            <Text style={styles.forgotPasswordTitle}>{t('auth.forgotPasswordTitle')}</Text>
+
+            <View style={styles.forgotPasswordDisclaimerBox}>
+              <Ionicons name="information-circle-outline" size={20} color="#4caf50" style={{ marginTop: 2 }} />
+              <Text style={styles.forgotPasswordDisclaimer}>
+                {t('auth.forgotPasswordDisclaimer')}
+              </Text>
+            </View>
+
+            <View style={styles.forgotPasswordButtons}>
+              <TouchableOpacity
+                style={styles.forgotPasswordCancelBtn}
+                onPress={() => setForgotPasswordVisible(false)}
+                disabled={deletingAccount}
+              >
+                <Text style={styles.forgotPasswordCancelText}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.forgotPasswordConfirmBtn, deletingAccount && styles.buttonDisabled]}
+                onPress={handleForgotPassword}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.forgotPasswordConfirmText}>{t('auth.forgotPasswordConfirm')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 🌍 LANGUAGE MODAL */}
       <Modal visible={langVisible} transparent animationType="fade">
@@ -391,5 +491,94 @@ const styles = StyleSheet.create({
   langItemActive: {
     borderColor: '#4caf50',
     backgroundColor: '#f1f8f4',
+  },
+
+  forgotPasswordLink: {
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  forgotPasswordText: {
+    color: '#4caf50',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  forgotPasswordCard: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+  },
+  forgotPasswordClose: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: 4,
+  },
+  forgotPasswordIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#e8f5e9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  forgotPasswordTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d5016',
+    marginBottom: 16,
+  },
+  forgotPasswordDisclaimerBox: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f8f4',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    gap: 10,
+  },
+  forgotPasswordDisclaimer: {
+    flex: 1,
+    color: '#2d5016',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  forgotPasswordButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    marginTop: 4,
+  },
+  forgotPasswordCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forgotPasswordCancelText: {
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  forgotPasswordConfirmBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#d32f2f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forgotPasswordConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
 });

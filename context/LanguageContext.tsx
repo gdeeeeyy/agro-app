@@ -69,6 +69,12 @@ const translations = {
     'auth.signupSuccess': 'Account created successfully',
     'auth.loginError': 'Invalid credentials',
     'auth.signupError': 'Failed to create account',
+    'auth.forgotPassword': 'Forgot Password?',
+    'auth.forgotPasswordTitle': 'Reset Password',
+    'auth.forgotPasswordDisclaimer': 'Since this app uses phone number authentication without email recovery, your existing account will need to be deleted.\n\nAfter deletion, you can create a new account using the same phone number with a new password.',
+    'auth.forgotPasswordConfirm': 'Delete',
+    'auth.accountDeleted': 'Account deleted. Please create a new account.',
+    'auth.deleteError': 'Failed to delete account. Please try again.',
     
     // Home Screen
     'home.title': 'Agriismart',
@@ -345,6 +351,12 @@ const translations = {
     'auth.signupSuccess': 'கணக்கு வெற்றிகரமாக உருவாக்கப்பட்டது',
     'auth.loginError': 'தவறான விவரங்கள்',
     'auth.signupError': 'கணக்கு உருவாக்க முடியவில்லை',
+    'auth.forgotPassword': 'கடவுச்சொல் மறந்துவிட்டதா?',
+    'auth.forgotPasswordTitle': 'கடவுச்சொல் மீட்டமை',
+    'auth.forgotPasswordDisclaimer': 'இந்த செயலி மின்னஞ்சல் மீட்பு இல்லாமல் தொலைபேசி எண் அங்கீகாரத்தைப் பயன்படுத்துவதால், உங்கள் நிலவுள்ள கணக்கு நீக்கப்படும்.\n\nநீக்கிய பின், அதே தொலைபேசி எண்ணைப் பயன்படுத்தி புதிய கடவுச்சொல்லுடன் புதிய கணக்கை உருவாக்கலாம்.',
+    'auth.forgotPasswordConfirm': 'நீக்கு',
+    'auth.accountDeleted': 'கணக்கு நீக்கப்பட்டது. புதிய கணக்கை உருவாக்கவும்.',
+    'auth.deleteError': 'கணக்கை நீக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
     
     // Home Screen
     'home.title': 'அக்ரிஸ்மார்ட்',
