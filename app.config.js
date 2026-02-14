@@ -57,9 +57,6 @@ export default {
     },
     extra: {
       router: {},
-      eas: {
-        projectId: "6f402230-bb39-4c78-945c-6617065f9bb3"
-      },
       // Client-side config (no secrets here - API key is server-side only)
       cloudinaryCloudName: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
       cloudinaryPreset: process.env.EXPO_PUBLIC_CLOUDINARY_PRESET,
