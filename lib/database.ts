@@ -17,7 +17,8 @@ export async function listMessages(conversationId: number) {
 export async function getConversations(userId: number) {
   if (!API_URL) throw new Error('API_URL not configured');
   // alias for listConversations naming symmetry
-  return await api.get(`/conversations?userId=${userId}`);
+  try { return await api.get(`/conversations?userId=${userId}`); }
+  catch { return []; }
 }
 export async function sendMessage(conversationId: number, senderId: number, text: string) {
   if (!API_URL) throw new Error('API_URL not configured');
