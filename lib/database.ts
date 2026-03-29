@@ -841,14 +841,13 @@ export async function updateProduct(id: number, product: {
 export async function deleteProduct(id: number) {
   try {
     if (API_URL) {
-      await api.del(`/products/${id}`);
-      return true;
+      return await api.del(`/products/${id}`);
     }
     await db.runAsync("DELETE FROM products WHERE id = ?", id);
-    return true;
+    return { ok: true, deleted: true };
   } catch (err) {
-    console.error("SQLite delete error:", err);
-    return false;
+    console.error("Delete error:", err);
+    return null;
   }
 }
 
