@@ -22,11 +22,10 @@ export async function uploadImage(
   const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
   form.append('file', {
-    // @ts-ignore: React Native FormData file shape
     uri: localUri,
     type: mime,
     name: `upload.${ext || 'jpg'}`,
-  });
+  } as any);
   form.append('upload_preset', UPLOAD_PRESET);
   if (options?.folder) form.append('folder', options.folder);
 
