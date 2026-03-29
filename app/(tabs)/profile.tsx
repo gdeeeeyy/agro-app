@@ -66,7 +66,7 @@ export default function Profile() {
 
         <TouchableOpacity
           style={styles.tileRow}
-          onPress={() => Linking.openURL('mailto:kvktvmalai91@gmail.com?subject=For%20Sale%20-%20Agriismart')}
+          onPress={() => Linking.openURL('mailto:kvktvmalai91@gmail.com?subject=For%20Sale%20-%20agriismart')}
         >
           <View style={styles.tileLeft}>
             <Ionicons name="mail" size={20} color="#4caf50" />

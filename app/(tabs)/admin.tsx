@@ -432,9 +432,12 @@ const pickImage = async () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const success = await deleteProduct(product.id);
-              if (success) {
-                Alert.alert('Success', 'Product deleted successfully');
+              const res = await deleteProduct(product.id);
+              if (res && res.ok) {
+                const msg = res.softDeleted 
+                  ? 'Product has order history and has been archived' 
+                  : 'Product deleted successfully';
+                Alert.alert('Success', msg);
                 await loadProducts();
               } else {
                 Alert.alert('Error', 'Failed to delete product');
@@ -625,7 +628,7 @@ const pickImage = async () => {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-            <Text style={styles.headerTitle}>Agriismart Admin</Text>
+            <Text style={styles.headerTitle}>agriismart Admin</Text>
           </View>
         </View>
         <View style={styles.accessDenied}>
@@ -650,7 +653,7 @@ const pickImage = async () => {
         </View>
         <View style={styles.headerTop}>
           <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.headerTitle}>Agriismart Admin</Text>
+          <Text style={styles.headerTitle}>agriismart Admin</Text>
         </View>
       </View>
 

@@ -41,7 +41,6 @@ export default function App() {
   const [result, setResult] = useState<any>(null);
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [disclaimerVisible, setDisclaimerVisible] = useState(true);
   const { user } = useContext(UserContext);
 
   const isFirstFocus = useRef(true);
@@ -356,33 +355,7 @@ mediaTypes: ['images'] as any,
         <View style={{ height: 10 }} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
 
-      {/* Sample disclaimer popup */}
-      <Modal
-        visible={disclaimerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDisclaimerVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setDisclaimerVisible(false)}>
-          <View style={styles.disclaimerOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.disclaimerCard}>
-                <Text style={styles.disclaimerTitle}>Disclaimer</Text>
-                <Text style={styles.disclaimerText}>
-                  This plant diagnosis is AI-generated and should be used as a guide only.
-                  Always consult a qualified agronomist or expert before taking critical decisions.
-                </Text>
-                <TouchableOpacity
-                  style={styles.disclaimerButton}
-                  onPress={() => setDisclaimerVisible(false)}
-                >
-                  <Text style={styles.disclaimerButtonText}>OK, I Understand</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+
 
       {/* Plant picker modal */}
       <Modal
