@@ -1,13 +1,13 @@
+import Config from './config';
+
 export type UploadedImage = { url: string; publicId: string };
 
 export async function uploadImage(
   localUri: string,
   options?: { folder?: string },
 ): Promise<UploadedImage> {
-  const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  const UPLOAD_PRESET =
-    process.env.EXPO_PUBLIC_CLOUDINARY_PRESET ||
-    process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+  const CLOUD_NAME = Config.CLOUDINARY_CLOUD_NAME;
+  const UPLOAD_PRESET = Config.CLOUDINARY_PRESET;
 
   if (!CLOUD_NAME || !UPLOAD_PRESET) {
     throw new Error(

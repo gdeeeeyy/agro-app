@@ -1,6 +1,8 @@
 import { secureStorage } from './secureStorage';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import Config from './config';
+
+export const API_URL = Config.API_URL;
 
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];

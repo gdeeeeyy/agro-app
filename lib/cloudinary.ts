@@ -1,9 +1,10 @@
+import Config from './config';
 import { v2 as cloudinary } from 'cloudinary';
 
 // Configure Cloudinary
 const cloudinaryConfig = cloudinary.config({
-  cloud_name: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY,
+  cloud_name: Config.CLOUDINARY_CLOUD_NAME,
+  api_key: Config.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET, // Keep this server-side only
   secure: true
 });
@@ -15,11 +16,11 @@ export const uploadImage = async (fileUri: string, folder: string = 'agro-app') 
     
     const formData = new FormData();
     formData.append('file', blob);
-    formData.append('upload_preset', process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'agro_app_unsigned');
+    formData.append('upload_preset', Config.CLOUDINARY_PRESET);
     formData.append('folder', folder);
 
     const uploadResponse = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${Config.CLOUDINARY_CLOUD_NAME}/image/upload`,
       {
         method: 'POST',
         body: formData,
@@ -51,11 +52,11 @@ export const deleteImage = async (publicId: string) => {
     const formData = new FormData();
     formData.append('public_id', publicId);
     formData.append('signature', signature);
-    formData.append('api_key', process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY || '');
+    formData.append('api_key', Config.CLOUDINARY_API_KEY);
     formData.append('timestamp', timestamp.toString());
 
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/destroy`,
+      `https://api.cloudinary.com/v1_1/${Config.CLOUDINARY_CLOUD_NAME}/image/destroy`,
       {
         method: 'POST',
         body: formData,

@@ -444,6 +444,14 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Agriismart API is running',
+    status: isReady ? 'ready' : 'initializing',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/health', async (req, res) => {
   try { await pool.query('select 1'); res.json({ ok: true }); } catch (e) { res.status(500).json({ ok: false }); }
 });

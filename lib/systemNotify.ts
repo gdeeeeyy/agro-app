@@ -1,3 +1,4 @@
+import Config from './config';
 import { emitNotificationsChanged } from './notifBus';
 
 export async function registerPushToken(userId?: number | null) {
@@ -8,7 +9,7 @@ export async function registerPushToken(userId?: number | null) {
     const tokRes = await Notifications.getExpoPushTokenAsync?.();
     const token = tokRes?.data || tokRes;
     if (!token) return;
-    await fetch((process.env.EXPO_PUBLIC_API_URL || '') + '/push/register', {
+    await fetch(Config.API_URL + '/push/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId || null, token })

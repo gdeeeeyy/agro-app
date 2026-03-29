@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
+import Config from './config';
+
 // Supabase client initialisation. Uses Expo public env vars so it works in RN.
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = Config.SUPABASE_URL;
+const SUPABASE_ANON_KEY = Config.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('Supabase configuration missing (URL or Anon Key)');

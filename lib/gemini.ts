@@ -1,8 +1,9 @@
+import Config from "./config";
 import axios from "axios";
 import Constants from 'expo-constants';
 
 // Get backend API URL from config
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'https://agro-app-6hlq.onrender.com';
+const API_URL = Config.API_URL;
 
 export async function analyzePlantImage(base64Image: string, plantName: string, language: 'en' | 'ta' = 'en') {
   // Call backend API instead of Gemini directly (API key stays server-side)

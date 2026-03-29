@@ -30,6 +30,7 @@ export async function sendMessage(conversationId: number, senderId: number, text
   }
 }
 
+import Config from './config';
 import { Platform } from 'react-native';
 import { api, API_URL } from './api';
 
@@ -1584,7 +1585,7 @@ export async function listCropDiseaseImages(diseaseId: number) {
 export async function deleteCropPestImage(imageId: number) {
   try {
     // Only call remote if explicitly enabled
-    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
+    if (API_URL && Config.API_SUPPORTS_CROP_DOCTOR_DELETE) {
       try { await api.del(`/pest-images/${imageId}`); } catch {/* ignore; fall back to local */}
     }
     await db.runAsync("DELETE FROM crop_pest_images WHERE id = ?", imageId);
@@ -1594,7 +1595,7 @@ export async function deleteCropPestImage(imageId: number) {
 
 export async function deleteCropDiseaseImage(imageId: number) {
   try {
-    if (API_URL && process.env.EXPO_PUBLIC_API_SUPPORTS_CROP_DOCTOR_DELETE === '1') {
+    if (API_URL && Config.API_SUPPORTS_CROP_DOCTOR_DELETE) {
       try { await api.del(`/disease-images/${imageId}`); } catch {/* ignore */}
     }
     await db.runAsync("DELETE FROM crop_disease_images WHERE id = ?", imageId);

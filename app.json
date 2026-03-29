@@ -2,10 +2,10 @@
   "expo": {
     "name": "Agriismart",
     "slug": "agriismart",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "android": {
       "package": "com.agriismart.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#4caf50"
