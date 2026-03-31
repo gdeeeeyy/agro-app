@@ -267,13 +267,13 @@ export default function Orders() {
           </View>
         <View style={styles.orderDetailRow}>
           <Ionicons name="business" size={20} color="#666" />
-          <Text style={styles.orderDetailText} numberOfLines={2}>
+          <Text style={styles.orderDetailText}>
             Booking: {String((item as any).booking_address || (item as any).bookingAddress || 'Address not given')}
           </Text>
         </View>
         <View style={styles.orderDetailRow}>
           <Ionicons name="location" size={20} color="#666" />
-          <Text style={styles.orderDetailText} numberOfLines={2}>
+          <Text style={styles.orderDetailText}>
             {String((item as any).delivery_address || (item as any).deliveryAddress || 'Address not given')}
           </Text>
         </View>

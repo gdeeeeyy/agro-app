@@ -282,7 +282,7 @@ export default function Cart() {
       )}
       
       <View style={styles.itemDetails}>
-        <Text style={styles.itemName} numberOfLines={2}>
+        <Text style={styles.itemName}>
           {currentLanguage === 'ta' && item.name_ta ? item.name_ta : item.name}
         </Text>
         {item.variant_label ? (

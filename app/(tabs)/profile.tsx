@@ -59,7 +59,7 @@ export default function Profile() {
         <TouchableOpacity style={styles.tileRow} onPress={() => router.push('/contact')}>
           <View style={styles.tileLeft}>
             <Ionicons name="call" size={20} color="#4caf50" />
-            <Text style={styles.tileTitle} numberOfLines={2}>{t('contact.title')}</Text>
+            <Text style={styles.tileTitle}>{t('contact.title')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>
@@ -70,7 +70,7 @@ export default function Profile() {
         >
           <View style={styles.tileLeft}>
             <Ionicons name="mail" size={20} color="#4caf50" />
-            <Text style={styles.tileTitle} numberOfLines={2}>{t('account.forSaleContact')}</Text>
+            <Text style={styles.tileTitle}>{t('account.forSaleContact')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#2d5016" />
         </TouchableOpacity>

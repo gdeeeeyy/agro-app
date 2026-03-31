@@ -138,8 +138,8 @@ export default function AdminDashboard() {
       // Prefetch variants for master view (to show stock per variant)
       try {
         const entries = await Promise.all(allProducts.map(async (p:any) => {
-          try { const vs = await db.getProductVariants(Number(p.id)); return [Number(p.id), vs as any[]] as const; }
-          catch { return [Number(p.id), []] as const; }
+          try { const vs = await db.getProductVariants(Number(p.id)); return [Number(p.id), (vs as any[]) || []] as [number, any[]]; }
+          catch { return [Number(p.id), []] as [number, any[]]; }
         }));
         const vm: Record<number, any[]> = {};
         entries.forEach(([pid, vs]) => { vm[pid] = vs; });
@@ -241,7 +241,7 @@ export default function AdminDashboard() {
       low_stock_alert_time: String((product as any).low_stock_alert_time || '09:00'),
     });
     // Parse existing keywords
-    const existingKeywords = product.keywords.split(',').map(k => k.trim()).filter(k => k);
+    const existingKeywords = (product.keywords || '').split(',').map((k: string) => k.trim()).filter((k: string) => k);
     setSelectedKeywords(existingKeywords);
     setEditingProduct(product);
     setModalVisible(true);
@@ -368,13 +368,18 @@ const pickImage = async () => {
       cost_per_unit: 0,
       low_stock_threshold: Number(formData.low_stock_threshold || '20') || 20,
       low_stock_alert_time: formData.low_stock_alert_time?.trim() || '09:00',
-      // Let backend auto-approve products created by master admin (is_admin=2)
+    };
+
+    // Metadata is primarily for new products or identifying ownership
+    const metaData = {
       created_by: user?.id ?? undefined,
       creator_role: user?.is_admin ?? 0,
     };
 
     try {
       if (editingProduct) {
+        // For updates, we primarily send the product fields.
+        // ownership metadata (created_by) usually doesn't change on edit.
         const success = await updateProduct(editingProduct.id, productData);
         if (success) {
           // If a vendor edited this product, mark it as pending for admin review
@@ -391,7 +396,7 @@ const pickImage = async () => {
           Alert.alert('Error', 'Failed to update product');
         }
       } else {
-        const productId = await addProduct(productData);
+        const productId = await addProduct({ ...productData, ...metaData });
         if (productId) {
           // If we drafted variants, add them now
           if (draftVariants.length) {
