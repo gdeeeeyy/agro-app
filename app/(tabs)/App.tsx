@@ -14,16 +14,13 @@ import {
   ActionSheetIOS,
   Platform,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
-import { savePlant, findProductsByKeywords, getRelatedProductsByName, listImprovedArticles } from "../../lib/database";
-import { analyzePlantImage } from "../../lib/gemini";
-import ProductCard from "../../components/ProductCard";
+import { savePlant, listImprovedArticles } from "../../lib/database";
+import { analyzePlantImage } from "../../lib/ai";
 import { useLanguage } from "../../context/LanguageContext";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
@@ -39,7 +36,6 @@ export default function App() {
   const [othersOpen, setOthersOpen] = useState(false);
   const [othersName, setOthersName] = useState('');
   const [result, setResult] = useState<any>(null);
-  const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useContext(UserContext);
 
@@ -50,7 +46,6 @@ export default function App() {
     setImage(null);
     setPlantName('');
     setPlantNote('');
-    setRecommendedProducts([]);
   }, []);
 
   const handleClearResults = useCallback(() => {
@@ -81,47 +76,6 @@ export default function App() {
     }, [result, handleClearResults])
   );
 
-  // Function to extract relevant keywords from analysis
-  const extractKeywordsFromAnalysis = (analysis: any, plantName: string): string[] => {
-    const keywords: string[] = [];
-    
-    // Add plant name as primary keyword
-    keywords.push(plantName.toLowerCase());
-    
-    // Extract disease-related keywords
-    if (analysis.disease_name) {
-      keywords.push(analysis.disease_name.toLowerCase());
-    }
-    
-    // Extract treatment-related keywords
-    if (analysis.treatment) {
-      const treatmentWords = analysis.treatment.toLowerCase()
-        .split(/[,\s]+/)
-        .filter((word: string) => word.length > 3)
-        .slice(0, 3); // Take top 3 treatment words
-      keywords.push(...treatmentWords);
-    }
-    
-    // Extract severity-related keywords
-    if (analysis.severity) {
-      keywords.push(analysis.severity.toLowerCase());
-    }
-    
-    // Add common agricultural terms based on analysis
-    if (analysis.disease_name && analysis.disease_name.toLowerCase().includes('fungal')) {
-      keywords.push('fungicide', 'antifungal');
-    }
-    if (analysis.disease_name && analysis.disease_name.toLowerCase().includes('bacterial')) {
-      keywords.push('antibacterial', 'bactericide');
-    }
-    if (analysis.disease_name && analysis.disease_name.toLowerCase().includes('pest')) {
-      keywords.push('pesticide', 'insecticide');
-    }
-    
-    // Remove duplicates and return
-    return [...new Set(keywords)].filter(keyword => keyword.length > 2);
-  };
-
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -134,36 +88,32 @@ export default function App() {
     return true;
   };
 
-const takePhoto = async () => {
+  const takePhoto = async () => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) return;
 
-    const result = await ImagePicker.launchCameraAsync({
-mediaTypes: ['images'] as any,
-      // Reduce size so base64 upload doesn't exceed server limits.
+    const pickerResult = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
       allowsEditing: true,
       aspect: [4, 3],
     });
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+    if (!pickerResult.canceled) {
+      setImage(pickerResult.assets[0].uri);
       setResult(null);
-      setRecommendedProducts([]);
     }
   };
 
-const pickImageFromGallery = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-mediaTypes: ['images'] as any,
-      // Reduce size so base64 upload doesn't exceed server limits.
+  const pickImageFromGallery = async () => {
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
       allowsEditing: true,
       aspect: [4, 3],
     });
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+    if (!pickerResult.canceled) {
+      setImage(pickerResult.assets[0].uri);
       setResult(null);
-      setRecommendedProducts([]);
     }
   };
 
@@ -198,37 +148,21 @@ mediaTypes: ['images'] as any,
     try {
       const base64 = await uriToBase64(image);
       const augmentedName = plantNote ? `${plantName} (Note: ${plantNote})` : plantName;
-      const geminiResponse = await analyzePlantImage(base64, augmentedName, currentLanguage);
+      
+      // Perform AI analysis using the new Groq module
+      const aiResponse = await analyzePlantImage(base64, augmentedName, currentLanguage);
 
       // Immediately update result and stop loading so UI renders right away
-      setResult(geminiResponse);
+      setResult(aiResponse);
       setLoading(false);
       setImage(null);
       setPlantName("");
       setPlantNote("");
 
       // Continue background tasks after UI has updated
-      savePlant(user.id, plantName, image, JSON.stringify(geminiResponse)).catch(err => 
+      savePlant(user.id, plantName, image, JSON.stringify(aiResponse)).catch(err => 
         console.error("Save plant error:", err)
       );
-
-      // Extract keywords from the analysis for better product matching
-      const analysisKeywords = extractKeywordsFromAnalysis(geminiResponse, plantName);
-      findProductsByKeywords(analysisKeywords, 5).then(async (products) => {
-        // Also fetch related products based on the top matched product name
-        let related: any[] = [];
-        if (products.length > 0) {
-          const top = products[0] as any;
-          const topName = currentLanguage === 'ta' ? (top.name_ta || top.name) : top.name;
-          related = await getRelatedProductsByName(topName, products.map((p: any) => p.id), 3);
-        }
-        // Merge and dedupe by product id
-        const map: Record<string, any> = {};
-        [...products, ...related].forEach((p: any) => { map[p.id] = p; });
-        const combined = Object.values(map);
-        setRecommendedProducts(combined);
-      }).catch(err => console.error("Product fetch error:", err));
-
     } catch (error) {
       console.error("Analysis error:", error);
       Alert.alert(t('scanner.error'), t('scanner.failed'));
@@ -338,24 +272,9 @@ mediaTypes: ['images'] as any,
         )}
 
         {result && !result.error && <PlantAnalysis data={result} />}
-
-
-        {recommendedProducts.length > 0 && (
-          <View style={styles.recommendationsSection}>
-            <Text style={styles.recommendationsTitle}>{t('scan.recommendations')}</Text>
-            <Text style={styles.recommendationsSubtitle}>
-              {currentLanguage === 'ta' ? 'உங்கள் தாவர ஆய்வின் அடிப்படையில்' : 'Based on your plant analysis'}
-            </Text>
-            {recommendedProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </View>
-        )}
         </ScrollView>
         <View style={{ height: 10 }} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />
-
-
 
       {/* Plant picker modal */}
       <Modal
@@ -403,51 +322,9 @@ mediaTypes: ['images'] as any,
 
 
 const styles = StyleSheet.create({
-  topRight: {
-    position: 'absolute',
-    top: 8,
-    right: 12,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 0,
-  },
   wrapper: {
     flex: 1,
     backgroundColor: "#f5f5f5",
-  },
-  header: {
-    backgroundColor: "#4caf50",
-    position: 'relative',
-    paddingTop: 10,
-    paddingBottom: 10,
-    paddingHorizontal: 12,
-  },
-  headerTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  logo: {
-    width: 36,
-    height: 36,
-    marginRight: 12,
-    borderRadius: 8,
-    transform: [{ scale: 1.2 }],
-    overflow: 'hidden',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#e8f5e9",
   },
   container: {
     flexGrow: 1,
@@ -541,23 +418,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
-  recommendationsSection: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-  },
-  recommendationsTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2d5016",
-    marginBottom: 8,
-  },
-  recommendationsSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 16,
-  },
   loadingOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -578,42 +438,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: '#333',
-    fontWeight: '700',
-  },
-  disclaimerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  disclaimerCard: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 18,
-    elevation: 4,
-  },
-  disclaimerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2d5016',
-    marginBottom: 8,
-  },
-  disclaimerText: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 16,
-  },
-  disclaimerButton: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#4caf50',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  disclaimerButtonText: {
-    color: '#fff',
     fontWeight: '700',
   },
 });
