@@ -1,4 +1,4 @@
-# Publishing Agriismart to Google Play Store
+# Publishing agriismart to Google Play Store
 
 This guide walks you through the complete process of publishing your Expo/React Native app to the Google Play Store.
 
@@ -66,7 +66,7 @@ Ensure your `app.json` has the correct configuration:
 ```json
 {
   "expo": {
-    "name": "Agriismart",
+    "name": "agriismart",
     "slug": "agriismart",
     "version": "1.1.0",
     "android": {
@@ -107,7 +107,7 @@ Once the build is complete, download the `.aab` file from the Expo dashboard or 
 1. Go to [Google Play Console](https://play.google.com/console)
 2. Click **"Create app"**
 3. Fill in the details:
-   - **App name**: Agriismart
+   - **App name**: agriismart
    - **Default language**: English (United States) or your preferred language
    - **App or game**: App
    - **Free or paid**: Free (or Paid if applicable)
@@ -118,14 +118,14 @@ Once the build is complete, download the `.aab` file from the Expo dashboard or 
 Navigate to **"Grow" > "Store presence" > "Main store listing"**:
 
 #### App Details
-- **App name**: Agriismart
+- **App name**: agriismart
 - **Short description** (80 chars max):
   ```
   AI-powered plant disease detection & agricultural products for farmers
   ```
 - **Full description** (4000 chars max):
   ```
-  Agriismart is your complete farming companion app designed to help farmers identify plant diseases, learn about crop management, and purchase quality agricultural products.
+  agriismart is your complete farming companion app designed to help farmers identify plant diseases, learn about crop management, and purchase quality agricultural products.
 
   🌱 PLANT DISEASE SCANNER
   • Take a photo of your plant leaves
@@ -187,7 +187,7 @@ Navigate to **"Policy" > "App content"** and complete:
 1. **Privacy policy**: Add a URL to your privacy policy
    - Host it on your website or as a static endpoint on your Render server
    
-2. **Ads**: Declare if your app contains ads (No for Agriismart)
+2. **Ads**: Declare if your app contains ads (No for agriismart)
 
 3. **App access**: If login is required, provide test credentials:
    ```

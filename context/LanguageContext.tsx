@@ -77,7 +77,7 @@ const translations = {
     'auth.deleteError': 'Failed to delete account. Please try again.',
     
     // Home Screen
-    'home.title': 'Agriismart',
+    'home.title': 'agriismart',
     'home.subtitle': 'Faith of the Farmers - Plant Disease Detection',
     'home.welcome': 'Welcome',
     'home.recentScans': 'Recent Scans',
@@ -121,7 +121,7 @@ const translations = {
     'scan.retryAnalysis': 'Retry Analysis',
     
     // Store
-    'store.title': 'Agriismart Store',
+    'store.title': 'agriismart Store',
     'store.subtitle': 'Faith of the Farmers - Agricultural Products',
     'store.search': 'Search products...',
     'store.searchResults': 'Search Results',
@@ -135,7 +135,7 @@ const translations = {
     'store.addToCartError': 'Failed to add to cart',
     
     // Cart
-'cart.title': 'Agriismart Cart',
+'cart.title': 'agriismart Cart',
 'cart.subtitle': 'Faith of the Farmers - Your shopping cart',
 'cart.empty': 'Your cart is empty',
     'cart.emptySubtext': 'Add some products to get started',
@@ -196,7 +196,7 @@ const translations = {
     'order.loginRequired': 'Please login to place an order.',
     
     // Admin
-    'admin.title': 'Agriismart Admin',
+    'admin.title': 'agriismart Admin',
     'admin.subtitle': 'Faith of the Farmers - Manage Products',
     'admin.accessDenied': 'Access Denied',
     'admin.accessDeniedDesc': 'You need admin privileges to access this page',
@@ -253,7 +253,7 @@ const translations = {
 'status.cancelled': 'Cancelled',
 
     // Scanner / Analysis UI
-    'scanner.headerTitle': 'Agriismart Scanner',
+    'scanner.headerTitle': 'agriismart Scanner',
     'scanner.headerSubtitle': 'Faith of the Farmers - AI Plant Analysis',
     'scanner.plantName': 'Plant Name',
 'scanner.placeholder': 'e.g., Tomato, Rose, Wheat',

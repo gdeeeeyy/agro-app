@@ -2,9 +2,9 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: "Agriismart",
+    name: "agriismart",
     slug: "agriismart",
-    version: "2.0.1",
+    version: "2.0.3",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "agriismart",
@@ -22,7 +22,7 @@ export default {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.agriismart.app",
-      versionCode: 3
+      versionCode: 5
     },
     web: {
       output: "static",

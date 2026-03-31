@@ -1,12 +1,15 @@
 import Config from "./config";
 import axios from "axios";
-import Constants from 'expo-constants';
 
 // Get backend API URL from config
 const API_URL = Config.API_URL;
 
+/**
+ * Highly optimized plant analysis using Groq AI via the backend.
+ * Groq's high throughput allows for faster response times compared to previous Gemini implementation.
+ */
 export async function analyzePlantImage(base64Image: string, plantName: string, language: 'en' | 'ta' = 'en') {
-  // Call backend API instead of Gemini directly (API key stays server-side)
+  // Call backend API instead of Groq directly (API key stays server-side)
   const maxRetries = 3;
   let attempt = 0;
   let lastErr: any = null;
@@ -28,8 +31,13 @@ export async function analyzePlantImage(base64Image: string, plantName: string, 
       const status = err?.response?.status;
       const retriable = status === 429 || status === 503 || err?.code === 'ECONNABORTED' || err?.message?.includes('Network request failed');
       if (!retriable || attempt === maxRetries - 1) {
-        console.error("Plant analysis API error:", err.response?.data || err.message);
-        return { plant: plantName, disease_or_pest: "Service unavailable", description: "AI service temporarily unavailable (try again later)", keywords: [] };
+        console.error("Plant analysis API error (Groq):", err.response?.data || err.message);
+        return { 
+          plant: plantName, 
+          disease_or_pest: "Service busy", 
+          description: "AI analysis is currently under heavy load (Groq). Please try again in a few moments.", 
+          keywords: [] 
+        };
       }
       const backoff = 1000 * Math.pow(2, attempt);
       await new Promise(r => setTimeout(r, backoff));
@@ -37,5 +45,10 @@ export async function analyzePlantImage(base64Image: string, plantName: string, 
     }
   }
 
-  return { plant: plantName, disease_or_pest: "Service unavailable", description: String(lastErr?.message || 'Unknown error'), keywords: [] };
+  return { 
+    plant: plantName, 
+    disease_or_pest: "Connection issue", 
+    description: String(lastErr?.message || 'The AI service is temporarily unreachable.'), 
+    keywords: [] 
+  };
 }

@@ -81,6 +81,11 @@ if (Platform.OS !== 'web') (async () => {
       unit TEXT,
       stock_available INTEGER DEFAULT 0,
       cost_per_unit REAL NOT NULL,
+      seller_name TEXT,
+      created_by INTEGER,
+      creator_role INTEGER DEFAULT 0,
+      low_stock_threshold INTEGER DEFAULT 20,
+      low_stock_alert_time TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -299,6 +304,8 @@ if (Platform.OS !== 'web') (async () => {
     // Low stock alert config (threshold + optional time-of-day string like '09:00')
     await addProdIntCol('low_stock_threshold', 20);
     await addProdTextCol('low_stock_alert_time');
+    await addProdIntCol('created_by', 0);
+    await addProdIntCol('creator_role', 0);
 
     // users migration (addresses)
     const userCols = await db.getAllAsync("PRAGMA table_info(users)");
@@ -774,7 +781,7 @@ export async function addProduct(product: {
       return (res as any).id || null;
     }
     const result = await db.runAsync(
-      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, seller_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, seller_name, created_by, creator_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
       product.plant_used,
       product.keywords,
@@ -786,7 +793,9 @@ export async function addProduct(product: {
       product.unit || null,
       product.stock_available,
       product.cost_per_unit,
-      product.seller_name || null
+      product.seller_name || null,
+      product.created_by || null,
+      product.creator_role || 0
     );
     return result.lastInsertRowId;
   } catch (err) {
@@ -808,6 +817,10 @@ export async function updateProduct(id: number, product: {
   cost_per_unit?: number;
   unit?: string;
   seller_name?: string;
+  low_stock_threshold?: number;
+  low_stock_alert_time?: string;
+  created_by?: number;
+  creator_role?: number;
 }) {
   try {
     if (API_URL) {
@@ -817,8 +830,14 @@ export async function updateProduct(id: number, product: {
     const fields: string[] = [];
     const values: any[] = [];
     
+    const validColumns = [
+      'name', 'plant_used', 'keywords', 'details', 'name_ta', 'plant_used_ta',
+      'details_ta', 'image', 'stock_available', 'cost_per_unit', 'unit',
+      'seller_name', 'low_stock_threshold', 'low_stock_alert_time', 'created_by', 'creator_role'
+    ];
+    
     Object.entries(product).forEach(([key, value]) => {
-      if (value !== undefined) {
+      if (value !== undefined && validColumns.includes(key)) {
         fields.push(`${key} = ?`);
         values.push(value);
       }

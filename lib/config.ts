@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 
 /**
- * Central configuration for the Agriismart application.
+ * Central configuration for the agriismart application.
  * All environment variables should be accessed through this object.
  * 
  * Uses EXPO_PUBLIC_ prefixed environment variables which are automatically 

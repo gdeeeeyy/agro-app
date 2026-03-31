@@ -1,4 +1,4 @@
-# Agriismart
+# agriismart
 
 A comprehensive agriculture mobile application built with React Native and Expo, designed to help farmers with plant disease detection, crop management, and agricultural product purchasing.
 

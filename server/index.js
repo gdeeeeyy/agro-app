@@ -446,7 +446,7 @@ app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 app.get('/', (req, res) => {
   res.json({
-    message: 'Agriismart API is running',
+    message: 'agriismart API is running',
     status: isReady ? 'ready' : 'initializing',
     timestamp: new Date().toISOString()
   });
@@ -522,7 +522,7 @@ app.post('/auth/request-otp', async (req, res) => {
     try {
       const params = new URLSearchParams({
         phone: number,
-        message: `Your Agriismart login OTP is ${code}`,
+        message: `Your agriismart login OTP is ${code}`,
         key: TEXTBELT_KEY,
       });
       const resp = await fetch(TEXTBELT_URL, {
@@ -791,6 +791,7 @@ app.get('/products/admin', async (req, res) => {
     FROM products p
     LEFT JOIN order_items oi
       ON oi.product_id = p.id AND oi.rating IS NOT NULL
+    WHERE p.status != 'deleted'
     GROUP BY p.id
     ORDER BY p.created_at DESC`));
 });
@@ -798,7 +799,48 @@ app.get('/products/pending', async (req, res) => {
   res.json(await all("SELECT * FROM products WHERE status='pending' ORDER BY created_at DESC"));
 });
 
-// Per-product reviews (for Masters to inspect ratings and comments)
+// Deduction of stock for an order (idempotent via stock_deducted flag)
+async function deductStockForOrder(orderId) {
+  try {
+    const flag = await one('SELECT stock_deducted FROM orders WHERE id=$1', [orderId]);
+    if (flag && flag.stock_deducted === true) return false;
+
+    const items = await all('SELECT product_id, variant_id, quantity FROM order_items WHERE order_id=$1', [orderId]);
+    for (const it of items) {
+      if (it.variant_id) {
+        await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
+      } else {
+        await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
+      }
+      
+      // Low stock alert logic
+      try {
+        const prod = await one('SELECT stock_available, low_stock_threshold, low_stock_alert_time, created_by, name FROM products WHERE id=$1', [it.product_id]);
+        if (prod && prod.created_by) {
+          const threshold = prod.low_stock_threshold != null ? Number(prod.low_stock_threshold) : 20;
+          const currentStock = Number(prod.stock_available || 0);
+          if (Number.isFinite(currentStock) && currentStock <= threshold) {
+            const ownerId = Number(prod.created_by);
+            const title = `Low stock: ${prod.name || 'Product'}`;
+            const msg = `Stock for ${prod.name || 'this product'} is now ${currentStock} (alert at ${threshold}).`;
+            await pool.query('INSERT INTO notifications (title, message, user_id) VALUES ($1,$2,$3)', [title, msg, ownerId]);
+            const toks = await all('SELECT token FROM push_tokens WHERE user_id=$1', [ownerId]);
+            if (toks.length) {
+              const pushMsgs = toks.map(t => ({ to: t.token, sound: 'default', title, body: msg }));
+              fetch('https://exp.host/--/api/v2/push/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pushMsgs) }).catch(()=>{});
+            }
+          }
+        }
+      } catch (le) { console.warn('Low stock alert check failed:', le.message); }
+    }
+    await pool.query('UPDATE orders SET stock_deducted=true WHERE id=$1', [orderId]);
+    return true;
+  } catch (err) {
+    console.error('deductStockForOrder error:', err);
+    return false;
+  }
+}
+
 app.get('/products/:id/reviews', async (req, res) => {
   const pid = Number(req.params.id);
   if (!Number.isFinite(pid)) return res.status(400).json({ error: 'invalid product id' });
@@ -886,11 +928,22 @@ app.patch('/products/:id', async (req, res) => {
 });
 
 app.delete('/products/:id', async (req, res) => {
-  // Prevent deleting a product that appears in order_items (preserve order history integrity)
-  const ref = await one('SELECT 1 FROM order_items WHERE product_id=$1 LIMIT 1', [req.params.id]);
-  if (ref) return res.status(400).json({ error: 'cannot delete product with order history' });
-  await pool.query('DELETE FROM products WHERE id=$1', [req.params.id]);
-  res.json({ ok: true });
+  try {
+    const id = req.params.id;
+    // Prevent deleting a product that appears in order_items (preserve order history integrity)
+    const ref = await one('SELECT 1 FROM order_items WHERE product_id=$1 LIMIT 1', [id]);
+    if (ref) {
+      // If order history exists, perform a soft-delete by setting status to 'deleted'
+      await pool.query("UPDATE products SET status='deleted', updated_at=now() WHERE id=$1", [id]);
+      return res.json({ ok: true, softDeleted: true });
+    }
+    // No order history: hard delete is safe
+    await pool.query('DELETE FROM products WHERE id=$1', [id]);
+    res.json({ ok: true, deleted: true });
+  } catch (e) {
+    console.error('Delete product error:', e);
+    res.status(500).json({ error: 'failed to delete product' });
+  }
 });
 
 // Variants
@@ -1549,6 +1602,8 @@ app.get('/payments/razorpay/callback', async (req, res) => {
             'INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)',
             [orderId, 'confirmed', paymentId || null]
           );
+          // Deduct stock now that it's confirmed/paid
+          await deductStockForOrder(orderId);
         } catch {}
 
         // On successful payment, clear cart for this user
@@ -1660,47 +1715,14 @@ app.patch('/orders/:id', async (req, res) => {
       await pool.query('INSERT INTO order_status_history (order_id, status, note) VALUES ($1,$2,$3)', [req.params.id, statusLower, statusNote || null]);
     }
   } catch {}
-  // On dispatch, deduct stock once (idempotent)
+  // On confirm or dispatch, deduct stock once (idempotent via status check in deductStockForOrder)
   try {
-    if (statusLower === 'dispatched') {
-      const flag = await one('SELECT stock_deducted FROM orders WHERE id=$1', [req.params.id]);
-      if (!flag || flag.stock_deducted !== true) {
-        const items = await all('SELECT product_id, variant_id, quantity FROM order_items WHERE order_id=$1', [req.params.id]);
-        for (const it of items) {
-          if (it.variant_id) {
-            await pool.query('UPDATE product_variants SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.variant_id]);
-          } else {
-            await pool.query('UPDATE products SET stock_available = stock_available - $1 WHERE id=$2', [it.quantity, it.product_id]);
-          }
-          // After each deduction, check low stock alert for the owning vendor/admin
-          try {
-            const prod = await one('SELECT stock_available, low_stock_threshold, low_stock_alert_time, created_by, name FROM products WHERE id=$1', [it.product_id]);
-            if (prod && prod.created_by) {
-              const threshold = prod.low_stock_threshold != null ? Number(prod.low_stock_threshold) : 20;
-              const currentStock = Number(prod.stock_available || 0);
-              if (Number.isFinite(currentStock) && currentStock <= threshold) {
-                const ownerId = Number(prod.created_by);
-                const title = `Low stock: ${prod.name || 'Product'}`;
-                const msg = `Stock for ${prod.name || 'this product'} is now ${currentStock} (alert at ${threshold}).`;
-                await pool.query('INSERT INTO notifications (title, message, user_id) VALUES ($1,$2,$3)', [title, msg, ownerId]);
-                // Push only to this owner's registered devices
-                try {
-                  const toks = await all('SELECT token FROM push_tokens WHERE user_id=$1', [ownerId]);
-                  if (toks.length) {
-                    const pushMsgs = toks.map(t => ({ to: t.token, sound: 'default', title, body: msg }));
-                    await fetch('https://exp.host/--/api/v2/push/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pushMsgs) }).catch(()=>{});
-                  }
-                } catch {}
-              }
-            }
-          } catch (le) {
-            console.warn('Low stock alert check failed:', le.message);
-          }
-        }
-        await pool.query('UPDATE orders SET stock_deducted=true WHERE id=$1', [req.params.id]);
-      }
+    if (['confirmed', 'dispatched', 'shipped', 'delivered'].includes(statusLower)) {
+      await deductStockForOrder(req.params.id);
     }
-  } catch (e) { console.warn('Stock deduction on dispatch failed:', e.message); }
+  } catch (e) {
+    console.warn('Stock deduction trigger failed:', e.message);
+  }
   // Send notification to the order owner (user-specific)
   try {
     const o = await one('SELECT user_id FROM orders WHERE id=$1', [req.params.id]);

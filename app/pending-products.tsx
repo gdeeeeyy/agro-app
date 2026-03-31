@@ -34,9 +34,9 @@ export default function PendingProducts() {
       <View style={{ flexDirection:'row', alignItems:'center' }}>
         {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : <View style={[styles.thumb,{ backgroundColor:'#eaf6ec' }]} />}
         <View style={{ flex:1 }}>
-          <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.subline} numberOfLines={1}>Pending approval • Stock: {item.stock_available} • ₹{item.cost_per_unit}</Text>
-          {item.keywords ? <Text style={styles.subline} numberOfLines={1}>{item.keywords}</Text> : null}
+          <Text style={styles.title}>{item.name}</Text>
+          <Text style={styles.subline}>Pending approval • Stock: {item.stock_available} • ₹{item.cost_per_unit}</Text>
+          {item.keywords ? <Text style={styles.subline}>{item.keywords}</Text> : null}
         </View>
         <Ionicons name="chevron-forward" size={18} color="#2d5016" />
       </View>

@@ -51,7 +51,7 @@ export default function AppHeader() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <Image source={require('../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.title} numberOfLines={1}>{currentLanguage === 'ta' ? 'அக்ரிஸ்மார்ட்' : 'Agriismart'}</Text>
+          <Text style={styles.title} numberOfLines={1}>{currentLanguage === 'ta' ? 'அக்ரிஸ்மார்ட்' : 'agriismart'}</Text>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={openNotifications} accessibilityLabel="Notifications" style={[styles.actionBtn, { position:'relative' }]}>
