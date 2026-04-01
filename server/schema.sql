@@ -169,3 +169,25 @@ CREATE TABLE IF NOT EXISTS improved_article_images (
   position INTEGER,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Enable Row Level Security on all tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cart_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE keywords ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crop_guides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crop_pests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crop_pest_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crop_diseases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crop_disease_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improved_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improved_articles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improved_article_images ENABLE ROW LEVEL SECURITY;
+
+-- Since the app uses a custom backend and does not use the Supabase Data API,
+-- we do not need to define any public policies for anon/authenticated roles.
+-- This effectively blocks all access via the Supabase API while allowing
+-- the backend server (connecting as owner) to function normally.

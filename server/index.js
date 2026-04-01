@@ -428,6 +428,23 @@ async function runMigrations() {
       ON CONFLICT (slug) DO UPDATE SET
         name_en = EXCLUDED.name_en,
         name_ta = EXCLUDED.name_ta`);
+
+    // Ensure Row Level Security is enabled on all tables (Secures Supabase Data API)
+    const tables = [
+      'users', 'products', 'cart_items', 'orders', 'order_items', 'keywords',
+      'crops', 'crop_guides', 'crop_pests', 'crop_pest_images', 'crop_diseases',
+      'crop_disease_images', 'improved_categories', 'improved_articles',
+      'improved_article_images', 'order_status_history', 'conversations',
+      'conversation_participants', 'messages', 'notifications', 'push_tokens',
+      'logistics', 'login_otps', 'scan_plants', 'product_variants'
+    ];
+    for (const table of tables) {
+      try {
+        await pool.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+      } catch (err) {
+        console.warn(`Could not enable RLS on ${table}:`, err.message);
+      }
+    }
   } catch (e) {
     console.warn('Startup migration warning:', e.message);
   } finally {
