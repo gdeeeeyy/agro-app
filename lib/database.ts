@@ -459,7 +459,7 @@ export async function savePlant(userId: number, name: string, imageUri: string, 
       result
     );
   } catch (err) {
-    console.error("SQLite insert error:", err);
+    console.error("Database insert error:", err);
   }
 }
 
@@ -469,7 +469,7 @@ export async function getAllPlants(userId: number) {
     const rows = await db.getAllAsync("SELECT * FROM plants WHERE user_id = ? ORDER BY id DESC", userId);
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -516,7 +516,7 @@ export async function listUsersBasic() {
     // running in local/offline mode.
     const rows = await db.getAllAsync('SELECT id, full_name, number, is_admin FROM users ORDER BY created_at ASC');
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function getNotifications(userId?: number) {
@@ -527,7 +527,7 @@ export async function getNotifications(userId?: number) {
     }
     if (userId) return await db.getAllAsync('SELECT * FROM notifications WHERE user_id IS NULL OR user_id = ? ORDER BY created_at DESC', userId);
     return await db.getAllAsync('SELECT * FROM notifications WHERE user_id IS NULL ORDER BY created_at DESC');
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function publishSystemNotification(title: string, message: string, title_ta?: string, message_ta?: string) {
@@ -541,7 +541,7 @@ export async function publishSystemNotification(title: string, message: string, 
     try { await db.runAsync('ALTER TABLE notifications ADD COLUMN message_ta TEXT'); } catch {}
     const r = await db.runAsync('INSERT INTO notifications (title, message, title_ta, message_ta, user_id) VALUES (?, ?, ?, ?, NULL)', title, message, title_ta || null, message_ta || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 
 // Improved Technologies helpers
@@ -551,7 +551,7 @@ export async function listImprovedCategories() {
       try { return await api.get('/improved-categories'); } catch (e) { /* fall back */ }
     }
     return await db.getAllAsync('SELECT * FROM improved_categories ORDER BY name_en ASC');
-  } catch (err) { console.error('SQLite fetch error (categories):', err); return []; }
+  } catch (err) { console.error('Database fetch error (categories):', err); return []; }
 }
 
 export async function createImprovedCategory(input: { name_en: string; name_ta?: string }) {
@@ -584,7 +584,7 @@ export async function createImprovedCategory(input: { name_en: string; name_ta?:
     );
     return r.lastInsertRowId;
   } catch (err) {
-    console.error('SQLite insert error (category):', err);
+    console.error('Database insert error (category):', err);
     return null;
   }
 }
@@ -601,7 +601,7 @@ export async function listImprovedArticles(categorySlug: string, language: 'en'|
       (cat as any).id
     );
     return rows;
-  } catch (err) { console.error('SQLite fetch error (articles):', err); return []; }
+  } catch (err) { console.error('Database fetch error (articles):', err); return []; }
 }
 
 export async function getImprovedArticle(id: number) {
@@ -616,7 +616,7 @@ export async function getImprovedArticle(id: number) {
       id
     );
     return { ...(article as any), images };
-  } catch (err) { console.error('SQLite fetch error (article):', err); return null; }
+  } catch (err) { console.error('Database fetch error (article):', err); return null; }
 }
 
 export async function createImprovedArticle(input: {
@@ -645,7 +645,7 @@ export async function createImprovedArticle(input: {
       input.body_ta || null
     );
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error (article):', err); return null; }
+  } catch (err) { console.error('Database insert error (article):', err); return null; }
 }
 
 export async function updateImprovedArticle(id: number, input: {
@@ -669,7 +669,7 @@ export async function updateImprovedArticle(id: number, input: {
       ...vals
     );
     return true;
-  } catch (err) { console.error('SQLite update error (article):', err); return false; }
+  } catch (err) { console.error('Database update error (article):', err); return false; }
 }
 
 export async function deleteImprovedArticle(id: number) {
@@ -680,7 +680,7 @@ export async function deleteImprovedArticle(id: number) {
     await db.runAsync('DELETE FROM improved_article_images WHERE article_id = ?', id);
     await db.runAsync('DELETE FROM improved_articles WHERE id = ?', id);
     return true;
-  } catch (err) { console.error('SQLite delete error (article):', err); return false; }
+  } catch (err) { console.error('Database delete error (article):', err); return false; }
 }
 
 export async function addImprovedArticleImage(articleId: number, image: string, public_id?: string, caption_en?: string, caption_ta?: string, position?: number) {
@@ -693,7 +693,7 @@ export async function addImprovedArticleImage(articleId: number, image: string, 
       articleId, image, public_id || null, caption_en || null, caption_ta || null, position ?? null
     );
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error (article image):', err); return null; }
+  } catch (err) { console.error('Database insert error (article image):', err); return null; }
 }
 
 export async function updateImprovedArticleImage(id: number, fields: { caption_en?: string; caption_ta?: string; position?: number; }) {
@@ -707,7 +707,7 @@ export async function updateImprovedArticleImage(id: number, fields: { caption_e
     vals.push(id);
     await db.runAsync(`UPDATE improved_article_images SET ${sets.join(', ')} WHERE id = ?`, ...vals);
     return true;
-  } catch (err) { console.error('SQLite update error (article image):', err); return false; }
+  } catch (err) { console.error('Database update error (article image):', err); return false; }
 }
 
 export async function deleteImprovedArticleImage(id: number) {
@@ -717,7 +717,7 @@ export async function deleteImprovedArticleImage(id: number) {
     }
     await db.runAsync('DELETE FROM improved_article_images WHERE id = ?', id);
     return true;
-  } catch (err) { console.error('SQLite delete error (article image):', err); return false; }
+  } catch (err) { console.error('Database delete error (article image):', err); return false; }
 }
 
 export async function getAllProducts() {
@@ -799,7 +799,7 @@ export async function addProduct(product: {
     );
     return result.lastInsertRowId;
   } catch (err) {
-    console.error("SQLite insert error:", err);
+    console.error("Database insert error:", err);
     return null;
   }
 }
@@ -852,7 +852,7 @@ export async function updateProduct(id: number, product: {
     );
     return true;
   } catch (err) {
-    console.error("SQLite update error:", err);
+    console.error("Database update error:", err);
     return false;
   }
 }
@@ -993,7 +993,7 @@ export async function getCartItems(userId: number) {
     );
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -1025,7 +1025,7 @@ export async function addToCart(userId: number, productId: number, quantity: num
     }
     return true;
   } catch (err) {
-    console.error("SQLite insert error:", err);
+    console.error("Database insert error:", err);
     return false;
   }
 }
@@ -1049,7 +1049,7 @@ export async function updateCartItemQuantity(userId: number, productId: number, 
     }
     return true;
   } catch (err) {
-    console.error("SQLite update error:", err);
+    console.error("Database update error:", err);
     return false;
   }
 }
@@ -1066,7 +1066,7 @@ export async function removeFromCart(userId: number, productId: number, variantI
     );
     return true;
   } catch (err) {
-    console.error("SQLite delete error:", err);
+    console.error("Database delete error:", err);
     return false;
   }
 }
@@ -1080,7 +1080,7 @@ export async function clearCart(userId: number) {
     await db.runAsync("DELETE FROM cart_items WHERE user_id = ?", userId);
     return true;
   } catch (err) {
-    console.error("SQLite delete error:", err);
+    console.error("Database delete error:", err);
     return false;
   }
 }
@@ -1101,7 +1101,7 @@ export async function getCartTotal(userId: number) {
     );
     return (rows[0] as any)?.total || 0;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return 0;
   }
 }
@@ -1176,7 +1176,7 @@ export async function getUserOrders(userId: number) {
     );
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -1193,7 +1193,7 @@ export async function getOrderById(orderId: number) {
     );
     return rows[0] || null;
   } catch (err) {
-    console.error('SQLite fetch error:', err);
+    console.error('Database fetch error:', err);
     return null;
   }
 }
@@ -1210,7 +1210,7 @@ export async function getOrderItems(orderId: number) {
     );
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -1233,7 +1233,7 @@ export async function rateOrderItem(orderItemId: number, rating: number, review?
     await db.runAsync(`UPDATE order_items SET ${sets.join(', ')} WHERE id = ?`, ...vals);
     return true;
   } catch (err) {
-    console.error('SQLite update error:', err);
+    console.error('Database update error:', err);
     return false;
   }
 }
@@ -1252,7 +1252,7 @@ export async function getAllOrders() {
     );
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -1267,7 +1267,7 @@ export async function getOrderStatusHistory(orderId: number) {
       orderId
     );
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function updateOrderStatus(
@@ -1308,7 +1308,7 @@ export async function updateOrderStatus(
     }
     return true;
   } catch (err) {
-    console.error("SQLite update error:", err);
+    console.error("Database update error:", err);
     return false;
   }
 }
@@ -1322,7 +1322,7 @@ export async function deleteOrder(orderId: number) {
     await db.runAsync("DELETE FROM orders WHERE id = ?", orderId);
     return true;
   } catch (err) {
-    console.error("SQLite delete error:", err);
+    console.error("Database delete error:", err);
     return false;
   }
 }
@@ -1335,7 +1335,7 @@ export async function listLogistics() {
     }
     const rows = await db.getAllAsync("SELECT * FROM logistics ORDER BY name ASC");
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function addLogistic(name: string, tracking_url?: string) {
@@ -1345,7 +1345,7 @@ export async function addLogistic(name: string, tracking_url?: string) {
     }
     const r = await db.runAsync("INSERT INTO logistics (name, tracking_url) VALUES (?, ?)", name, tracking_url || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 
 export async function deleteLogistic(id: number) {
@@ -1353,7 +1353,7 @@ export async function deleteLogistic(id: number) {
     if (API_URL) { try { await api.del(`/logistics/${id}`); return true; } catch {} }
     await db.runAsync("DELETE FROM logistics WHERE id = ?", id);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 // Crops functions
@@ -1366,7 +1366,7 @@ export async function getAllCrops() {
     const rows = await db.getAllAsync("SELECT * FROM crops ORDER BY name ASC");
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -1387,7 +1387,7 @@ export async function addCrop(input: { name: string; name_ta?: string; image?: s
     );
     return result.lastInsertRowId;
   } catch (err) {
-    console.error("SQLite insert error:", err);
+    console.error("Database insert error:", err);
     return null;
   }
 }
@@ -1401,7 +1401,7 @@ export async function updateCrop(id: number, input: { name?: string; name_ta?: s
     vals.push(id);
     await db.runAsync(`UPDATE crops SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
     return true;
-  } catch (err) { console.error('SQLite update error:', err); return false; }
+  } catch (err) { console.error('Database update error:', err); return false; }
 }
 
 export async function deleteCrop(id: number) {
@@ -1409,7 +1409,7 @@ export async function deleteCrop(id: number) {
     if (API_URL) { await api.del(`/crops/${id}`); return true; }
     await db.runAsync("DELETE FROM crops WHERE id = ?", id);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
@@ -1429,7 +1429,7 @@ export async function getCropGuide(cropId: number, language: 'en'|'ta' = 'en') {
     );
     return row || { cultivation_guide: null, pest_management: null, disease_management: null };
   } catch (err) {
-    console.error('SQLite fetch error:', err);
+    console.error('Database fetch error:', err);
     return { cultivation_guide: null, pest_management: null, disease_management: null } as any;
   }
 }
@@ -1462,7 +1462,7 @@ export async function listCropPests(cropId: number, language: 'en'|'ta' = 'en') 
       cropId
     );
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 export async function updateCropPest(pestId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
@@ -1473,7 +1473,7 @@ export async function updateCropPest(pestId: number, fields: { name?: string; na
     vals.push(pestId);
     await db.runAsync(`UPDATE crop_pests SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
     return true;
-  } catch (err) { console.error('SQLite update error:', err); return false; }
+  } catch (err) { console.error('Database update error:', err); return false; }
 }
 export async function addCropPest(cropId: number, language: 'en'|'ta', name: string, description?: string, management?: string) {
   try {
@@ -1485,7 +1485,7 @@ export async function addCropPest(cropId: number, language: 'en'|'ta', name: str
     }
     const r = await db.runAsync("INSERT INTO crop_pests (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function addCropPestBoth(cropId: number, input: { name_en: string; name_ta: string; description_en?: string; description_ta?: string; management_en?: string; management_ta?: string; }) {
   try {
@@ -1500,7 +1500,7 @@ export async function addCropPestBoth(cropId: number, input: { name_en: string; 
       cropId, input.name_en, input.name_ta || null, input.description_en || null, input.description_ta || null, input.management_en || null, input.management_ta || null
     );
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function addCropPestImage(pestId: number, image: string, caption?: string, caption_ta?: string, public_id?: string) {
   try {
@@ -1510,7 +1510,7 @@ export async function addCropPestImage(pestId: number, image: string, caption?: 
     }
     const r = await db.runAsync("INSERT INTO crop_pest_images (pest_id, image, caption, caption_ta, public_id) VALUES (?, ?, ?, ?, ?)", pestId, image, caption || null, caption_ta || null, public_id || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function listCropPestImages(pestId: number) {
   try {
@@ -1523,7 +1523,7 @@ export async function listCropPestImages(pestId: number) {
       pestId
     );
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en') {
   try {
@@ -1536,7 +1536,7 @@ export async function listCropDiseases(cropId: number, language: 'en'|'ta' = 'en
       cropId
     );
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 export async function updateCropDisease(diseaseId: number, fields: { name?: string; name_ta?: string; description?: string; description_ta?: string; management?: string; management_ta?: string; }) {
   try {
@@ -1547,7 +1547,7 @@ export async function updateCropDisease(diseaseId: number, fields: { name?: stri
     vals.push(diseaseId);
     await db.runAsync(`UPDATE crop_diseases SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
     return true;
-  } catch (err) { console.error('SQLite update error:', err); return false; }
+  } catch (err) { console.error('Database update error:', err); return false; }
 }
 export async function addCropDisease(cropId: number, language: 'en'|'ta', name: string, description?: string, management?: string) {
   try {
@@ -1559,7 +1559,7 @@ export async function addCropDisease(cropId: number, language: 'en'|'ta', name: 
     }
     const r = await db.runAsync("INSERT INTO crop_diseases (crop_id, language, name, description, management) VALUES (?, ?, ?, ?, ?)", cropId, language, name, description || null, management || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function addCropDiseaseBoth(cropId: number, input: { name_en: string; name_ta: string; description_en?: string; description_ta?: string; management_en?: string; management_ta?: string; }) {
   try {
@@ -1574,7 +1574,7 @@ export async function addCropDiseaseBoth(cropId: number, input: { name_en: strin
       cropId, input.name_en, input.name_ta || null, input.description_en || null, input.description_ta || null, input.management_en || null, input.management_ta || null
     );
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function addCropDiseaseImage(diseaseId: number, image: string, caption?: string, caption_ta?: string, public_id?: string) {
   try {
@@ -1584,7 +1584,7 @@ export async function addCropDiseaseImage(diseaseId: number, image: string, capt
     }
     const r = await db.runAsync("INSERT INTO crop_disease_images (disease_id, image, caption, caption_ta, public_id) VALUES (?, ?, ?, ?, ?)", diseaseId, image, caption || null, caption_ta || null, public_id || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function listCropDiseaseImages(diseaseId: number) {
   try {
@@ -1597,7 +1597,7 @@ export async function listCropDiseaseImages(diseaseId: number) {
       diseaseId
     );
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function deleteCropPestImage(imageId: number) {
@@ -1608,7 +1608,7 @@ export async function deleteCropPestImage(imageId: number) {
     }
     await db.runAsync("DELETE FROM crop_pest_images WHERE id = ?", imageId);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export async function deleteCropDiseaseImage(imageId: number) {
@@ -1618,7 +1618,7 @@ export async function deleteCropDiseaseImage(imageId: number) {
     }
     await db.runAsync("DELETE FROM crop_disease_images WHERE id = ?", imageId);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export async function deleteCropPest(imageId: number) {
@@ -1626,7 +1626,7 @@ export async function deleteCropPest(imageId: number) {
     if (API_URL) { try { await api.del(`/pests/${imageId}`); } catch {/* fall back to local */} }
     await db.runAsync("DELETE FROM crop_pests WHERE id = ?", imageId);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export async function deleteCropDisease(diseaseId: number) {
@@ -1634,7 +1634,7 @@ export async function deleteCropDisease(diseaseId: number) {
     if (API_URL) { try { await api.del(`/diseases/${diseaseId}`); } catch {/* fall back to local */} }
     await db.runAsync("DELETE FROM crop_diseases WHERE id = ?", diseaseId);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export async function deleteCropGuide(cropId: number, language: 'en'|'ta') {
@@ -1642,7 +1642,7 @@ export async function deleteCropGuide(cropId: number, language: 'en'|'ta') {
     if (API_URL) { try { await api.del(`/crops/${cropId}/guide?lang=${language}`); } catch (e) { console.warn('Remote deleteCropGuide failed, deleting local only:', e); } }
     await db.runAsync("DELETE FROM crop_guides WHERE crop_id = ? AND language = ?", cropId, language);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export async function getScanPlants() {
@@ -1650,7 +1650,7 @@ export async function getScanPlants() {
     if (API_URL) return await api.get('/scan-plants');
     const rows = await db.getAllAsync("SELECT * FROM scan_plants ORDER BY name ASC");
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function addScanPlant(name: string, name_ta?: string) {
@@ -1661,7 +1661,7 @@ export async function addScanPlant(name: string, name_ta?: string) {
     }
     const r = await db.runAsync("INSERT INTO scan_plants (name, name_ta) VALUES (?, ?)", name, name_ta || null);
     return r.lastInsertRowId;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 
 export async function deleteScanPlant(id: number) {
@@ -1669,7 +1669,7 @@ export async function deleteScanPlant(id: number) {
     if (API_URL) { await api.del(`/scan-plants/${id}`); return true; }
     await db.runAsync("DELETE FROM scan_plants WHERE id = ?", id);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 // Keyword functions
@@ -1682,7 +1682,7 @@ export async function getProductVariants(productId: number) {
     }
     const rows = await db.getAllAsync("SELECT id, product_id, label, price, stock_available FROM product_variants WHERE product_id = ? ORDER BY price ASC", productId);
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 export async function addProductVariant(productId: number, input: { label: string; price: number; stock_available?: number; }) {
   try {
@@ -1700,7 +1700,7 @@ export async function addProductVariant(productId: number, input: { label: strin
     );
     const row = await db.getFirstAsync?.("SELECT id FROM product_variants WHERE product_id = ? AND label = ?", productId, input.label);
     return row?.id ?? null;
-  } catch (err) { console.error('SQLite insert error:', err); return null; }
+  } catch (err) { console.error('Database insert error:', err); return null; }
 }
 export async function updateProductVariant(variantId: number, fields: { label?: string; price?: number; stock_available?: number; }) {
   try {
@@ -1711,14 +1711,14 @@ export async function updateProductVariant(variantId: number, fields: { label?: 
     vals.push(variantId);
     await db.runAsync(`UPDATE product_variants SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
     return true;
-  } catch (err) { console.error('SQLite update error:', err); return false; }
+  } catch (err) { console.error('Database update error:', (err as any)?.message || err); return false; }
 }
 export async function deleteProductVariant(variantId: number) {
   try {
     if (API_URL) { try { await api.del(`/variants/${variantId}`); return true; } catch { /* fall back */ } }
     await db.runAsync("DELETE FROM product_variants WHERE id = ?", variantId);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', (err as any)?.message || err); return false; }
 }
 
 export async function getAllKeywords() {
@@ -1727,7 +1727,7 @@ export async function getAllKeywords() {
     const rows = await db.getAllAsync("SELECT * FROM keywords ORDER BY name ASC");
     return rows;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return [];
   }
 }
@@ -1746,7 +1746,7 @@ export async function addKeyword(name: string) {
     );
     return result.lastInsertRowId;
   } catch (err) {
-    console.error("SQLite insert error:", err);
+    console.error("Database insert error:", err);
     return null;
   }
 }
@@ -1760,7 +1760,7 @@ export async function deleteKeyword(id: number) {
     await db.runAsync("DELETE FROM keywords WHERE id = ?", id);
     return true;
   } catch (err) {
-    console.error("SQLite delete error:", err);
+    console.error("Database delete error:", err);
     return false;
   }
 }
@@ -1783,7 +1783,7 @@ export async function updateUserAddress(userId: number, address: string) {
     );
     return true;
   } catch (err) {
-    console.error("SQLite update error:", err);
+    console.error("Database update error:", err);
     return false;
   }
 }
@@ -1835,7 +1835,7 @@ export async function updateUser(
     await db.runAsync(`UPDATE users SET ${sets.join(', ')}, created_at=created_at WHERE id = ?`, ...vals);
     return true;
   } catch (err) {
-    console.error('SQLite update error:', err);
+    console.error('Database update error:', err);
     return false;
   }
 }
@@ -1845,7 +1845,7 @@ export async function getUserById(userId: number) {
     const rows = await db.getAllAsync("SELECT * FROM users WHERE id = ?", userId);
     return rows[0] || null;
   } catch (err) {
-    console.error("SQLite fetch error:", err);
+    console.error("Database fetch error:", err);
     return null;
   }
 }
@@ -1858,7 +1858,7 @@ export async function listAdmins() {
     }
     const rows = await db.getAllAsync("SELECT id, number, full_name, is_admin FROM users WHERE is_admin > 0 ORDER BY created_at ASC");
     return rows;
-  } catch (err) { console.error('SQLite fetch error:', err); return []; }
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function setAdminRole(userId: number, role: 0|1|2) {
@@ -1866,7 +1866,7 @@ export async function setAdminRole(userId: number, role: 0|1|2) {
     if (API_URL) { await api.patch(`/users/${userId}`, { is_admin: role }); return true; }
     await db.runAsync("UPDATE users SET is_admin = ? WHERE id = ?", role, userId);
     return true;
-  } catch (err) { console.error('SQLite update error:', err); return false; }
+  } catch (err) { console.error('Database update error:', err); return false; }
 }
 
 export async function deleteUser(id: number) {
@@ -1878,7 +1878,7 @@ export async function deleteUser(id: number) {
     await db.runAsync("DELETE FROM users WHERE id = ?", id);
     return true;
   } catch (err) {
-    console.error('SQLite delete error:', err);
+    console.error('Database delete error:', err);
     return false;
   }
 }
@@ -1977,7 +1977,7 @@ export async function deleteAdmin(userId: number) {
     if (API_URL) { await api.del(`/admins/${userId}`); return true; }
     await db.runAsync("DELETE FROM users WHERE id = ?", userId);
     return true;
-  } catch (err) { console.error('SQLite delete error:', err); return false; }
+  } catch (err) { console.error('Database delete error:', err); return false; }
 }
 
 export default db;

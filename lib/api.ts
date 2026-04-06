@@ -49,7 +49,7 @@ async function request(path: string, options: RequestInit = {}) {
   const token = await secureStorage.getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers || {}),
+    ...(options.headers as any || {}),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -85,10 +85,18 @@ async function request(path: string, options: RequestInit = {}) {
     }
   }
 
-  // Handle cold-starts/transient upstream issues with a short retry
+  // Handle cold-starts/transient upstream issues with a more robust backoff
   if (!res.ok && [502, 503, 504].includes(res.status)) {
-    await new Promise(r => setTimeout(r, 800));
-    res = await doFetch();
+    let retries = 5;
+    let delay = 2000; // Start with 2s delay (Render cold start)
+    while (retries > 0) {
+      console.warn(`API ${res.status} (retrying in ${delay}ms, ${retries} left): ${url}`);
+      await new Promise(r => setTimeout(r, delay));
+      res = await doFetch();
+      if (res.ok || ![502, 503, 504].includes(res.status)) break;
+      retries--;
+      delay *= 2; // Exponential backoff
+    }
   }
 
   if (!res.ok) {
