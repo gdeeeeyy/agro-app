@@ -83,17 +83,28 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: isManagedSsl ? { re
 // Ensure runtime migrations (idempotent)
 let isReady = false;
 async function runMigrations() {
+  const q = async (label, sql, params = []) => {
+    try {
+      await pool.query(sql, params);
+    } catch (e) {
+      console.error(`Migration Failed [${label}]:`, e.message);
+      // We don't throw here to allow other idempotent migrations to attempt to run,
+      // but in a real production app you might want to stop.
+    }
+  };
+
   try {
+    console.log('Starting database migrations...');
     // Columns that might be missing on older deploys
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT");
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS seller_name TEXT");
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS logistics_name TEXT");
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number TEXT");
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT");
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN DEFAULT false");
+    await q('products.unit', "ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT");
+    await q('products.seller_name', "ALTER TABLE products ADD COLUMN IF NOT EXISTS seller_name TEXT");
+    await q('orders.logistics_name', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS logistics_name TEXT");
+    await q('orders.tracking_number', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number TEXT");
+    await q('orders.tracking_url', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT");
+    await q('orders.stock_deducted', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN DEFAULT false");
 
     // Core tables required by API (subset; IF NOT EXISTS keeps this idempotent)
-    await pool.query(`CREATE TABLE IF NOT EXISTS users (
+    await q('users.table', `CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
       number TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
@@ -104,10 +115,10 @@ async function runMigrations() {
       is_admin INTEGER DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS booking_address TEXT");
-    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS delivery_address TEXT");
+    await q('users.booking_address', "ALTER TABLE users ADD COLUMN IF NOT EXISTS booking_address TEXT");
+    await q('users.delivery_address', "ALTER TABLE users ADD COLUMN IF NOT EXISTS delivery_address TEXT");
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS products (
+    await q('products.table', `CREATE TABLE IF NOT EXISTS products (
       id BIGSERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       plant_used TEXT NOT NULL,
@@ -129,19 +140,19 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved'");
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS created_by BIGINT");
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_by BIGINT");
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS review_note TEXT");
+    await q('products.status', "ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved'");
+    await q('products.created_by', "ALTER TABLE products ADD COLUMN IF NOT EXISTS created_by BIGINT");
+    await q('products.reviewed_by', "ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_by BIGINT");
+    await q('products.reviewed_at', "ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
+    await q('products.review_note', "ALTER TABLE products ADD COLUMN IF NOT EXISTS review_note TEXT");
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS keywords (
+    await q('keywords.table', `CREATE TABLE IF NOT EXISTS keywords (
       id BIGSERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS crops (
+    await q('crops.table', `CREATE TABLE IF NOT EXISTS crops (
       id BIGSERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       name_ta TEXT,
@@ -150,12 +161,12 @@ async function runMigrations() {
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
     // Seed default crops if missing (idempotent)
-    await pool.query(`
+    await q('crops.seed.tomato', `
       INSERT INTO crops (name, name_ta)
       SELECT 'Tomato', 'தக்காளி'
       WHERE NOT EXISTS (SELECT 1 FROM crops WHERE lower(name) = 'tomato')
     `);
-    await pool.query(`
+    await q('crops.seed.brinjal', `
       INSERT INTO crops (name, name_ta)
       SELECT 'Brinjal', 'கத்தரிக்காய்'
       WHERE NOT EXISTS (
@@ -163,7 +174,7 @@ async function runMigrations() {
       )
     `);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS crop_guides (
+    await q('crop_guides.table', `CREATE TABLE IF NOT EXISTS crop_guides (
       id BIGSERIAL PRIMARY KEY,
       crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
       language TEXT NOT NULL DEFAULT 'en',
@@ -175,7 +186,7 @@ async function runMigrations() {
     )`);
 
     // Missing tables causing 42P01 errors on Render
-    await pool.query(`CREATE TABLE IF NOT EXISTS crop_pests (
+    await q('crop_pests.table', `CREATE TABLE IF NOT EXISTS crop_pests (
       id BIGSERIAL PRIMARY KEY,
       crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
       language TEXT NOT NULL DEFAULT 'en',
@@ -187,7 +198,7 @@ async function runMigrations() {
       UNIQUE(crop_id, language, name)
     )`);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS crop_pest_images (
+    await q('crop_pest_images.table', `CREATE TABLE IF NOT EXISTS crop_pest_images (
       id BIGSERIAL PRIMARY KEY,
       pest_id BIGINT NOT NULL REFERENCES crop_pests(id) ON DELETE CASCADE,
       image_url TEXT NOT NULL,
@@ -195,9 +206,9 @@ async function runMigrations() {
       caption_ta TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("ALTER TABLE crop_pest_images ADD COLUMN IF NOT EXISTS caption_ta TEXT");
+    await q('crop_pest_images.caption_ta', "ALTER TABLE crop_pest_images ADD COLUMN IF NOT EXISTS caption_ta TEXT");
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS crop_diseases (
+    await q('crop_diseases.table', `CREATE TABLE IF NOT EXISTS crop_diseases (
       id BIGSERIAL PRIMARY KEY,
       crop_id BIGINT NOT NULL REFERENCES crops(id) ON DELETE CASCADE,
       language TEXT NOT NULL DEFAULT 'en',
@@ -209,7 +220,7 @@ async function runMigrations() {
       UNIQUE(crop_id, language, name)
     )`);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS crop_disease_images (
+    await q('crop_disease_images.table', `CREATE TABLE IF NOT EXISTS crop_disease_images (
       id BIGSERIAL PRIMARY KEY,
       disease_id BIGINT NOT NULL REFERENCES crop_diseases(id) ON DELETE CASCADE,
       image_url TEXT NOT NULL,
@@ -219,18 +230,18 @@ async function runMigrations() {
     )`);
 
     // Simplify bilingual columns (one row per pest/disease with EN+TA fields)
-    await pool.query("ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS name_ta TEXT");
-    await pool.query("ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS description_ta TEXT");
-    await pool.query("ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS management_ta TEXT");
-    await pool.query("ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS name_ta TEXT");
-    await pool.query("ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS description_ta TEXT");
-    await pool.query("ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS management_ta TEXT");
-    await pool.query("ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS cultivation_guide_ta TEXT");
-    await pool.query("ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS pest_management_ta TEXT");
-    await pool.query("ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS disease_management_ta TEXT");
-    await pool.query("ALTER TABLE crop_disease_images ADD COLUMN IF NOT EXISTS caption_ta TEXT");
+    await q('crop_pests.name_ta', "ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS name_ta TEXT");
+    await q('crop_pests.description_ta', "ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS description_ta TEXT");
+    await q('crop_pests.management_ta', "ALTER TABLE crop_pests ADD COLUMN IF NOT EXISTS management_ta TEXT");
+    await q('crop_diseases.name_ta', "ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS name_ta TEXT");
+    await q('crop_diseases.description_ta', "ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS description_ta TEXT");
+    await q('crop_diseases.management_ta', "ALTER TABLE crop_diseases ADD COLUMN IF NOT EXISTS management_ta TEXT");
+    await q('crop_guides.cultivation_guide_ta', "ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS cultivation_guide_ta TEXT");
+    await q('crop_guides.pest_management_ta', "ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS pest_management_ta TEXT");
+    await q('crop_guides.disease_management_ta', "ALTER TABLE crop_guides ADD COLUMN IF NOT EXISTS disease_management_ta TEXT");
+    await q('crop_disease_images.caption_ta', "ALTER TABLE crop_disease_images ADD COLUMN IF NOT EXISTS caption_ta TEXT");
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS cart_items (
+    await q('cart_items.table', `CREATE TABLE IF NOT EXISTS cart_items (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -239,7 +250,7 @@ async function runMigrations() {
       UNIQUE(user_id, product_id)
     )`);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS orders (
+    await q('orders.table', `CREATE TABLE IF NOT EXISTS orders (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       total_amount DOUBLE PRECISION NOT NULL,
@@ -256,11 +267,11 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS booking_address TEXT");
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address TEXT");
-    await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'");
+    await q('orders.booking_address', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS booking_address TEXT");
+    await q('orders.delivery_address', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address TEXT");
+    await q('orders.payment_status', "ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'");
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
+    await q('order_items.table', `CREATE TABLE IF NOT EXISTS order_items (
       id BIGSERIAL PRIMARY KEY,
       order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       product_id BIGINT NOT NULL REFERENCES products(id),
@@ -271,30 +282,30 @@ async function runMigrations() {
     )`);
 
     // Order status history for timeline (Flipkart-style)
-    await pool.query(`CREATE TABLE IF NOT EXISTS order_status_history (
+    await q('order_status_history.table', `CREATE TABLE IF NOT EXISTS order_status_history (
       id BIGSERIAL PRIMARY KEY,
       order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       status TEXT NOT NULL,
       note TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id, created_at)");
+    await q('order_status_history.index', "CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id, created_at)");
 
     // Messaging tables
-    await pool.query(`CREATE TABLE IF NOT EXISTS conversations (
+    await q('conversations.table', `CREATE TABLE IF NOT EXISTS conversations (
       id BIGSERIAL PRIMARY KEY,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS conversation_participants (
+    await q('conversation_participants.table', `CREATE TABLE IF NOT EXISTS conversation_participants (
       conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       PRIMARY KEY (conversation_id, user_id)
     )`);
     // Backfill columns if table exists with older schema
-    await pool.query("ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS conversation_id BIGINT");
-    await pool.query("ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS user_id BIGINT");
+    await q('conversation_participants.conversation_id', "ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS conversation_id BIGINT");
+    await q('conversation_participants.user_id', "ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS user_id BIGINT");
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS messages (
+    await q('messages.table', `CREATE TABLE IF NOT EXISTS messages (
       id BIGSERIAL PRIMARY KEY,
       conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
       sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -302,15 +313,15 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
     // Backfill messages columns if missing
-    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS conversation_id BIGINT");
-    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id BIGINT");
-    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS text TEXT");
-    await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()");
+    await q('messages.conversation_id', "ALTER TABLE messages ADD COLUMN IF NOT EXISTS conversation_id BIGINT");
+    await q('messages.sender_id', "ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id BIGINT");
+    await q('messages.text', "ALTER TABLE messages ADD COLUMN IF NOT EXISTS text TEXT");
+    await q('messages.created_at', "ALTER TABLE messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()");
     // Safe index creation
-    try { await pool.query("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at)"); } catch (ie) { console.warn('Index create warn:', ie.message); }
+    try { await pool.query("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at)"); } catch {}
 
     // In-app notifications (system or per-user)
-    await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
+    await q('notifications.table', `CREATE TABLE IF NOT EXISTS notifications (
       id BIGSERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       message TEXT NOT NULL,
@@ -319,11 +330,11 @@ async function runMigrations() {
       user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TIMESTAMPTZ DEFAULT now()
     )`);
-    await pool.query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title_ta TEXT");
-    await pool.query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message_ta TEXT");
+    await q('notifications.title_ta', "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title_ta TEXT");
+    await q('notifications.message_ta', "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message_ta TEXT");
 
     // Expo push tokens
-    await pool.query(`CREATE TABLE IF NOT EXISTS push_tokens (
+    await q('push_tokens.table', `CREATE TABLE IF NOT EXISTS push_tokens (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
       token TEXT UNIQUE NOT NULL,
@@ -331,7 +342,7 @@ async function runMigrations() {
     )`);
 
     // Logistics carriers (for shipping/tracking)
-    await pool.query(`CREATE TABLE IF NOT EXISTS logistics (
+    await q('logistics.table', `CREATE TABLE IF NOT EXISTS logistics (
       id BIGSERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       tracking_url TEXT,
@@ -339,23 +350,23 @@ async function runMigrations() {
     )`);
 
     // login OTP table (10-minute validity)
-    await pool.query(`CREATE TABLE IF NOT EXISTS login_otps (
+    await q('login_otps.table', `CREATE TABLE IF NOT EXISTS login_otps (
       id BIGSERIAL PRIMARY KEY,
       number TEXT NOT NULL,
       otp TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now(),
       expires_at TIMESTAMPTZ DEFAULT (now() + interval '10 minutes')
     )`);
-    await pool.query("CREATE INDEX IF NOT EXISTS idx_login_otps_number ON login_otps(number)");
+    await q('login_otps.index', "CREATE INDEX IF NOT EXISTS idx_login_otps_number ON login_otps(number)");
 
     // scan_plants table for mobile Scanner Plants
-    await pool.query(`CREATE TABLE IF NOT EXISTS scan_plants (
+    await q('scan_plants.table', `CREATE TABLE IF NOT EXISTS scan_plants (
       id BIGSERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       name_ta TEXT
     )`);
     // Product variants
-    await pool.query(`CREATE TABLE IF NOT EXISTS product_variants (
+    await q('product_variants.table', `CREATE TABLE IF NOT EXISTS product_variants (
       id BIGSERIAL PRIMARY KEY,
       product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       label TEXT NOT NULL,
@@ -366,7 +377,7 @@ async function runMigrations() {
       UNIQUE(product_id, label)
     )`);
     // Ensure product_variants unique constraint (label per product) if not present
-    await pool.query(`
+    await q('product_variants.unique_label', `
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_variants_product_id_label_key') THEN
           ALTER TABLE product_variants ADD CONSTRAINT product_variants_product_id_label_key UNIQUE (product_id, label);
@@ -375,17 +386,17 @@ async function runMigrations() {
     `);
 
     // Low stock alert columns (idempotent)
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 20");
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alert_time TEXT");
+    await q('products.low_stock_threshold', "ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 20");
+    await q('products.low_stock_alert_time', "ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alert_time TEXT");
     // Backfill columns for existing installations
-    await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS label TEXT");
-    await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS price DOUBLE PRECISION");
-    await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_available INTEGER DEFAULT 0");
+    await q('product_variants.label_col', "ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS label TEXT");
+    await q('product_variants.price_col', "ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS price DOUBLE PRECISION");
+    await q('product_variants.stock_col', "ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_available INTEGER DEFAULT 0");
 
     // Cart variants support
-    await pool.query(`ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id) ON DELETE CASCADE`);
+    await q('cart_items.variant_id', `ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id) ON DELETE CASCADE`);
     // Ensure cart_items variant FK has ON DELETE CASCADE (Postgres doesn't automatically update existing FK)
-    await pool.query(`
+    await q('cart_items.variant_id_cascade', `
       DO $$ BEGIN
         IF EXISTS (
           SELECT 1 FROM information_schema.key_column_usage 
@@ -398,25 +409,25 @@ async function runMigrations() {
     `);
 
     // Adjust unique to (user, product, variant)
-    try { await pool.query('ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_user_id_product_id_key'); } catch {}
-    await pool.query('DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = \'cart_items_user_product_variant_unique\') THEN ALTER TABLE cart_items ADD CONSTRAINT cart_items_user_product_variant_unique UNIQUE (user_id, product_id, variant_id); END IF; END $$;');
+    await q('cart_items.unique_v2_drop', 'ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_user_id_product_id_key');
+    await q('cart_items.unique_v2_add', 'DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = \'cart_items_user_product_variant_unique\') THEN ALTER TABLE cart_items ADD CONSTRAINT cart_items_user_product_variant_unique UNIQUE (user_id, product_id, variant_id); END IF; END $$;');
 
     // Order items capture variant
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id BIGINT');
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label TEXT');
+    await q('order_items.variant_id', 'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id BIGINT');
+    await q('order_items.variant_label', 'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label TEXT');
     // Ratings & reviews per ordered product
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS rating INTEGER');
-    await pool.query('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS review TEXT');
+    await q('order_items.rating', 'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS rating INTEGER');
+    await q('order_items.review', 'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS review TEXT');
 
     // Improved Technologies: categories and articles
-    await pool.query(`CREATE TABLE IF NOT EXISTS improved_categories (
+    await q('improved_categories.table', `CREATE TABLE IF NOT EXISTS improved_categories (
       id BIGSERIAL PRIMARY KEY,
       slug TEXT UNIQUE NOT NULL,
       name_en TEXT NOT NULL,
       name_ta TEXT
     )`);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS improved_articles (
+    await q('improved_articles.table', `CREATE TABLE IF NOT EXISTS improved_articles (
       id BIGSERIAL PRIMARY KEY,
       category_id BIGINT NOT NULL REFERENCES improved_categories(id) ON DELETE CASCADE,
       heading_en TEXT NOT NULL,
@@ -429,7 +440,7 @@ async function runMigrations() {
       updated_at TIMESTAMPTZ DEFAULT now()
     )`);
 
-    await pool.query(`CREATE TABLE IF NOT EXISTS improved_article_images (
+    await q('improved_article_images.table', `CREATE TABLE IF NOT EXISTS improved_article_images (
       id BIGSERIAL PRIMARY KEY,
       article_id BIGINT NOT NULL REFERENCES improved_articles(id) ON DELETE CASCADE,
       image_url TEXT NOT NULL,
@@ -441,7 +452,7 @@ async function runMigrations() {
     )`);
 
     // Seed fixed Improved Technology categories (idempotent)
-    await pool.query(`INSERT INTO improved_categories (slug, name_en, name_ta)
+    await q('improved_categories.seed', `INSERT INTO improved_categories (slug, name_en, name_ta)
       VALUES
         ('agronomy', 'Agronomy crops', 'வளர்ப்பு பயிர்கள்'),
         ('horticulture', 'Horticulture crops', 'தோட்டக்கலைப் பயிர்கள்'),
@@ -461,14 +472,12 @@ async function runMigrations() {
       'logistics', 'login_otps', 'scan_plants', 'product_variants'
     ];
     for (const table of tables) {
-      try {
-        await pool.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
-      } catch (err) {
-        console.warn(`Could not enable RLS on ${table}:`, err.message);
-      }
+      await q(`rls.${table}`, `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
     }
+
+    console.log('Database migrations completed successfully.');
   } catch (e) {
-    console.warn('Startup migration warning:', e.message);
+    console.error('Critical Database Migration Error:', e.message);
   } finally {
     isReady = true;
   }
@@ -482,6 +491,15 @@ app.use(cors());
 // Increase body limits to avoid 413 Payload Too Large.
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
+// Basic request logger for observability
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
 
 app.get('/', (req, res) => {
   res.json({
@@ -1995,6 +2013,16 @@ app.post('/push/register', async (req, res) => {
   } catch (e) {
     console.error(e); res.status(500).json({ error: 'failed' });
   }
+});
+
+// Global Error Handler for better visibility in logs
+app.use((err, req, res, next) => {
+  console.error('--- Global Server Error ---');
+  console.error(`Method: ${req.method} URL: ${req.url}`);
+  console.error(err.stack || err);
+  console.error('---------------------------');
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
 app.listen(PORT, () => console.log(`API listening on :${PORT}`));
