@@ -221,6 +221,59 @@ export default function AdminDashboard() {
     setModalVisible(true);
   };
 
+  const syncVariants = async (productId: number) => {
+    try {
+      const db = await import('../../lib/database');
+      const list = (await db.getProductVariants(productId)) as any[];
+      setVariants(list || []);
+      
+      // Update product aggregate totals (stock and min price)
+      const totalStock = list.reduce((sum, v) => sum + (Number(v.stock_available) || 0), 0);
+      const minPrice = list.length > 0 
+        ? list.reduce((min, v) => Math.min(min, Number(v.price) || 0), Number.POSITIVE_INFINITY)
+        : 0;
+
+      if (isFinite(minPrice)) {
+        await updateProduct(productId, { 
+          stock_available: totalStock, 
+          cost_per_unit: minPrice 
+        });
+        // Optionally refresh the main products list to show updated values
+        loadProducts();
+      }
+    } catch (error) {
+      console.error('Error syncing variants:', error);
+    }
+  };
+
+  const handleDeleteVariant = (variantId: number, productId: number, label: string) => {
+    Alert.alert(
+      'Delete Variant',
+      `Are you sure you want to delete the variant "${label}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const db = await import('../../lib/database');
+              const success = await db.deleteProductVariant(variantId);
+              if (success) {
+                await syncVariants(productId);
+              } else {
+                Alert.alert('Error', 'Failed to delete variant');
+              }
+            } catch (error) {
+              console.error('Error deleting variant:', error);
+              Alert.alert('Error', 'Failed to delete variant');
+            }
+          }
+        },
+      ]
+    );
+  };
+
   const openEditModal = (product: any) => {
     // Ensure vendor users list is up to date when editing
     loadVendorUsers();
@@ -245,14 +298,13 @@ export default function AdminDashboard() {
     setSelectedKeywords(existingKeywords);
     setEditingProduct(product);
     setModalVisible(true);
+    
     // Load variants into editor
-    (async () => {
-      setVariantsProductId(Number(product.id));
-      try {
-        const list = await (await import('../../lib/database')).getProductVariants(Number(product.id));
-        setVariants(list as any[]);
-      } catch {}
-    })();
+    const pid = Number(product.id);
+    setVariantsProductId(pid);
+    if (!isNaN(pid)) {
+      syncVariants(pid);
+    }
   };
 
   const closeModal = () => {
@@ -994,7 +1046,13 @@ const pickImage = async () => {
                 {variants.map(v => (
                   <View key={v.id} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:8, borderBottomWidth:1, borderBottomColor:'#f5f5f5' }}>
                     <Text style={{ color:'#333' }}>{v.label} — Rs. {v.price} • Stock: {v.stock_available}</Text>
-                    <TouchableOpacity onPress={async ()=> { await (await import('../../lib/database')).deleteProductVariant(Number(v.id)); const db = await import('../../lib/database'); const list = await db.getProductVariants(Number(variantsProductId)); setVariants(list as any[]); try { const totalStock = (list as any[]).reduce((s, it:any)=> s + (Number(it.stock_available)||0), 0); const minPrice = (list as any[]).reduce((m, it:any)=> Math.min(m, Number(it.price)||0), Number.POSITIVE_INFINITY); if (isFinite(minPrice as any)) { await updateProduct(Number(variantsProductId), { stock_available: totalStock, cost_per_unit: minPrice }); } } catch {} }}>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        if (variantsProductId) {
+                          handleDeleteVariant(Number(v.id), variantsProductId, String(v.label || ''));
+                        }
+                      }}
+                    >
                       <Ionicons name="trash" size={18} color="#d32f2f" />
                     </TouchableOpacity>
                   </View>
@@ -1045,13 +1103,22 @@ const pickImage = async () => {
                 <TouchableOpacity style={[styles.saveButton, { marginTop: 8 }]} onPress={async ()=>{
                   if (!variantsProductId || !newVarQty.trim() || !newVarPrice.trim()) return;
                   const label = `${newVarQty.trim()} ${newVarUnit}`;
-                  const ok = await (await import('../../lib/database')).addProductVariant(Number(variantsProductId), { label, price: Number(newVarPrice), stock_available: Number(newVarStock||0) });
-                  if (ok) {
+                  try {
                     const db = await import('../../lib/database');
-                    const list = await db.getProductVariants(Number(variantsProductId));
-                    setVariants(list as any[]);
-                    try { const totalStock = (list as any[]).reduce((s, it:any)=> s + (Number(it.stock_available)||0), 0); const minPrice = (list as any[]).reduce((m, it:any)=> Math.min(m, Number(it.price)||0), Number.POSITIVE_INFINITY); if (isFinite(minPrice as any)) { await updateProduct(Number(variantsProductId), { stock_available: totalStock, cost_per_unit: minPrice }); } } catch {}
-                    setNewVarQty(''); setNewVarPrice(''); setNewVarStock('');
+                    const ok = await db.addProductVariant(variantsProductId, { 
+                      label, 
+                      price: Number(newVarPrice), 
+                      stock_available: Number(newVarStock||0) 
+                    });
+                    if (ok) {
+                      await syncVariants(variantsProductId);
+                      setNewVarQty(''); setNewVarPrice(''); setNewVarStock('');
+                    } else {
+                      Alert.alert('Error', 'Failed to add variant');
+                    }
+                  } catch (error) {
+                    console.error('Error adding variant:', error);
+                    Alert.alert('Error', 'Failed to add variant');
                   }
                 }}>
                   <Text style={styles.saveButtonText}>Add Variant</Text>
