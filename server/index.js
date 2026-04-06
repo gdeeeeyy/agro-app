@@ -365,6 +365,15 @@ async function runMigrations() {
       updated_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(product_id, label)
     )`);
+    // Ensure product_variants unique constraint (label per product) if not present
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_variants_product_id_label_key') THEN
+          ALTER TABLE product_variants ADD CONSTRAINT product_variants_product_id_label_key UNIQUE (product_id, label);
+        END IF;
+      END $$;
+    `);
+
     // Low stock alert columns (idempotent)
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 20");
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_alert_time TEXT");
@@ -374,8 +383,21 @@ async function runMigrations() {
     await pool.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_available INTEGER DEFAULT 0");
 
     // Cart variants support
-    await pool.query(`ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id)`);
-    // adjust unique to (user, product, variant)
+    await pool.query(`ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id) ON DELETE CASCADE`);
+    // Ensure cart_items variant FK has ON DELETE CASCADE (Postgres doesn't automatically update existing FK)
+    await pool.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.key_column_usage 
+          WHERE table_name = 'cart_items' AND column_name = 'variant_id' AND constraint_name = 'cart_items_variant_id_fkey'
+        ) THEN
+          ALTER TABLE cart_items DROP CONSTRAINT cart_items_variant_id_fkey;
+          ALTER TABLE cart_items ADD CONSTRAINT cart_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    // Adjust unique to (user, product, variant)
     try { await pool.query('ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_user_id_product_id_key'); } catch {}
     await pool.query('DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = \'cart_items_user_product_variant_unique\') THEN ALTER TABLE cart_items ADD CONSTRAINT cart_items_user_product_variant_unique UNIQUE (user_id, product_id, variant_id); END IF; END $$;');
 
