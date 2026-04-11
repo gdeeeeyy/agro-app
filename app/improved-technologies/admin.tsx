@@ -109,7 +109,10 @@ export default function ImprovedTechnologiesAdmin() {
                     style={styles.categoryRow}
                   >
                     <Text style={styles.categoryRowText}>{label}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#4caf50" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="create" size={18} color="#4caf50" />
+                      <Ionicons name="chevron-forward" size={18} color="#4caf50" />
+                    </View>
                   </TouchableOpacity>
                 );
               })}

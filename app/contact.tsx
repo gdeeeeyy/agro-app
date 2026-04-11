@@ -86,9 +86,9 @@ export default function Contact() {
             <Text style={styles.actionText}>{PHONE_MOBILE_2}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionRow, { marginTop: 6 }]} onPress={() => wa(PHONE_MOBILE_1)}>
+          <TouchableOpacity style={[styles.actionRow, { marginTop: 6 }]} onPress={() => wa(PHONE_MOBILE_2)}>
             <Ionicons name="logo-whatsapp" size={18} color="#4caf50" />
-            <Text style={styles.actionText}>{t('contact.whatsapp')}: {PHONE_MOBILE_1}</Text>
+            <Text style={styles.actionText}>{t('contact.whatsapp')}: {PHONE_MOBILE_2}</Text>
           </TouchableOpacity>
         </View>
       </View>

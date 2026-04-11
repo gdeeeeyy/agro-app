@@ -68,12 +68,6 @@ export default function ImprovedTechnologiesCategory() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#2d5016' }}>
-          {currentLanguage === 'ta' ? 'நிலைகள்' : 'Articles'}
-        </Text>
-        <Text style={{ marginTop: 4, color: '#666', fontSize: 13 }}>
-          {currentLanguage === 'ta' ? 'முழு விபரங்களைப் படிக்க ஒரு கட்டுரையைத் தேர்ந்தெடுக்கவும்.' : 'Select an article to read full details.'}
-        </Text>
 
         {loading ? (
           <Text style={{ color: '#666', marginTop: 8 }}>{currentLanguage === 'ta' ? 'எற்றுதல் நடந்துகொண்டிருக்கிறது...' : 'Loading...'}</Text>

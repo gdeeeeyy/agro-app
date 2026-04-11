@@ -95,7 +95,7 @@ export default function ImprovedTechnologiesAdminEditor() {
     const headingAutoEn =
       extractHeadingFromHtml(bodyEn).trim() || 'Untitled article';
     const headingAutoTa =
-      extractHeadingFromHtml(bodyTa).trim() || undefined;
+      extractHeadingFromHtml(bodyTa).trim() || headingAutoEn || 'Untitled article';
 
     try {
       let articleId: number;
@@ -108,7 +108,10 @@ export default function ImprovedTechnologiesAdminEditor() {
           body_en: bodyEn || undefined,
           body_ta: bodyTa || undefined,
         });
-        if (!createdId) return;
+        if (!createdId) {
+          Alert.alert('Error', 'Could not create article. Please check your network connection.');
+          return;
+        }
         articleId = Number(createdId);
       } else {
         articleId = Number(id);
@@ -133,8 +136,9 @@ export default function ImprovedTechnologiesAdminEditor() {
 
       // Both languages are always completed here, so redirect back after save
       router.back();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to save article');
+    } catch (e: any) {
+      console.error('Save error:', e);
+      Alert.alert('Error', `Failed to save article: ${e?.message || 'Unknown error'}`);
     }
   };
 

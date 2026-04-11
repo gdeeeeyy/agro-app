@@ -63,18 +63,6 @@ export default function App() {
     );
   }, [currentLanguage, t, clearResults]);
 
-  // Show confirm dialog when page regains focus with existing results
-  useFocusEffect(
-    useCallback(() => {
-      if (isFirstFocus.current) {
-        isFirstFocus.current = false;
-        return;
-      }
-      if (result !== null) {
-        handleClearResults();
-      }
-    }, [result, handleClearResults])
-  );
 
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -271,7 +259,20 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {result && !result.error && <PlantAnalysis data={result} />}
+        {result && !result.error && (
+          <View style={{ marginTop: 10 }}>
+            <PlantAnalysis data={result} />
+            <TouchableOpacity 
+              style={[styles.actionButton, { marginTop: 20, backgroundColor: '#4caf50' }]} 
+              onPress={clearResults}
+            >
+              <Ionicons name="add-circle" size={24} color="#fff" />
+              <Text style={[styles.actionButtonText, { marginLeft: 8 }]}>
+                {currentLanguage === 'ta' ? 'புதிய பரிசோதனை' : 'New Diagnosis'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         </ScrollView>
         <View style={{ height: 10 }} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#f5f5f5' }} />

@@ -158,14 +158,14 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
           
   const displayLabel = selectedVariant 
     ? (selParsed.quantity && selParsed.unit 
-        ? `${selParsed.quantity} ${selParsed.unit}` 
+        ? `${Number(selParsed.quantity) * selectedQuantity} ${selParsed.unit}` 
         : (selectedVariant?.label || ''))
     : (variants.length > 0 && minVariant
         ? (minParsed.quantity && minParsed.unit 
-            ? `${minParsed.quantity} ${minParsed.unit}` 
+            ? `${Number(minParsed.quantity) * selectedQuantity} ${minParsed.unit}` 
             : (minVariant?.label || ''))
         : (serverParsed.quantity && serverParsed.unit 
-            ? `${serverParsed.quantity} ${serverParsed.unit}` 
+            ? `${Number(serverParsed.quantity) * selectedQuantity} ${serverParsed.unit}` 
             : (serverMinLabel || '')));
 
   const doAddToCart = async (qty: number, variantId?: number) => {
@@ -362,7 +362,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
               <View style={styles.unitContainer}>
                 <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
                   <Text style={styles.unitSelectorText}>
-                    {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
+                    {selectedVariant ? `Rs. ${selectedVariant.price * selectedQuantity} / ${displayLabel}` : 'Select unit'}
                   </Text>
                   <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
                 </TouchableOpacity>
@@ -425,7 +425,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             {variants.length > 0 && (
               <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
                 <Text style={styles.unitSelectorText}>
-                  {selectedVariant ? `Rs. ${selectedVariant.price} / ${selParsed.quantity && selParsed.unit ? `${selParsed.quantity} ${selParsed.unit}` : (selectedVariant.label || '')}` : 'Select unit'}
+                  {selectedVariant ? `Rs. ${selectedVariant.price * selectedQuantity} / ${displayLabel}` : 'Select unit'}
                 </Text>
                 <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
               </TouchableOpacity>
@@ -491,7 +491,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 <ScrollView>
                   {variants.map(v => {
                     const p = parseVariantLabel(v.label);
-                    const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                    const qtyUnit = p.quantity && p.unit ? `${Number(p.quantity) * selectedQuantity} ${p.unit}` : String(v.label || '');
                     const isSelected = Number(selectedVariantId) === Number(v.id);
                     return (
                       <TouchableOpacity
@@ -506,7 +506,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                             color={isSelected ? '#4caf50' : '#999'}
                             style={{ marginRight: 8 }}
                           />
-                          <Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
+                          <Text style={styles.unitItemText}>Rs. {v.price * selectedQuantity} / {qtyUnit}</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -593,7 +593,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                         <Text style={{ fontWeight: '700', color: '#333', marginBottom: 8 }}>Available units</Text>
                         {variants.map(v => {
                           const p = parseVariantLabel(v.label);
-                          const qtyUnit = p.quantity && p.unit ? `${p.quantity} ${p.unit}` : String(v.label || '');
+                          const qtyUnit = p.quantity && p.unit ? `${Number(p.quantity) * selectedQuantity} ${p.unit}` : String(v.label || '');
                           const isSelected = Number(selectedVariantId) === Number(v.id);
                           const inStock = Number(v.stock_available ?? 0) > 0;
                           return (
@@ -610,7 +610,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                                   color={isSelected ? '#4caf50' : '#999'}
                                   style={{ marginRight: 8 }}
                                 />
-                                <Text style={styles.unitItemText}>Rs. {v.price} / {qtyUnit}</Text>
+                                <Text style={styles.unitItemText}>Rs. {v.price * selectedQuantity} / {qtyUnit}</Text>
                               </View>
                               <Text style={{ color: inStock ? '#4caf50' : '#d32f2f', fontWeight: '600' }}>
                                 {inStock ? 'In stock' : 'Out'}
@@ -670,7 +670,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <View style={styles.actionBar}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.actionPrice} numberOfLines={1}>
-                  Rs. {Number(displayPrice).toFixed(0)}{displayLabel ? ` / ${displayLabel}` : ''}
+                  Rs. {Number(displayPrice * selectedQuantity).toFixed(0)}{displayLabel ? ` / ${displayLabel}` : ''}
                 </Text>
               </View>
 

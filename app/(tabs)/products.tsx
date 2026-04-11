@@ -44,7 +44,7 @@ interface Product {
 
 export default function Products() {
   const { user } = useContext(UserContext);
-  const { t } = useLanguage();
+  const { currentLanguage, t } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
@@ -68,7 +68,12 @@ export default function Products() {
   };
 
   const loadKeywords = async () => {
-    setKeywords([]);
+    try {
+      const allKeywords = await getAllKeywords() as Keyword[];
+      setKeywords(allKeywords);
+    } catch (error) {
+      console.error('Error loading keywords:', error);
+    }
   };
 
   const handleKeywordFilter = async (keywordName: string | null) => {
@@ -115,6 +120,7 @@ export default function Products() {
 
   useEffect(() => {
     loadProducts();
+    loadKeywords();
   }, []);
 
   const renderProduct = ({ item }: { item: Product }) => (
@@ -170,7 +176,50 @@ export default function Products() {
         </View>
       </View>
 
-      {/* Keyword filters removed as requested */}
+      <View style={styles.filterContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              selectedKeyword === null && styles.filterChipActive,
+            ]}
+            onPress={() => handleKeywordFilter(null)}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                selectedKeyword === null && styles.filterChipTextActive,
+              ]}
+            >
+              {currentLanguage === 'ta' ? 'அனைத்தும்' : 'All'}
+            </Text>
+          </TouchableOpacity>
+
+          {keywords.map((keyword) => (
+            <TouchableOpacity
+              key={keyword.id}
+              style={[
+                styles.filterChip,
+                selectedKeyword === keyword.name && styles.filterChipActive,
+              ]}
+              onPress={() => handleKeywordFilter(keyword.name)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedKeyword === keyword.name && styles.filterChipTextActive,
+                ]}
+              >
+                {keyword.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
         <FlatList
           data={filteredProducts}

@@ -67,12 +67,6 @@ export default function ImprovedTechnologiesHome() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#2d5016' }}>
-          {currentLanguage === 'ta' ? 'வகைகள்' : 'Categories'}
-        </Text>
-        <Text style={{ marginTop: 4, color: '#666', fontSize: 13 }}>
-          {currentLanguage === 'ta' ? 'மேம்படுத்திய முறைகளை அறிய ஒரு வகையைத் தேர்ந்தெடுக்கவும்.' : 'Choose a category to explore improved practices.'}
-        </Text>
 
         {loading ? (
           <View style={{ marginTop: 16 }}>

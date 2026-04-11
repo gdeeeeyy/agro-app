@@ -721,15 +721,23 @@ export async function deleteImprovedArticleImage(id: number) {
 }
 
 export async function getAllProducts() {
-  // Remote-only mode: do not fall back to local SQLite
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get('/products');
+  try {
+    if (API_URL) {
+      try { return await api.get('/products'); }
+      catch (e) { console.warn('Remote getAllProducts failed, using local DB:', e); }
+    }
+    return await db.getAllAsync("SELECT * FROM products ORDER BY name ASC");
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function getAllProductsAdmin() {
-  // Remote-only: do not fall back to local
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get('/products/admin');
+  try {
+    if (API_URL) {
+      try { return await api.get('/products/admin'); }
+      catch (e) { console.warn('Remote getAllProductsAdmin failed, using local DB:', e); }
+    }
+    return await db.getAllAsync("SELECT * FROM products ORDER BY created_at DESC");
+  } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
 export async function getProductReviews(productId: number) {
@@ -1331,7 +1339,8 @@ export async function deleteOrder(orderId: number) {
 export async function listLogistics() {
   try {
     if (API_URL) {
-      try { return await api.get('/logistics'); } catch {}
+      try { return await api.get('/logistics'); }
+      catch (e) { console.warn('Remote listLogistics failed, using local DB:', e); }
     }
     const rows = await db.getAllAsync("SELECT * FROM logistics ORDER BY name ASC");
     return rows;
@@ -1723,7 +1732,10 @@ export async function deleteProductVariant(variantId: number) {
 
 export async function getAllKeywords() {
   try {
-    if (API_URL) return await api.get('/keywords');
+    if (API_URL) {
+      try { return await api.get('/keywords'); }
+      catch (e) { console.warn('Remote getAllKeywords failed, using local DB:', e); }
+    }
     const rows = await db.getAllAsync("SELECT * FROM keywords ORDER BY name ASC");
     return rows;
   } catch (err) {

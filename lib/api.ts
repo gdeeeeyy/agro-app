@@ -56,7 +56,27 @@ async function request(path: string, options: RequestInit = {}) {
   }
 
   const doFetch = () => fetch(url, { ...options, headers });
-  let res = await doFetch();
+  let res: Response;
+
+  let connectionRetries = 3;
+  while (connectionRetries > 0) {
+    try {
+      res = await doFetch();
+      break;
+    } catch (e: any) {
+      connectionRetries--;
+      if (connectionRetries === 0) {
+        console.error('API connection failed after multiple retries:', e);
+        throw e;
+      }
+      const delay = 2000;
+      console.warn(`Network request failed (retrying in ${delay}ms, ${connectionRetries} left): ${url}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+
+  // @ts-ignore - res is guaranteed to be assigned or we would have thrown
+  if (!res) throw new Error('Failed to fetch');
 
   // Handle 401 Unauthorized - try to refresh token
   if (res.status === 401 && token) {
