@@ -65,6 +65,8 @@ export default function QuillEditor({ value, onChange, style }: Props) {
       <button class="ql-underline"></button>
       <button class="ql-list" value="ordered"></button>
       <button class="ql-list" value="bullet"></button>
+      <button class="ql-script" value="sub"></button>
+      <button class="ql-script" value="super"></button>
       <button class="ql-image"></button>
     </div>
     <div id="editor"></div>

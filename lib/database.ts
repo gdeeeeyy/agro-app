@@ -444,6 +444,18 @@ if (Platform.OS !== 'web') (async () => {
     if (!(names.includes('brinjal') || names.includes('eggplant') || names.includes('aubergine'))) {
       await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Brinjal', 'கத்தரிக்காய்');
     }
+    if (!names.includes('ladies finger') && !names.includes('ladiesfinger') && !names.includes('okra')) {
+      await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Ladies Finger', 'வெண்டைக்காய்');
+    }
+    if (!names.includes('paddy') && !names.includes('rice')) {
+      await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Paddy', 'நெல்');
+    }
+    if (!names.includes('chilli') && !names.includes('chili')) {
+      await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Chilli', 'மிளகாய்');
+    }
+    if (!names.includes('banana')) {
+      await db.runAsync("INSERT INTO crops (name, name_ta) VALUES (?, ?)", 'Banana', 'வாழை');
+    }
   } catch (se) {
     console.warn('Seed crops skipped:', se);
   }
@@ -586,6 +598,58 @@ export async function createImprovedCategory(input: { name_en: string; name_ta?:
   } catch (err) {
     console.error('Database insert error (category):', err);
     return null;
+  }
+}
+
+export async function updateImprovedCategory(id: number, input: { name_en?: string; name_ta?: string }) {
+  try {
+    if (API_URL) {
+      try { await api.patch(`/improved-categories/${id}`, input); return true; } catch (e) { /* fall back */ }
+    }
+    const fields: string[] = [];
+    const vals: any[] = [];
+    if (input.name_en !== undefined) {
+      fields.push('name_en = ?');
+      vals.push(input.name_en);
+      let base = String(input.name_en)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      if (base) {
+        fields.push('slug = ?');
+        vals.push(base);
+      }
+    }
+    if (input.name_ta !== undefined) {
+      fields.push('name_ta = ?');
+      vals.push(input.name_ta);
+    }
+    if (!fields.length) return true;
+    vals.push(id);
+    await db.runAsync(`UPDATE improved_categories SET ${fields.join(', ')} WHERE id = ?`, ...vals);
+    return true;
+  } catch (err) {
+    console.error('Database update error (category):', err);
+    return false;
+  }
+}
+
+export async function deleteImprovedCategory(id: number) {
+  try {
+    if (API_URL) {
+      try { await api.del(`/improved-categories/${id}`); return true; } catch (e) { /* fall back */ }
+    }
+    // Delete articles and images first to maintain integrity
+    const arts = (await db.getAllAsync('SELECT id FROM improved_articles WHERE category_id = ?', id)) as any[];
+    for (const a of arts) {
+      await db.runAsync('DELETE FROM improved_article_images WHERE article_id = ?', a.id);
+    }
+    await db.runAsync('DELETE FROM improved_articles WHERE category_id = ?', id);
+    await db.runAsync('DELETE FROM improved_categories WHERE id = ?', id);
+    return true;
+  } catch (err) {
+    console.error('Database delete error (category):', err);
+    return false;
   }
 }
 
@@ -1778,8 +1842,23 @@ export async function deleteKeyword(id: number) {
 }
 
 export async function getProductsByKeyword(keyword: string) {
-  if (!API_URL) throw new Error('API_URL not configured');
-  return await api.get(`/products/by-keyword?name=${encodeURIComponent(keyword)}`);
+  try {
+    if (API_URL) {
+      try { return await api.get(`/products/by-keyword?name=${encodeURIComponent(keyword)}`); }
+      catch (e) { console.warn('Remote getProductsByKeyword failed, using local DB:', e); }
+    }
+    const like = `%${String(keyword || '').toLowerCase()}%`;
+    const rows = await db.getAllAsync(
+      `SELECT * FROM products 
+       WHERE lower(keywords) LIKE ? OR lower(name) LIKE ? OR lower(name_ta) LIKE ?
+       ORDER BY name ASC`,
+      like, like, like
+    );
+    return rows;
+  } catch (err) {
+    console.error("Database fetch error (by keyword):", err);
+    return [];
+  }
 }
 
 // User functions

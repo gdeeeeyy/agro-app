@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
-import { listImprovedCategories, createImprovedCategory } from '../../lib/database';
+import { listImprovedCategories, createImprovedCategory, updateImprovedCategory, deleteImprovedCategory } from '../../lib/database';
 
 export default function ImprovedTechnologiesAdmin() {
   const { currentLanguage } = useLanguage();
@@ -14,6 +14,10 @@ export default function ImprovedTechnologiesAdmin() {
   const [newNameTa, setNewNameTa] = useState('');
   const [savingCategory, setSavingCategory] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [editNameEn, setEditNameEn] = useState('');
+  const [editNameTa, setEditNameTa] = useState('');
 
   const loadCategories = async () => {
     try {
@@ -56,6 +60,66 @@ export default function ImprovedTechnologiesAdmin() {
     } finally {
       setSavingCategory(false);
     }
+  };
+
+  const handleEditCategory = async () => {
+    const nameEn = editNameEn.trim();
+    const nameTa = editNameTa.trim();
+
+    if (!nameEn) {
+      Alert.alert('Missing info', 'Enter category name');
+      return;
+    }
+
+    try {
+      setSavingCategory(true);
+      const ok = await updateImprovedCategory(editingCategory.id, {
+        name_en: nameEn,
+        name_ta: nameTa || undefined,
+      });
+      if (!ok) {
+        Alert.alert('Error', 'Could not update category');
+        return;
+      }
+      setEditNameEn('');
+      setEditNameTa('');
+      setEditingCategory(null);
+      await loadCategories();
+      setEditModalVisible(false);
+    } catch {
+      Alert.alert('Error', 'Could not update category');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = (id: number) => {
+    Alert.alert(
+      'Delete Category',
+      'Are you sure? This will delete all articles in this category too.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const ok = await deleteImprovedCategory(id);
+              if (!ok) {
+                Alert.alert('Error', 'Could not delete category');
+                return;
+              }
+              await loadCategories();
+            } catch {
+              Alert.alert('Error', 'Could not delete category');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   useEffect(() => {
@@ -109,8 +173,24 @@ export default function ImprovedTechnologiesAdmin() {
                     style={styles.categoryRow}
                   >
                     <Text style={styles.categoryRowText}>{label}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="create" size={18} color="#4caf50" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setEditingCategory(c);
+                          setEditNameEn(c.name_en || '');
+                          setEditNameTa(c.name_ta || '');
+                          setEditModalVisible(true);
+                        }}
+                        style={{ padding: 4 }}
+                      >
+                        <Ionicons name="create" size={20} color="#4caf50" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => handleDeleteCategory(c.id)}
+                        style={{ padding: 4 }}
+                      >
+                        <Ionicons name="trash" size={20} color="#f44336" />
+                      </TouchableOpacity>
                       <Ionicons name="chevron-forward" size={18} color="#4caf50" />
                     </View>
                   </TouchableOpacity>
@@ -161,8 +241,39 @@ export default function ImprovedTechnologiesAdmin() {
                   <Text style={{ color: '#666', fontWeight: '600' }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.primaryBtn} onPress={handleAddCategory} disabled={savingCategory}>
-                  <Ionicons name="save" size={18} color="#fff" />
+                  {savingCategory ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="save" size={18} color="#fff" />}
                   <Text style={styles.primaryBtnText}>{savingCategory ? 'Saving...' : 'Save'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {editModalVisible && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Edit Category</Text>
+              <TextInput
+                style={styles.input}
+                value={editNameEn}
+                onChangeText={setEditNameEn}
+                placeholder="Name (English)"
+                placeholderTextColor="#999"
+              />
+              <TextInput
+                style={styles.input}
+                value={editNameTa}
+                onChangeText={setEditNameTa}
+                placeholder="பெயர் (Tamil)"
+                placeholderTextColor="#999"
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 12 }}>
+                <TouchableOpacity onPress={() => { setEditModalVisible(false); setEditingCategory(null); }}>
+                  <Text style={{ color: '#666', fontWeight: '600', paddingVertical: 10 }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.primaryBtn} onPress={handleEditCategory} disabled={savingCategory}>
+                  {savingCategory ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="save" size={18} color="#fff" />}
+                  <Text style={styles.primaryBtnText}>{savingCategory ? 'Updating...' : 'Update'}</Text>
                 </TouchableOpacity>
               </View>
             </View>

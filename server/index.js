@@ -173,6 +173,26 @@ async function runMigrations() {
         SELECT 1 FROM crops WHERE lower(name) IN ('brinjal','eggplant','aubergine')
       )
     `);
+    await q('crops.seed.ladiesfinger', `
+      INSERT INTO crops (name, name_ta)
+      SELECT 'Ladies Finger', 'வெண்டைக்காய்'
+      WHERE NOT EXISTS (SELECT 1 FROM crops WHERE lower(name) IN ('ladies finger','ladiesfinger','okra'))
+    `);
+    await q('crops.seed.paddy', `
+      INSERT INTO crops (name, name_ta)
+      SELECT 'Paddy', 'நெல்'
+      WHERE NOT EXISTS (SELECT 1 FROM crops WHERE lower(name) IN ('paddy','rice'))
+    `);
+    await q('crops.seed.chilli', `
+      INSERT INTO crops (name, name_ta)
+      SELECT 'Chilli', 'மிளகாய்'
+      WHERE NOT EXISTS (SELECT 1 FROM crops WHERE lower(name) IN ('chilli','chili'))
+    `);
+    await q('crops.seed.banana', `
+      INSERT INTO crops (name, name_ta)
+      SELECT 'Banana', 'வாழை'
+      WHERE NOT EXISTS (SELECT 1 FROM crops WHERE lower(name) = 'banana')
+    `);
 
     await q('crop_guides.table', `CREATE TABLE IF NOT EXISTS crop_guides (
       id BIGSERIAL PRIMARY KEY,
@@ -1286,6 +1306,35 @@ app.post('/improved-categories', async (req, res) => {
   }
 });
 
+app.patch('/improved-categories/:id', async (req, res) => {
+  const { name_en, name_ta, slug } = req.body || {};
+  const set = []; const vals = []; let i = 1;
+  if (name_en !== undefined) { set.push(`name_en=$${i++}`); vals.push(name_en); }
+  if (name_ta !== undefined) { set.push(`name_ta=$${i++}`); vals.push(name_ta); }
+  if (slug !== undefined) { set.push(`slug=$${i++}`); vals.push(slug); }
+  if (!set.length) return res.json({ ok: true });
+  vals.push(req.params.id);
+  await pool.query(`UPDATE improved_categories SET ${set.join(', ')} WHERE id=$${i}`, vals);
+  res.json({ ok: true });
+});
+
+app.delete('/improved-categories/:id', async (req, res) => {
+  try {
+    // Delete all related articles and images
+    const arts = await all('SELECT id FROM improved_articles WHERE category_id=$1', [req.params.id]);
+    const artIds = arts.map(a => a.id);
+    if (artIds.length) {
+      await pool.query('DELETE FROM improved_article_images WHERE article_id = ANY($1::bigint[])', [artIds]);
+      await pool.query('DELETE FROM improved_articles WHERE category_id=$1', [req.params.id]);
+    }
+    await pool.query('DELETE FROM improved_categories WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Delete category error:', e);
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
 app.get('/improved-articles', async (req, res) => {
   const slug = String(req.query.categorySlug || '').trim();
   const lang = String(req.query.lang || 'en').toLowerCase() === 'ta' ? 'ta' : 'en';
@@ -1901,6 +1950,10 @@ Respond strictly in JSON:
 1) நோய் அல்லது பூச்சி
 2) சுருக்கமான விளக்கம்
 3) 3-5 முக்கிய வார்த்தைகள்
+
+முக்கிய குறிப்பு: தாவர பெயர்களை நேரடியாக மொழிபெயர்க்காமல் சரியான தமிழ் பெயர்களை பயன்படுத்தவும். 
+உதாரணமாக: "Ladies Finger" என்பது "வெண்டைக்காய்" (Vendakkai) என இருக்க வேண்டும் ("பெண்கள் விரல்" அல்ல).
+
 கண்டிப்பாக JSON வடிவத்தில் பதிலளிக்கவும் (தமிழில்):
 { "plant": "${plantName}", "disease_or_pest": "...", "description": "...", "keywords": ["..."] }
 அனைத்து மதிப்புகளும் தமிழில் இருக்க வேண்டும்.`,

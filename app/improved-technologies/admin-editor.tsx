@@ -8,9 +8,9 @@ import { uploadImprovedArticleDoc } from '../../lib/supabase';
 import QuillEditor from '../../components/QuillEditor';
 
 const INSTRUCTIONS_EN =
-  '<p><em>Instructions:</em> Use the toolbar to add headings, sub-headings, bullet lists and images. The first heading will be used as the article title.</p><p><br/></p>';
+  '<p><em>Instructions:</em> Use the toolbar to add headings, sub-headings, lists, images, and <b>subscript/superscript</b> (for formulas). The first heading will be the title.</p><p><br/></p>';
 const INSTRUCTIONS_TA =
-  '<p><em>வழிமுறைகள்:</em> தலைப்பு, துணைத் தலைப்பு, பட்டியல்கள் மற்றும் படங்களை மேலுள்ள கருவிப்பட்டையை பயன்படுத்தி சேர்க்கவும். முதல் தலைப்பு கட்டுரையின் தலைப்பாக பயன்படுத்தப்படும்.</p><p><br/></p>';
+  '<p><em>வழிமுறைகள்:</em> தலைப்பு, துணைத் தலைப்பு, பட்டியல்கள், படங்கள் மற்றும் <b>கீழ்ஒட்டு/மேல்ஒட்டு</b> (சூத்திரங்களுக்கு) ஆகியவற்றை கருவிப்பட்டையை பயன்படுத்தி சேர்க்கவும்.</p><p><br/></p>';
 
 const extractHeadingFromHtml = (html: string, fallback?: string): string => {
   if (!html) return fallback || '';
