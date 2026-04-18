@@ -56,7 +56,10 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
   };
 
   const handleSubmit = async () => {
-    if (!number || !password || (isSignup && !fullName)) {
+    const trimmedNumber = number.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedNumber || !trimmedPassword || (isSignup && !fullName)) {
       setError(t('auth.fillFields'));
       return;
     }
@@ -71,8 +74,8 @@ export default function AuthScreen({ initialMode = 'login' }: AuthScreenProps) {
 
     try {
       const result = isSignup
-        ? await signUp(number, password, fullName)
-        : await signIn(number, password);
+        ? await signUp(trimmedNumber, trimmedPassword, fullName)
+        : await signIn(trimmedNumber, trimmedPassword);
 
       const { user, error: authError } = result;
 

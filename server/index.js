@@ -564,11 +564,26 @@ app.post('/auth/signup', async (req, res) => {
 
 app.post('/auth/signin', async (req, res) => {
   const { number, password } = req.body || {};
+  const trimmedNumber = String(number || '').trim();
+  
+  console.log(`[AUTH] Sign-in attempt: number="${trimmedNumber}", hashPrefix="${String(password || '').substring(0, 8)}..."`);
+
   const u = await one(
     'SELECT id, number, full_name, is_admin, created_at, booking_address, delivery_address FROM users WHERE number=$1 AND password=$2',
-    [number, password]
+    [trimmedNumber, password]
   );
-  if (!u) return res.status(401).json({ error: 'Invalid number or password' });
+  
+  if (!u) {
+    const userExists = await one('SELECT id FROM users WHERE number=$1', [trimmedNumber]);
+    if (userExists) {
+      console.warn(`[AUTH] Failed sign-in for ${trimmedNumber}: Password mismatch`);
+    } else {
+      console.warn(`[AUTH] Failed sign-in for ${trimmedNumber}: User not found`);
+    }
+    return res.status(401).json({ error: 'Invalid number or password' });
+  }
+
+  console.log(`[AUTH] Successful sign-in for ${trimmedNumber} (ID: ${u.id})`);
   const tokens = generateTokens(u);
   res.json({ user: u, ...tokens });
 });
