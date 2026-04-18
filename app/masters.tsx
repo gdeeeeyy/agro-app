@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, publishSystemNotification, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
+import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, exportDetailedOrders, publishSystemNotification, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
 import { uploadImprovedArticleDoc } from '../lib/supabase';
 import { uploadImage } from '../lib/upload';
 import QuillEditor from '../components/QuillEditor';
@@ -122,6 +122,12 @@ export default function Masters() {
   const [articleImages, setArticleImages] = useState<any[]>([]);
   const [articleImgCaptionEn, setArticleImgCaptionEn] = useState('');
   const [articleImgCaptionTa, setArticleImgCaptionTa] = useState('');
+
+  // Detailed export state
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0]); // Default 30 days ago
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => { (async ()=>{ const all = await getAllCrops() as any[]; setCrops(all); if (all[0]) setSelectedCropId(Number(all[0].id)); })(); }, []);
   const [cropPickerOpen, setCropPickerOpen] = useState(false);
@@ -328,6 +334,87 @@ export default function Masters() {
     ]);
   };
 
+  const handleDetailedExport = async () => {
+    try {
+      setExportLoading(true);
+      const data = await exportDetailedOrders(startDate + ' 00:00:00', endDate + ' 23:59:59') as any[];
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        Alert.alert('No data', 'No orders found for the selected period.');
+        setExportLoading(false);
+        return;
+      }
+
+      const rowsHtml = data.map(item => `
+        <tr>
+          <td>${new Date(item.date).toLocaleDateString()}</td>
+          <td>#${item.bill_no}</td>
+          <td>${item.seller_name || ''}</td>
+          <td>${item.category || ''}</td>
+          <td>${item.product_name}</td>
+          <td>${item.buyer_name || ''}</td>
+          <td>${item.quantity}</td>
+          <td>₹${item.price}</td>
+        </tr>
+      `).join('');
+
+      const html = `
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset='utf-8'>
+          <title>Detailed Order Export</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            h1 { color: #2d5016; text-align: center; }
+            .period { text-align: center; margin-bottom: 20px; color: #666; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 10px; }
+            th { background-color: #f2f2f2; color: #333; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <h1>Detailed Order Report</h1>
+          <p class="period">Period: ${startDate} to ${endDate}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Bill no.</th>
+                <th>Seller</th>
+                <th>Category</th>
+                <th>Product</th>
+                <th>Buyer</th>
+                <th>Qty</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <p style="font-size: 10px; color: #999; margin-top: 20px;">Generated on: ${new Date().toLocaleString()}</p>
+        </body>
+        </html>
+      `;
+
+      const file = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, { 
+          mimeType: 'application/pdf', 
+          dialogTitle: 'Detailed Order Export' 
+        });
+      } else {
+        Alert.alert('Exported', file.uri);
+      }
+    } catch (e) {
+      console.error('Export error:', e);
+      Alert.alert('Error', 'Failed to generate report.');
+    } finally {
+      setExportLoading(false);
+      setExportModalVisible(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Green header area covering safe zone above Masters */}
@@ -394,7 +481,13 @@ export default function Masters() {
                 }
               }}>
                 <Ionicons name="download" size={18} color="#4caf50" />
-                <Text style={styles.masterBtnText}>Export data</Text>
+                <Text style={styles.masterBtnText}>Export User Data</Text>
+              </TouchableOpacity>
+
+              {/* 4b. Detailed Export with Custom Period */}
+              <TouchableOpacity style={styles.masterBtn} onPress={() => setExportModalVisible(true)}>
+                <Ionicons name="document-text" size={18} color="#4caf50" />
+                <Text style={styles.masterBtnText}>Detailed Order Export</Text>
               </TouchableOpacity>
 
               {/* 5. Send Notifications */}
@@ -1230,6 +1323,58 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
           </View>
         </View>
       </Modal>
+
+      {/* Detailed Export Modal */}
+      <Modal visible={exportModalVisible} transparent animationType="fade" onRequestClose={() => setExportModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', padding: 20, gap: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#2d5016' }}>Detailed Export</Text>
+              <TouchableOpacity onPress={() => setExportModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={{ fontSize: 14, color: '#666' }}>Enter period (YYYY-MM-DD):</Text>
+            
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#4caf50' }}>Start Date</Text>
+              <TextInput 
+                style={styles.input} 
+                value={startDate} 
+                onChangeText={setStartDate} 
+                placeholder="YYYY-MM-DD" 
+              />
+            </View>
+
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#4caf50' }}>End Date</Text>
+              <TextInput 
+                style={styles.input} 
+                value={endDate} 
+                onChangeText={setEndDate} 
+                placeholder="YYYY-MM-DD" 
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.savePrimaryBtn, { marginTop: 10 }]} 
+              onPress={handleDetailedExport}
+              disabled={exportLoading}
+            >
+              {exportLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="download" size={18} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>Confirm Export</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }

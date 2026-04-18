@@ -531,6 +531,21 @@ export async function listUsersBasic() {
   } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
+export async function exportDetailedOrders(start: string, end: string) {
+  try {
+    if (API_URL) {
+      return await api.get(`/admin/export-orders-detailed?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+    }
+    // For local fallback, we would need to join tables locally too.
+    // However, orders/products are often remote-first in this app.
+    // For now, this is primarily a remote feature.
+    return [];
+  } catch (err) {
+    console.error('Export fetch error:', err);
+    return [];
+  }
+}
+
 export async function getNotifications(userId?: number) {
   try {
     if (API_URL) {

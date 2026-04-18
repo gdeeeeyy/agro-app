@@ -1768,6 +1768,38 @@ app.get('/users-basic', async (req, res) => {
   res.json(await all('SELECT id, full_name, number, is_admin FROM users ORDER BY created_at ASC'));
 });
 
+app.get('/admin/export-orders-detailed', async (req, res) => {
+  const { start, end } = req.query;
+  if (!start || !end) return res.status(400).json({ error: 'start and end dates required' });
+  
+  // start and end should be in a format Postgres can parse, e.g. '2024-04-01'
+  const query = `
+    SELECT 
+      oi.created_at as date,
+      o.id as bill_no,
+      p.seller_name,
+      p.keywords as category,
+      oi.product_name,
+      u.full_name as buyer_name,
+      oi.quantity,
+      oi.price_per_unit as price
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    JOIN products p ON oi.product_id = p.id
+    JOIN users u ON o.user_id = u.id
+    WHERE oi.created_at >= $1 AND oi.created_at <= $2
+    ORDER BY oi.created_at DESC
+  `;
+  
+  try {
+    const rows = await all(query, [start, end]);
+    res.json(rows);
+  } catch (e) {
+    console.error('Export error:', e);
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
 // Notifications APIs
 app.get('/notifications', async (req, res) => {
   const userId = req.query.userId ? Number(req.query.userId) : null;
