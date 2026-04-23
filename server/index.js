@@ -1602,6 +1602,7 @@ app.post('/payments/razorpay/link', async (req, res) => {
             contact: customer.number || undefined,
           }
         : undefined,
+      upi_link: true, // Only show UPI payment options
     };
 
     const resp = await fetch(`${RAZORPAY_BASE_URL}/payment_links`, {

@@ -1175,7 +1175,7 @@ export async function clearCart(userId: number) {
 export async function getCartTotal(userId: number) {
   try {
     if (API_URL) {
-      try { const res = await api.get(`/cart/total?userId=${userId}`); return (res as any)?.total || 0; }
+      try { const res = await api.get(`/cart/total?userId=${userId}`); return Number((res as any)?.total || 0); }
       catch (e) { console.warn('Remote getCartTotal failed, using local DB:', e); }
     }
     const rows = await db.getAllAsync(
@@ -1186,7 +1186,7 @@ export async function getCartTotal(userId: number) {
        WHERE ci.user_id = ?`,
       userId
     );
-    return (rows[0] as any)?.total || 0;
+    return Number((rows[0] as any)?.total || 0);
   } catch (err) {
     console.error("Database fetch error:", err);
     return 0;

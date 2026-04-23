@@ -393,7 +393,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 <Text style={styles.zomatoSavingText}>{t('cart.total')}: ₹{cartTotal.toFixed(2)}</Text>
                 {selectedPayment ? (
                   <Text style={styles.zomatoPayUsingLabel}>
-                    Pay using {selectedPayment === 'online' ? 'UPI / Card (Razorpay)' : t('payment.cod')}
+                    Pay using {selectedPayment === 'online' ? 'UPI (Google Pay, PhonePe, etc.)' : t('payment.cod')}
                   </Text>
                 ) : (
                   <Text style={styles.zomatoPayUsingLabel}>{t('payment.required')}</Text>
@@ -451,8 +451,8 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                     color={selectedPayment === 'online' ? '#4caf50' : '#666'} 
                   />
                   <View style={styles.paymentOptionText}>
-                    <Text style={styles.paymentOptionTitle}>{currentLanguage === 'ta' ? 'UPI / கார்டு செலுத்தல்' : 'UPI / Card Payment'}</Text>
-                    <Text style={styles.paymentOptionSubtitle}>{currentLanguage === 'ta' ? 'Razorpay வழியாக பாதுகாப்பாக செலுத்தவும்' : 'Pay securely via Razorpay (UPI or cards)'}</Text>
+                    <Text style={styles.paymentOptionTitle}>{currentLanguage === 'ta' ? 'UPI செலுத்தல்' : 'UPI Payment'}</Text>
+                    <Text style={styles.paymentOptionSubtitle}>{currentLanguage === 'ta' ? 'Google Pay, PhonePe அல்லது பிற UPI ஆப்ஸ் மூலம் செலுத்தவும்' : 'Pay via Google Pay, PhonePe, or any UPI app'}</Text>
                   </View>
                 </View>
                 {selectedPayment === 'online' && (
@@ -480,7 +480,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 <Text style={styles.payUsingLabel}>{currentLanguage === 'ta' ? 'இதைப் பயன்படுத்தி செலுத்துவது' : 'PAY USING'}</Text>
                 <Text style={styles.payUsingMethod}>
                   {selectedPayment === 'online'
-                    ? (currentLanguage === 'ta' ? 'Razorpay UPI / கார்டு' : 'Razorpay UPI / Card')
+                    ? (currentLanguage === 'ta' ? 'UPI (GPay / PhonePe)' : 'UPI (GPay / PhonePe)')
                     : selectedPayment === 'cod'
                     ? t('payment.cod')
                     : t('payment.required')}

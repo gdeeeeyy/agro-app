@@ -166,7 +166,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             : (minVariant?.label || ''))
         : (serverParsed.quantity && serverParsed.unit 
             ? `${Number(serverParsed.quantity) * selectedQuantity} ${serverParsed.unit}` 
-            : (serverMinLabel || '')));
+            : (serverMinLabel || product.unit || '')));
 
   const doAddToCart = async (qty: number, variantId?: number) => {
     try {
@@ -358,16 +358,22 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 </View>
               ) : null}
             </View>
-            {variants.length > 0 && (
-              <View style={styles.unitContainer}>
-                <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
-                  <Text style={styles.unitSelectorText}>
-                    {selectedVariant ? `Rs. ${selectedVariant.price * selectedQuantity} / ${displayLabel}` : 'Select unit'}
-                  </Text>
+            <View style={styles.unitContainer}>
+              <TouchableOpacity 
+                style={styles.unitSelector} 
+                onPress={(e:any)=> { 
+                  if (variants.length > 0) { e?.stopPropagation?.(); setUnitOpen(true); }
+                }}
+                disabled={variants.length === 0}
+              >
+                <Text style={styles.unitSelectorText}>
+                  Rs. {(displayPrice * selectedQuantity).toFixed(2)} {displayLabel ? `/ ${displayLabel}` : ''}
+                </Text>
+                {variants.length > 0 && (
                   <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
-                </TouchableOpacity>
-              </View>
-            )}
+                )}
+              </TouchableOpacity>
+            </View>
             <View style={styles.bottomRow}>
               <View style={styles.qtyPill}>
                 <TouchableOpacity onPress={(e:any)=> { e?.stopPropagation?.(); setSelectedQuantity(q => Math.max(1, q - 1)); }}>
@@ -422,14 +428,20 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
                 </View>
               ) : null}
             </View>
-            {variants.length > 0 && (
-              <TouchableOpacity style={styles.unitSelector} onPress={(e:any)=> { e?.stopPropagation?.(); setUnitOpen(true); }}>
-                <Text style={styles.unitSelectorText}>
-                  {selectedVariant ? `Rs. ${selectedVariant.price * selectedQuantity} / ${displayLabel}` : 'Select unit'}
-                </Text>
+            <TouchableOpacity 
+              style={[styles.unitSelector, { marginTop: 4 }]} 
+              onPress={(e:any)=> { 
+                if (variants.length > 0) { e?.stopPropagation?.(); setUnitOpen(true); }
+              }}
+              disabled={variants.length === 0}
+            >
+              <Text style={styles.unitSelectorText}>
+                Rs. {(displayPrice * selectedQuantity).toFixed(2)} {displayLabel ? `/ ${displayLabel}` : ''}
+              </Text>
+              {variants.length > 0 && (
                 <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#4caf50" />
-              </TouchableOpacity>
-            )}
+              )}
+            </TouchableOpacity>
             <View style={[styles.bottomRow, { marginTop: 6 }]}>
               <View style={[styles.qtyPill, { height: 30, paddingHorizontal: 10, borderRadius: 8, gap: 8, backgroundColor: '#f5f5f5' }]}>
                 <TouchableOpacity 
