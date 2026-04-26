@@ -282,19 +282,15 @@ export default function Cart() {
       )}
       
       <View style={styles.itemDetails}>
-        <Text style={styles.itemName}>
+        <Text style={styles.itemName} numberOfLines={1}>
           {currentLanguage === 'ta' && item.name_ta ? item.name_ta : item.name}
+          {item.variant_label ? ` (${item.variant_label})` : ''}
         </Text>
-        {item.variant_label ? (
-          <Text style={{ color:'#4e7c35', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
-            {item.variant_label}
-          </Text>
-        ) : null}
         <Text style={styles.itemPrice}>
-          ₹{item.cost_per_unit} {currentLanguage === 'ta' ? 'ஒவ்வொரு' : 'each'}
+          Rs {item.cost_per_unit} / {item.variant_label || (currentLanguage === 'ta' ? 'ஒவ்வொரு' : 'each')}
         </Text>
         <Text style={styles.itemTotal}>
-          {currentLanguage === 'ta' ? 'மொத்தம்' : 'Total'}: ₹{(item.quantity * item.cost_per_unit).toFixed(2)}
+          {currentLanguage === 'ta' ? 'மொத்தம்' : 'Total'}: Rs {(item.quantity * item.cost_per_unit).toFixed(2)}
         </Text>
       </View>
 
@@ -354,7 +350,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
           <View style={styles.footer}>
             <View style={styles.totalContainer}>
               <Text style={styles.totalLabel}>{t('cart.total')}:</Text>
-              <Text style={styles.totalAmount}>₹{cartTotal.toFixed(2)}</Text>
+              <Text style={styles.totalAmount}>Rs {cartTotal.toFixed(2)}</Text>
             </View>
 
             <View style={styles.buttonContainer}>
@@ -390,7 +386,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
 
             <View style={styles.zomatoLikeHeader}>
               <View>
-                <Text style={styles.zomatoSavingText}>{t('cart.total')}: ₹{cartTotal.toFixed(2)}</Text>
+                <Text style={styles.zomatoSavingText}>{t('cart.total')}: Rs {cartTotal.toFixed(2)}</Text>
                 {selectedPayment ? (
                   <Text style={styles.zomatoPayUsingLabel}>
                     Pay using {selectedPayment === 'online' ? 'UPI (Google Pay, PhonePe, etc.)' : t('payment.cod')}
@@ -434,7 +430,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 </View>
               )}
 
-              <Text style={[styles.orderSummary, { marginTop: 4 }]}>{t('payment.orderTotal')}: ₹{cartTotal.toFixed(2)}</Text>
+              <Text style={[styles.orderSummary, { marginTop: 4 }]}>{t('payment.orderTotal')}: Rs {cartTotal.toFixed(2)}</Text>
 
               {/* Single online payment option via Razorpay */}
               <TouchableOpacity
@@ -494,7 +490,7 @@ onPress={() => handleRemoveItem(item.product_id, item.variant_id ?? undefined)}
                 onPress={handleConfirmOrder}
                 disabled={!selectedPayment}
               >
-                <Text style={styles.confirmButtonAmount}>₹{cartTotal.toFixed(2)}</Text>
+                <Text style={styles.confirmButtonAmount}>Rs {cartTotal.toFixed(2)}</Text>
                 <Text style={styles.confirmButtonText}>{currentLanguage === 'ta' ? 'ஆர்டர் செய்யவும்' : 'Place Order'}</Text>
               </TouchableOpacity>
             </View>
@@ -660,7 +656,8 @@ const styles = StyleSheet.create({
   },
   itemDetails: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
+    justifyContent: 'center',
   },
   itemName: {
     fontSize: 16,

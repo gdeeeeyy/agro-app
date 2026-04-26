@@ -145,6 +145,7 @@ async function runMigrations() {
     await q('products.reviewed_by', "ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_by BIGINT");
     await q('products.reviewed_at', "ALTER TABLE products ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
     await q('products.review_note', "ALTER TABLE products ADD COLUMN IF NOT EXISTS review_note TEXT");
+    await q('products.display_order', "ALTER TABLE products ADD COLUMN IF NOT EXISTS display_order INTEGER");
 
     await q('keywords.table', `CREATE TABLE IF NOT EXISTS keywords (
       id BIGSERIAL PRIMARY KEY,
@@ -831,7 +832,7 @@ app.get('/products', async (req, res) => {
       ON oi.product_id = p.id AND oi.rating IS NOT NULL
     WHERE p.status = 'approved'
     GROUP BY p.id
-    ORDER BY p.created_at DESC`));
+    ORDER BY p.display_order ASC NULLS LAST, p.created_at DESC`));
 });
 
 // Place search routes BEFORE ":id" to avoid route shadowing
@@ -852,7 +853,7 @@ app.get('/products/search', async (req, res) => {
       lower(p.name) LIKE $1 OR lower(p.plant_used) LIKE $1 OR lower(p.keywords) LIKE $1 OR lower(p.details) LIKE $1 OR
       lower(p.name_ta) LIKE $1 OR lower(p.plant_used_ta) LIKE $1 OR lower(p.details_ta) LIKE $1)
      GROUP BY p.id
-     ORDER BY p.created_at DESC`, [like]
+     ORDER BY p.display_order ASC NULLS LAST, p.created_at DESC`, [like]
   ));
 });
 
@@ -870,7 +871,7 @@ app.get('/products/by-keyword', async (req, res) => {
       ON oi.product_id = p.id AND oi.rating IS NOT NULL
     WHERE p.status='approved' AND lower(p.keywords) LIKE $1
     GROUP BY p.id
-    ORDER BY p.created_at DESC`, [like]));
+    ORDER BY p.display_order ASC NULLS LAST, p.created_at DESC`, [like]));
 });
 
 // Admin list (all products with status + rating summary)
@@ -885,7 +886,7 @@ app.get('/products/admin', async (req, res) => {
       ON oi.product_id = p.id AND oi.rating IS NOT NULL
     WHERE p.status != 'deleted'
     GROUP BY p.id
-    ORDER BY p.created_at DESC`));
+    ORDER BY p.display_order ASC NULLS LAST, p.created_at DESC`));
 });
 app.get('/products/pending', async (req, res) => {
   res.json(await all("SELECT * FROM products WHERE status='pending' ORDER BY created_at DESC"));
@@ -973,10 +974,11 @@ app.post('/products', async (req, res) => {
   const status = creatorRole === 2 ? 'approved' : 'pending';
   const lowThreshold = p.low_stock_threshold != null ? Number(p.low_stock_threshold) : 20;
   const alertTime = p.low_stock_alert_time ? String(p.low_stock_alert_time) : null;
+  const displayOrder = p.display_order != null ? Number(p.display_order) : null;
   const r = await one(
-    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, seller_name, stock_available, cost_per_unit, low_stock_threshold, low_stock_alert_time, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
-    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.seller_name ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), lowThreshold, alertTime, status, createdBy]
+    `INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, seller_name, stock_available, cost_per_unit, low_stock_threshold, low_stock_alert_time, status, created_by, display_order)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+    [p.name, p.plant_used, p.keywords, p.details, p.name_ta ?? null, p.plant_used_ta ?? null, p.details_ta ?? null, p.image ?? null, p.unit ?? null, p.seller_name ?? null, Number(p.stock_available || 0), Number(p.cost_per_unit || 0), lowThreshold, alertTime, status, createdBy, displayOrder]
   );
   res.json(r);
 });
@@ -1010,13 +1012,34 @@ app.patch('/products/:id/review', async (req, res) => {
 });
 
 app.patch('/products/:id', async (req, res) => {
-  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','seller_name','stock_available','cost_per_unit','low_stock_threshold','low_stock_alert_time'];
+  const allowed = ['name','plant_used','keywords','details','name_ta','plant_used_ta','details_ta','image','unit','seller_name','stock_available','cost_per_unit','low_stock_threshold','low_stock_alert_time','display_order'];
   const set = []; const vals = []; let i = 1;
   for (const k of allowed) if (k in req.body) { set.push(`${k}=$${i++}`); vals.push(req.body[k]); }
   if (!set.length) return res.json({ ok: true });
   vals.push(req.params.id);
   await pool.query(`UPDATE products SET ${set.join(', ')}, updated_at = now() WHERE id = $${i}`, vals);
   res.json({ ok: true });
+});
+
+// Renumber all products sequentially based on creation date
+app.post('/products/renumber', async (req, res) => {
+  try {
+    await pool.query(`
+      WITH numbered_products AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY created_at ASC) as row_num
+        FROM products
+        WHERE status != 'deleted'
+      )
+      UPDATE products
+      SET display_order = numbered_products.row_num
+      FROM numbered_products
+      WHERE products.id = numbered_products.id
+    `);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Renumber error:', e);
+    res.status(500).json({ error: 'failed to renumber products' });
+  }
 });
 
 app.delete('/products/:id', async (req, res) => {

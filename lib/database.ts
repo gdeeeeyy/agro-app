@@ -306,6 +306,7 @@ if (Platform.OS !== 'web') (async () => {
     await addProdTextCol('low_stock_alert_time');
     await addProdIntCol('created_by', 0);
     await addProdIntCol('creator_role', 0);
+    await addProdIntCol('display_order', 0);
 
     // users migration (addresses)
     const userCols = await db.getAllAsync("PRAGMA table_info(users)");
@@ -805,7 +806,7 @@ export async function getAllProducts() {
       try { return await api.get('/products'); }
       catch (e) { console.warn('Remote getAllProducts failed, using local DB:', e); }
     }
-    return await db.getAllAsync("SELECT * FROM products ORDER BY name ASC");
+    return await db.getAllAsync("SELECT * FROM products ORDER BY display_order ASC, name ASC");
   } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
@@ -815,7 +816,7 @@ export async function getAllProductsAdmin() {
       try { return await api.get('/products/admin'); }
       catch (e) { console.warn('Remote getAllProductsAdmin failed, using local DB:', e); }
     }
-    return await db.getAllAsync("SELECT * FROM products ORDER BY created_at DESC");
+    return await db.getAllAsync("SELECT * FROM products ORDER BY display_order ASC, created_at DESC");
   } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
@@ -861,6 +862,7 @@ export async function addProduct(product: {
   seller_name?: string;
   created_by?: number;      // optional: backend uses this to track creator
   creator_role?: number;    // optional: 1=vendor, 2=master (auto-approve)
+  display_order?: number;
 }) {
   try {
     if (API_URL) {
@@ -868,7 +870,7 @@ export async function addProduct(product: {
       return (res as any).id || null;
     }
     const result = await db.runAsync(
-      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, seller_name, created_by, creator_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (name, plant_used, keywords, details, name_ta, plant_used_ta, details_ta, image, unit, stock_available, cost_per_unit, seller_name, created_by, creator_role, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       product.name,
       product.plant_used,
       product.keywords,
@@ -882,7 +884,8 @@ export async function addProduct(product: {
       product.cost_per_unit,
       product.seller_name || null,
       product.created_by || null,
-      product.creator_role || 0
+      product.creator_role || 0,
+      product.display_order || null
     );
     return result.lastInsertRowId;
   } catch (err) {
@@ -908,6 +911,7 @@ export async function updateProduct(id: number, product: {
   low_stock_alert_time?: string;
   created_by?: number;
   creator_role?: number;
+  display_order?: number;
 }) {
   try {
     if (API_URL) {
@@ -920,7 +924,7 @@ export async function updateProduct(id: number, product: {
     const validColumns = [
       'name', 'plant_used', 'keywords', 'details', 'name_ta', 'plant_used_ta',
       'details_ta', 'image', 'stock_available', 'cost_per_unit', 'unit',
-      'seller_name', 'low_stock_threshold', 'low_stock_alert_time', 'created_by', 'creator_role'
+      'seller_name', 'low_stock_threshold', 'low_stock_alert_time', 'created_by', 'creator_role', 'display_order'
     ];
     
     Object.entries(product).forEach(([key, value]) => {
@@ -960,6 +964,17 @@ export async function deleteProduct(id: number) {
 export async function searchProducts(keywords: string) {
   if (!API_URL) throw new Error('API_URL not configured');
   return await api.get(`/products/search?q=${encodeURIComponent(keywords)}`);
+}
+
+export async function renumberProducts() {
+  if (!API_URL) return false;
+  try {
+    await api.post('/products/renumber', {});
+    return true;
+  } catch (e) {
+    console.error('Renumber products failed:', e);
+    return false;
+  }
 }
 
 export async function findProductsByKeywords(analysisKeywords: string[], limit: number = 5) {

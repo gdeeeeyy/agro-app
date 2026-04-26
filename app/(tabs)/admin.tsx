@@ -46,6 +46,7 @@ interface Product {
   rating_count?: number;
   low_stock_threshold?: number;
   low_stock_alert_time?: string | null;
+  display_order?: number;
 }
 
 interface ProductForm {
@@ -63,6 +64,7 @@ interface ProductForm {
   plant_used?: string; // required by server; default to name
   low_stock_threshold: string;
   low_stock_alert_time: string;
+  display_order: string;
 }
 
 interface Keyword {
@@ -108,6 +110,7 @@ export default function AdminDashboard() {
     pack_unit: 'gms',
     low_stock_threshold: '20',
     low_stock_alert_time: '09:00',
+    display_order: '',
   });
 
   // (moved isAdmin/isMaster/isVendor declarations up near UserContext)
@@ -207,6 +210,7 @@ export default function AdminDashboard() {
       plant_used: '',
       low_stock_threshold: '20',
       low_stock_alert_time: '09:00',
+      display_order: '',
     });
     setSelectedKeywords([]);
     setEditingProduct(null);
@@ -292,6 +296,7 @@ export default function AdminDashboard() {
       plant_used: (product as any).plant_used || product.name || '',
       low_stock_threshold: String((product as any).low_stock_threshold ?? 20),
       low_stock_alert_time: String((product as any).low_stock_alert_time || '09:00'),
+      display_order: String((product as any).display_order ?? ''),
     });
     // Parse existing keywords
     const existingKeywords = (product.keywords || '').split(',').map((k: string) => k.trim()).filter((k: string) => k);
@@ -420,6 +425,7 @@ const pickImage = async () => {
       cost_per_unit: 0,
       low_stock_threshold: Number(formData.low_stock_threshold || '20') || 20,
       low_stock_alert_time: formData.low_stock_alert_time?.trim() || '09:00',
+      display_order: formData.display_order ? Number(formData.display_order) : undefined,
     };
 
     // Metadata is primarily for new products or identifying ownership
@@ -572,7 +578,7 @@ const pickImage = async () => {
       
       <View style={styles.productDetails}>
         <Text style={styles.productName} numberOfLines={2}>
-          {item.name}
+          {item.display_order ? `#${item.display_order} ` : ''}{item.name}
         </Text>
         <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>ID: {item.id}</Text>
         {isMaster && (() => {
@@ -749,6 +755,33 @@ const pickImage = async () => {
               <Ionicons name="pricetags" size={22} color="#fff" />
               <Text style={styles.secondaryButtonText} numberOfLines={2}>Manage Keywords</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.secondaryButton, { backgroundColor: '#43a047' }]}
+              onPress={async () => {
+                Alert.alert('Renumber All', 'Assign sequential numbers (1, 2, 3...) to all products based on their creation date?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Renumber', onPress: async () => {
+                    try {
+                      const db = await import('../../lib/database');
+                      const ok = await db.renumberProducts();
+                      if (ok) {
+                        Alert.alert('Success', 'Products renumbered successfully');
+                        loadProducts();
+                      } else {
+                        Alert.alert('Error', 'Failed to renumber products');
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      Alert.alert('Error', 'An error occurred');
+                    }
+                  }}
+                ]);
+              }}
+            >
+              <Ionicons name="list" size={22} color="#fff" />
+              <Text style={styles.secondaryButtonText} numberOfLines={2}>Renumber All</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -855,6 +888,16 @@ const pickImage = async () => {
               placeholderTextColor="#666"
               value={formData.name_ta}
               onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
+            />
+
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Display Order / Number (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 1"
+              placeholderTextColor="#666"
+              value={formData.display_order}
+              keyboardType="numeric"
+              onChangeText={(text) => setFormData({ ...formData, display_order: text })}
             />
 
             {/* Keywords dropdown under product name */}
