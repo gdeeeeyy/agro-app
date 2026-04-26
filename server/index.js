@@ -353,6 +353,10 @@ async function runMigrations() {
     )`);
     await q('notifications.title_ta', "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title_ta TEXT");
     await q('notifications.message_ta', "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message_ta TEXT");
+    await q('notifications.expires_at', "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ");
+    
+    // Clear all existing notifications as requested by user
+    await pool.query("DELETE FROM notifications");
 
     // Expo push tokens
     await q('push_tokens.table', `CREATE TABLE IF NOT EXISTS push_tokens (
@@ -1827,6 +1831,13 @@ app.get('/admin/export-orders-detailed', async (req, res) => {
 // Notifications APIs
 app.get('/notifications', async (req, res) => {
   const userId = req.query.userId ? Number(req.query.userId) : null;
+  
+  // Auto-cleanup expired notifications
+  try {
+  } catch (e) {
+    console.error('Notification cleanup error:', e);
+  }
+
   if (userId) {
     res.json(await all('SELECT * FROM notifications WHERE user_id IS NULL OR user_id=$1 ORDER BY created_at DESC', [userId]));
   } else {
@@ -1834,10 +1845,30 @@ app.get('/notifications', async (req, res) => {
   }
 });
 app.post('/notifications', async (req, res) => {
-  const { title, message, title_ta, message_ta } = req.body || {};
+  const { title, message, title_ta, message_ta, timeout_days } = req.body || {};
   if (!title || !message) return res.status(400).json({ error: 'title and message required' });
-  const r = await one('INSERT INTO notifications (title, message, title_ta, message_ta) VALUES ($1,$2,$3,$4) RETURNING id', [title, message, title_ta || null, message_ta || null]);
-  // Broadcast push via Expo to all tokens (combine EN/TA for clarity)
+  
+  let expires_at = null;
+  if (timeout_days && Number(timeout_days) > 0) {
+    expires_at = new Date();
+    expires_at.setDate(expires_at.getDate() + Number(timeout_days));
+  }
+
+  const r = await one(
+    'INSERT INTO notifications (title, message, title_ta, message_ta, expires_at) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+    [title, message, title_ta || null, message_ta || null, expires_at]
+  );
+app.delete('/notifications', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM notifications');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Clear notifications error:', e);
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
+// Broadcast push via Expo to all tokens (combine EN/TA for clarity)
   try {
     const rows = await all('SELECT token FROM push_tokens');
     if (rows.length) {

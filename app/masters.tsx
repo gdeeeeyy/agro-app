@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, exportDetailedOrders, publishSystemNotification, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
+import { getAllCrops, addCrop, upsertCropGuide, listCropPests, addCropPestBoth, addCropPestImage, listCropDiseases, addCropDiseaseBoth, addCropDiseaseImage, getCropGuide, updateCropPest, updateCropDisease, deleteCropPestImage, deleteCropDiseaseImage, deleteCropPest, deleteCropDisease, deleteCrop, deleteCropGuide, listCropPestImages, listCropDiseaseImages, listAdmins, setAdminRole, deleteAdmin, listLogistics, addLogistic, deleteLogistic, listUsersBasic, exportDetailedOrders, publishSystemNotification, clearAllNotifications, listImprovedCategories, listImprovedArticles, getImprovedArticle, createImprovedArticle, updateImprovedArticle, deleteImprovedArticle, addImprovedArticleImage, deleteImprovedArticleImage } from '../lib/database';
 import { uploadImprovedArticleDoc } from '../lib/supabase';
 import { uploadImage } from '../lib/upload';
 import QuillEditor from '../components/QuillEditor';
@@ -106,6 +106,7 @@ export default function Masters() {
   const [notifMessage, setNotifMessage] = useState('');
   const [notifTitleTa, setNotifTitleTa] = useState('');
   const [notifMessageTa, setNotifMessageTa] = useState('');
+  const [notifTimeout, setNotifTimeout] = useState('');
   const [notifModalVisible, setNotifModalVisible] = useState(false);
 
   // Improved Technologies admin state
@@ -1311,13 +1312,56 @@ if (diseasePendingImageUri) { const up = await uploadImage(diseasePendingImageUr
               <View style={{ height:10 }} />
               <TextInput style={[styles.input,{ marginBottom:8 }]} placeholder="தலைப்பு (Tamil)" placeholderTextColor="#999" value={notifTitleTa} onChangeText={setNotifTitleTa} />
               <TextInput style={[styles.input,{ minHeight:100, textAlignVertical:'top' }]} placeholder="செய்தி (Tamil)" placeholderTextColor="#999" value={notifMessageTa} onChangeText={setNotifMessageTa} multiline />
+              <View style={{ height:10 }} />
+              <TextInput style={[styles.input,{ marginBottom:8 }]} placeholder="timeout time (in days)" placeholderTextColor="#999" value={notifTimeout} onChangeText={setNotifTimeout} keyboardType="numeric" />
               <TouchableOpacity style={[styles.masterBtn, { marginTop: 12 }]} onPress={async ()=>{
                 if (!notifTitle.trim() || !notifMessage.trim()) { Alert.alert('Error','Enter English title and message'); return; }
-                const id = await publishSystemNotification(notifTitle.trim(), notifMessage.trim(), notifTitleTa.trim()||undefined, notifMessageTa.trim()||undefined);
-                if (id) { Alert.alert('Sent','Notification published'); emitNotificationsChanged(); setNotifTitle(''); setNotifMessage(''); setNotifTitleTa(''); setNotifMessageTa(''); setNotifModalVisible(false); } else { Alert.alert('Error','Failed to publish'); }
+                const id = await publishSystemNotification(
+                  notifTitle.trim(), 
+                  notifMessage.trim(), 
+                  notifTitleTa.trim()||undefined, 
+                  notifMessageTa.trim()||undefined,
+                  notifTimeout ? Number(notifTimeout) : undefined
+                );
+                if (id) { 
+                  Alert.alert('Sent','Notification published'); 
+                  emitNotificationsChanged(); 
+                  setNotifTitle(''); setNotifMessage(''); setNotifTitleTa(''); setNotifMessageTa(''); setNotifTimeout(''); setNotifModalVisible(false); 
+                } else { 
+                  Alert.alert('Error','Failed to publish'); 
+                }
               }}>
                 <Ionicons name="send" size={18} color="#4caf50" />
                 <Text style={styles.masterBtnText}>Publish</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.masterBtn, { marginTop: 12, borderColor: '#f8d7da', backgroundColor: '#fdecea' }]} 
+                onPress={async ()=>{
+                  Alert.alert(
+                    'Clear All',
+                    'Are you sure you want to clear all sent notifications for everyone?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { 
+                        text: 'Clear All', 
+                        style: 'destructive', 
+                        onPress: async () => {
+                          const ok = await clearAllNotifications();
+                          if (ok) {
+                            Alert.alert('Cleared', 'All notifications have been removed');
+                            emitNotificationsChanged();
+                          } else {
+                            Alert.alert('Error', 'Failed to clear notifications');
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="trash" size={18} color="#d32f2f" />
+                <Text style={[styles.masterBtnText, { color: '#d32f2f' }]}>Clear All Sent Notifications</Text>
               </TouchableOpacity>
             </View>
           </View>

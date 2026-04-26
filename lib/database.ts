@@ -319,6 +319,18 @@ if (Platform.OS !== 'web') (async () => {
     await addUserTextCol('booking_address');
     await addUserTextCol('delivery_address');
 
+    // notifications migration
+    const notifCols = await db.getAllAsync("PRAGMA table_info(notifications)");
+    const notifColNames = (notifCols as any[]).map(c => c.name);
+    const addNotifTextCol = async (name: string) => {
+      if (!notifColNames.includes(name)) {
+        await db.runAsync(`ALTER TABLE notifications ADD COLUMN ${name} TEXT`);
+      }
+    };
+    await addNotifTextCol('title_ta');
+    await addNotifTextCol('message_ta');
+    await addNotifTextCol('expires_at');
+
     // orders migration (align with server: add logistics fields if missing)
     const orderCols = await db.getAllAsync("PRAGMA table_info(orders)");
     const orderColNames = (orderCols as any[]).map(c => c.name);
@@ -553,23 +565,48 @@ export async function getNotifications(userId?: number) {
       const path = userId ? `/notifications?userId=${userId}` : '/notifications';
       return await api.get(path);
     }
+    // Local: Cleanup expired before returning
+    try {
+      const now = new Date().toISOString();
+      await db.runAsync('DELETE FROM notifications WHERE expires_at IS NOT NULL AND expires_at < ?', now);
+    } catch {}
+
     if (userId) return await db.getAllAsync('SELECT * FROM notifications WHERE user_id IS NULL OR user_id = ? ORDER BY created_at DESC', userId);
     return await db.getAllAsync('SELECT * FROM notifications WHERE user_id IS NULL ORDER BY created_at DESC');
   } catch (err) { console.error('Database fetch error:', err); return []; }
 }
 
-export async function publishSystemNotification(title: string, message: string, title_ta?: string, message_ta?: string) {
+export async function publishSystemNotification(title: string, message: string, title_ta?: string, message_ta?: string, timeout_days?: number) {
   try {
     if (API_URL) {
-      const res = await api.post('/notifications', { title, message, title_ta, message_ta });
+      const res = await api.post('/notifications', { title, message, title_ta, message_ta, timeout_days });
       return (res as any)?.id || null;
     }
-    // Local: add bilingual columns if missing
-    try { await db.runAsync('ALTER TABLE notifications ADD COLUMN title_ta TEXT'); } catch {}
-    try { await db.runAsync('ALTER TABLE notifications ADD COLUMN message_ta TEXT'); } catch {}
-    const r = await db.runAsync('INSERT INTO notifications (title, message, title_ta, message_ta, user_id) VALUES (?, ?, ?, ?, NULL)', title, message, title_ta || null, message_ta || null);
+    
+    let expires_at = null;
+    if (timeout_days && timeout_days > 0) {
+      const d = new Date();
+      d.setDate(d.getDate() + timeout_days);
+      expires_at = d.toISOString();
+    }
+
+    const r = await db.runAsync(
+      'INSERT INTO notifications (title, message, title_ta, message_ta, user_id, expires_at) VALUES (?, ?, ?, ?, NULL, ?)',
+      title, message, title_ta || null, message_ta || null, expires_at
+    );
     return r.lastInsertRowId;
   } catch (err) { console.error('Database insert error:', err); return null; }
+}
+
+export async function clearAllNotifications() {
+  try {
+    if (API_URL) {
+      await api.del('/notifications');
+      return true;
+    }
+    await db.runAsync('DELETE FROM notifications');
+    return true;
+  } catch (err) { console.error('Database clear error:', err); return false; }
 }
 
 // Improved Technologies helpers
