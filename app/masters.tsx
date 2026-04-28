@@ -14,6 +14,8 @@ import { useLanguage } from '../context/LanguageContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as XLSX from 'xlsx';
 
 export default function Masters() {
   const { user } = useContext(UserContext);
@@ -345,71 +347,41 @@ export default function Masters() {
         return;
       }
 
-      const rowsHtml = data.map(item => `
-        <tr>
-          <td>${new Date(item.date).toLocaleDateString()}</td>
-          <td>#${item.bill_no}</td>
-          <td>${item.seller_name || ''}</td>
-          <td>${item.category || ''}</td>
-          <td>${item.product_name}</td>
-          <td>${item.buyer_name || ''}</td>
-          <td>${item.quantity}</td>
-          <td>₹${item.price}</td>
-        </tr>
-      `).join('');
+      // Format data for Excel
+      const formattedData = data.map(item => ({
+        'Date': new Date(item.date).toLocaleDateString(),
+        'Bill No': item.bill_no || '',
+        'Seller': item.seller_name || '',
+        'Category': item.category || '',
+        'Product': item.product_name || '',
+        'Buyer': item.buyer_name || '',
+        'Quantity': item.quantity || 0,
+        'Price': item.price || 0,
+        'Total': (item.quantity || 0) * (item.price || 0)
+      }));
 
-      const html = `
-        <!doctype html>
-        <html>
-        <head>
-          <meta charset='utf-8'>
-          <title>Detailed Order Export</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; color: #333; }
-            h1 { color: #2d5016; text-align: center; }
-            .period { text-align: center; margin-bottom: 20px; color: #666; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 10px; }
-            th { background-color: #f2f2f2; color: #333; font-weight: 700; }
-          </style>
-        </head>
-        <body>
-          <h1>Detailed Order Report</h1>
-          <p class="period">Period: ${startDate} to ${endDate}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Bill no.</th>
-                <th>Seller</th>
-                <th>Category</th>
-                <th>Product</th>
-                <th>Buyer</th>
-                <th>Qty</th>
-                <th>Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-          <p style="font-size: 10px; color: #999; margin-top: 20px;">Generated on: ${new Date().toLocaleString()}</p>
-        </body>
-        </html>
-      `;
+      const ws = XLSX.utils.json_to_sheet(formattedData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Orders");
+      const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
+      const uri = FileSystem.cacheDirectory + `OrderExport_${startDate}_to_${endDate}.xlsx`;
+      
+      await FileSystem.writeAsStringAsync(uri, wbout, {
+        encoding: 'base64'
+      });
 
-      const file = await Print.printToFileAsync({ html });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, { 
-          mimeType: 'application/pdf', 
-          dialogTitle: 'Detailed Order Export' 
+        await Sharing.shareAsync(uri, { 
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+          dialogTitle: 'Detailed Order Export',
+          UTI: 'com.microsoft.excel.xlsx'
         });
       } else {
-        Alert.alert('Exported', file.uri);
+        Alert.alert('Exported', uri);
       }
     } catch (e) {
       console.error('Export error:', e);
-      Alert.alert('Error', 'Failed to generate report.');
+      Alert.alert('Error', 'Failed to generate Excel report.');
     } finally {
       setExportLoading(false);
       setExportModalVisible(false);
@@ -473,12 +445,40 @@ export default function Masters() {
                 try {
                   const users = await listUsersBasic() as any[];
                   const rows = Array.isArray(users) ? users : [];
-                  const html = `<!doctype html><html><head><meta charset='utf-8'><title>Export</title></head><body><h1>Users</h1><table border='1' cellspacing='0' cellpadding='6'><tr><th>ID</th><th>Name</th><th>Phone</th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.full_name||''}</td><td>${u.number||''}</td></tr>`).join('')}</table></body></html>`;
-                  const file = await Print.printToFileAsync({ html });
-                  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Export data' });
-                  else Alert.alert('Exported', file.uri);
+                  if (rows.length === 0) {
+                    Alert.alert('No data', 'No users found.');
+                    return;
+                  }
+
+                  const formattedData = rows.map(u => ({
+                    'ID': u.id,
+                    'Name': u.full_name || '',
+                    'Phone': u.number || '',
+                    'Role': u.is_admin === 2 ? 'Master' : (u.is_admin === 1 ? 'Vendor' : 'User')
+                  }));
+
+                  const ws = XLSX.utils.json_to_sheet(formattedData);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Users");
+                  const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
+                  const uri = FileSystem.cacheDirectory + "UserExport.xlsx";
+                  
+                  await FileSystem.writeAsStringAsync(uri, wbout, {
+                    encoding: 'base64'
+                  });
+
+                  if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(uri, { 
+                      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+                      dialogTitle: 'User Export',
+                      UTI: 'com.microsoft.excel.xlsx'
+                    });
+                  } else {
+                    Alert.alert('Exported', uri);
+                  }
                 } catch (e) {
-                  Alert.alert('Error', 'Failed to export');
+                  console.error('User export error:', e);
+                  Alert.alert('Error', 'Failed to export users.');
                 }
               }}>
                 <Ionicons name="download" size={18} color="#4caf50" />

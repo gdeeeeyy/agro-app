@@ -282,7 +282,7 @@ export default function Cart() {
       )}
       
       <View style={styles.itemDetails}>
-        <Text style={styles.itemName} numberOfLines={1}>
+        <Text style={styles.itemName} numberOfLines={3}>
           {currentLanguage === 'ta' && item.name_ta ? item.name_ta : item.name}
           {item.variant_label ? ` (${item.variant_label})` : ''}
         </Text>
@@ -297,18 +297,18 @@ export default function Cart() {
       <View style={styles.quantityContainer}>
         <TouchableOpacity
           style={styles.quantityButton}
-onPress={() => handleQuantityChange(item.product_id, item.quantity - 1, item.variant_id ?? undefined)}
+          onPress={() => handleQuantityChange(item.product_id, item.quantity + 1, item.variant_id ?? undefined)}
         >
-          <Ionicons name="remove" size={16} color="#4caf50" />
+          <Ionicons name="add" size={16} color="#4caf50" />
         </TouchableOpacity>
         
         <Text style={styles.quantityText}>{item.quantity}</Text>
         
         <TouchableOpacity
           style={styles.quantityButton}
-onPress={() => handleQuantityChange(item.product_id, item.quantity + 1, item.variant_id ?? undefined)}
+          onPress={() => handleQuantityChange(item.product_id, item.quantity - 1, item.variant_id ?? undefined)}
         >
-          <Ionicons name="add" size={16} color="#4caf50" />
+          <Ionicons name="remove" size={16} color="#4caf50" />
         </TouchableOpacity>
       </View>
 
@@ -637,22 +637,26 @@ const styles = StyleSheet.create({
   },
   cartItem: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 130,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+    backgroundColor: '#f9f9f9',
   },
   itemDetails: {
     flex: 1,
@@ -661,43 +665,55 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#2d5016',
-    marginBottom: 4,
+    lineHeight: 22,
   },
   itemPrice: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    marginBottom: 2,
+    marginTop: 4,
   },
   itemTotal: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#4caf50',
+    marginTop: 4,
   },
   quantityContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    marginRight: 12,
+    backgroundColor: '#f1f8f4',
+    padding: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    gap: 4,
   },
   quantityButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   quantityText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginHorizontal: 12,
-    minWidth: 20,
+    fontWeight: '800',
+    color: '#2d5016',
+    marginVertical: 8,
+    minWidth: 24,
     textAlign: 'center',
   },
   removeButton: {
     padding: 8,
+    marginLeft: 4,
   },
   emptyContainer: {
     flex: 1,

@@ -580,7 +580,7 @@ const pickImage = async () => {
         <Text style={styles.productName} numberOfLines={2}>
           {item.display_order ? `#${item.display_order} ` : ''}{item.name}
         </Text>
-        <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>ID: {item.id}</Text>
+
         {isMaster && (() => {
           const avgRaw = (item as any).avg_rating;
           const countRaw = (item as any).rating_count;
@@ -890,7 +890,7 @@ const pickImage = async () => {
               onChangeText={(text) => setFormData({ ...formData, name_ta: text })}
             />
 
-            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Display Order / Number (Optional)</Text>
+            <Text style={{ color:'#2d5016', fontWeight:'700', marginBottom:6 }}>Product Number / ID (Optional)</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. 1"
