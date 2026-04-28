@@ -4,7 +4,7 @@ export default {
   expo: {
     name: "agriismart",
     slug: "agriismart",
-    version: "2.4.2",
+    version: "2.4.3",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "agriismart",
@@ -22,7 +22,7 @@ export default {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.agriismart.app",
-      versionCode: 14
+      versionCode: 15
     },
     web: {
       output: "static",
