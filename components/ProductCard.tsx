@@ -553,7 +553,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <Text style={styles.modalTitle}>
-                  {product.display_order ? `#${product.display_order} ` : ''}{(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
+                  #{product.id} {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
                 </Text>
                 <TouchableOpacity onPress={closeDetails} style={{ paddingLeft: 12 }}>
                   <Ionicons name="close" size={22} color="#333" />

@@ -1815,7 +1815,7 @@ app.get('/admin/export-orders-detailed', async (req, res) => {
     JOIN orders o ON oi.order_id = o.id
     JOIN products p ON oi.product_id = p.id
     JOIN users u ON o.user_id = u.id
-    WHERE oi.created_at >= $1 AND oi.created_at <= $2
+    WHERE oi.created_at >= $1 AND oi.created_at <= $2 AND o.status != 'cancelled'
     ORDER BY oi.created_at DESC
   `;
   

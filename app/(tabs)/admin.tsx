@@ -578,7 +578,7 @@ const pickImage = async () => {
       
       <View style={styles.productDetails}>
         <Text style={styles.productName} numberOfLines={2}>
-          {item.display_order ? `#${item.display_order} ` : ''}{item.name}
+          #{item.id} {item.name}
         </Text>
 
         {isMaster && (() => {
@@ -756,32 +756,6 @@ const pickImage = async () => {
               <Text style={styles.secondaryButtonText} numberOfLines={2}>Manage Keywords</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.secondaryButton, { backgroundColor: '#43a047' }]}
-              onPress={async () => {
-                Alert.alert('Renumber All', 'Assign sequential numbers (1, 2, 3...) to all products based on their creation date?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Renumber', onPress: async () => {
-                    try {
-                      const db = await import('../../lib/database');
-                      const ok = await db.renumberProducts();
-                      if (ok) {
-                        Alert.alert('Success', 'Products renumbered successfully');
-                        loadProducts();
-                      } else {
-                        Alert.alert('Error', 'Failed to renumber products');
-                      }
-                    } catch (e) {
-                      console.error(e);
-                      Alert.alert('Error', 'An error occurred');
-                    }
-                  }}
-                ]);
-              }}
-            >
-              <Ionicons name="list" size={22} color="#fff" />
-              <Text style={styles.secondaryButtonText} numberOfLines={2}>Renumber All</Text>
-            </TouchableOpacity>
           </View>
         )}
       </View>

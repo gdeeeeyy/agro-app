@@ -284,7 +284,6 @@ export default function Cart() {
       <View style={styles.itemDetails}>
         <Text style={styles.itemName} numberOfLines={3}>
           {currentLanguage === 'ta' && item.name_ta ? item.name_ta : item.name}
-          {item.variant_label ? ` (${item.variant_label})` : ''}
         </Text>
         <Text style={styles.itemPrice}>
           Rs {item.cost_per_unit} / {item.variant_label || (currentLanguage === 'ta' ? 'ஒவ்வொரு' : 'each')}
