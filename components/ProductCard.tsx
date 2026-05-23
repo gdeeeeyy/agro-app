@@ -346,7 +346,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
           />
           <View style={styles.contentRight}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.name, styles.nameCompact]}>
+              <Text style={[styles.name, styles.nameCompact]} numberOfLines={1}>
                 {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
               {cardRatingCount > 0 ? (
@@ -416,7 +416,7 @@ export default function ProductCard({ product, onPress, listOnlyDescription, com
           />
           <View style={styles.overlay}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.nameOverlay}>
+              <Text style={styles.nameOverlay} numberOfLines={1}>
                 {(currentLanguage === 'ta' && (product as any).name_ta) ? (product as any).name_ta : product.name}
               </Text>
               {cardRatingCount > 0 ? (

@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import PlantAnalysis from "../../components/PlantAnalysis";
 import { UserContext } from "../../context/UserContext";
-import { savePlant, listImprovedArticles } from "../../lib/database";
+import { savePlant, getAllCrops } from "../../lib/database";
 import { analyzePlantImage } from "../../lib/ai";
 import { useLanguage } from "../../context/LanguageContext";
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -162,13 +162,11 @@ export default function App() {
     (async () => {
       try {
         const lang = currentLanguage === 'ta' ? 'ta' : 'en';
-        const agro = await listImprovedArticles('agronomy', lang) as any[];
-        const hort = await listImprovedArticles('horticulture', lang) as any[];
-        const all = [...(Array.isArray(agro) ? agro : []), ...(Array.isArray(hort) ? hort : [])];
-        const normalized = all.map((a: any) => ({
-          id: a.id,
-          name: lang === 'ta' && a.heading_ta ? a.heading_ta : a.heading_en,
-        })).filter((a: any) => a.name);
+        const crops = await getAllCrops() as any[];
+        const normalized = crops.map((c: any) => ({
+          id: c.id,
+          name: lang === 'ta' && c.name_ta ? c.name_ta : c.name,
+        })).filter((c: any) => c.name);
         setPickerCrops(normalized);
       } catch {
         setPickerCrops([]);
