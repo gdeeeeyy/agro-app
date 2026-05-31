@@ -165,7 +165,7 @@ export default function App() {
         const crops = await getAllCrops() as any[];
         const normalized = crops.map((c: any) => ({
           id: c.id,
-          name: lang === 'ta' && c.name_ta ? c.name_ta : c.name,
+          name: lang === 'ta' && c.name_ta ? `${c.name_ta} ` : c.name,
         })).filter((c: any) => c.name);
         setPickerCrops(normalized);
       } catch {
