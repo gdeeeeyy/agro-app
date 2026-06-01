@@ -5,7 +5,7 @@
     "version": "2.4.6",
     "android": {
       "package": "com.agriismart.app",
-      "versionCode": 21,
+      "versionCode": 20,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#4caf50"
